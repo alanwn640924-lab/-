@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -598,7 +598,9 @@
         };
 
         window.saveData = async function(showMsg = false, forceOverwrite = false) {
-            state.lastModified = Date.now(); localStorage.setItem('freightData_115', JSON.stringify(state));
+            state.lastModified = Date.now();
+            if (window.customVendorCheckoutDB) state.vendorDB = window.customVendorCheckoutDB;
+            localStorage.setItem('freightData_115', JSON.stringify(state));
             let ind = document.getElementById("cloud-indicator");
             if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️ 雲端寫入中..."; setTimeout(() => ind.innerText = originalText, 800); }
             if (isCloudSyncEnabled && user) {
@@ -1913,7 +1915,10 @@
                 } else {
                     window.customVendorCheckoutDB[wh][vendor][date][cat] = val;
                 }
-                try { localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); } catch(e) {}
+                try { 
+                    localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); 
+                    if (typeof window.saveData === 'function') { state.lastModified = Date.now(); window.saveData(false); }
+                } catch(e) {}
             };
 
             // 2. 智慧注入「全部」選項至下拉選單，並設定為首屏預設呈現
