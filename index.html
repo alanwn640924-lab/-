@@ -1875,6 +1875,127 @@
             showToast("📤 請款單導出成功！");
         };
     </script>
+
+<!-- ⚡ GOD MODE RUNTIME PATCH START -->
+<script>
+(function() {
+    // 1. 永久且安全地攔截 localStorage.setItem，完美融合廠商資料，絕不造成無限迴圈
+    if (!window._origLocalStorageSetItem) {
+        window._origLocalStorageSetItem = localStorage.setItem;
+        localStorage.setItem = function(key, val) {
+            if (key === 'freightData_115' && window.customVendorCheckoutDB) {
+                try { 
+                    let obj = JSON.parse(val); 
+                    obj.vendorDB = window.customVendorCheckoutDB; 
+                    val = JSON.stringify(obj); 
+                } catch(e) {}
+            }
+            window._origLocalStorageSetItem.apply(this, arguments);
+        };
+    }
+
+    // 2. 強制攔截並升級存檔機制 (加入超級防抖 Debounce 避免切換廠商時瞬間呼叫 270 次當機！)
+    let attemptHook = setInterval(() => {
+        if (typeof window.saveData === 'function' && !window._saveDataHooked) {
+            const origSaveData = window.saveData;
+            let saveTimeout = null;
+            
+            window.saveData = async function(showMsg, forceOverwrite) {
+                // 若有明確提示或強制覆蓋 (例如按鈕點擊)，立刻執行
+                if (showMsg || forceOverwrite) {
+                    clearTimeout(saveTimeout);
+                    return await origSaveData(showMsg, forceOverwrite);
+                }
+                // 否則進行 800 毫秒的防抖 (Debounce)，將瞬間的 270 次呼叫整合成 1 次！徹底解決當機問題！
+                return new Promise((resolve) => {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(async () => {
+                        resolve(await origSaveData(false, false));
+                    }, 800);
+                });
+            };
+            window._saveDataHooked = true;
+        }
+        
+        if (typeof window.renderAll === 'function' && !window._renderAllHooked) {
+            const origRenderAll = window.renderAll;
+            window.renderAll = function() {
+                try {
+                    let stored = JSON.parse(window._origLocalStorageSetItem ? localStorage.getItem('freightData_115') : '{}');
+                    if (stored && stored.vendorDB) {
+                        window.customVendorCheckoutDB = stored.vendorDB;
+                        window._origLocalStorageSetItem.call(localStorage, 'freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
+                        if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
+                    }
+                } catch(e) {}
+                return origRenderAll.apply(this, arguments);
+            };
+            window._renderAllHooked = true;
+        }
+        if (window._saveDataHooked && window._renderAllHooked) clearInterval(attemptHook);
+    }, 500);
+
+    // 3. 強制攔截 MIS 匯入完成事件，一秒上傳雲端
+    const origAlert = window.alert;
+    window.alert = function(msg) {
+        let res = origAlert.apply(this, arguments);
+        if (typeof msg === 'string' && msg.includes('MIS結帳明細智慧對帳成功')) {
+            if (typeof window.saveData === 'function') window.saveData(true, true);
+        }
+        return res;
+    };
+
+    // 4. 全局監聽廠商區手動輸入，觸發存檔 (利用新的防抖 saveData)
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('vendor-daily-cell') || e.target.classList.contains('vendor-remark-input')) {
+            if (typeof window.saveData === 'function') window.saveData(false);
+        }
+    });
+
+    // 5. 強制解鎖 Delete 刪除鍵與方向鍵
+    document.addEventListener('keydown', function(e) {
+        let input = e.target;
+        if (input && input.classList && input.classList.contains('vendor-daily-cell') && !input.hasAttribute('readonly')) {
+            let key = e.key, allowMove = false;
+            if (['ArrowUp', 'ArrowDown', 'Enter'].includes(key)) allowMove = true;
+            if (key === 'ArrowLeft' && input.selectionEnd === 0) allowMove = true;
+            if (key === 'ArrowRight' && input.selectionStart === input.value.length) allowMove = true;
+            if (allowMove) {
+                e.preventDefault();
+                let tr = input.closest('tr'), tbody = tr.closest('tbody'), cIdx = Array.from(tr.children).indexOf(input.closest('td')), rIdx = Array.from(tbody.children).indexOf(tr), nextInput = null;
+                if (key === 'ArrowRight') { let nt = tr.children[cIdx + 1]; if (nt) nextInput = nt.querySelector('input:not([readonly])'); }
+                else if (key === 'ArrowLeft') { let pt = tr.children[cIdx - 1]; if (pt) nextInput = pt.querySelector('input:not([readonly])'); }
+                else if (key === 'ArrowDown' || key === 'Enter') { for (let i=rIdx+1; i<tbody.children.length; i++) { let td=tbody.children[i].children[cIdx]; if(td&&td.querySelector('input:not([readonly])')){ nextInput=td.querySelector('input'); break; } } }
+                else if (key === 'ArrowUp') { for (let i=rIdx-1; i>=0; i--) { let td=tbody.children[i].children[cIdx]; if(td&&td.querySelector('input:not([readonly])')){ nextInput=td.querySelector('input'); break; } } }
+                if (nextInput) { nextInput.focus(); nextInput.select(); } 
+                return;
+            }
+        }
+        if ((e.key === 'Delete' || e.key === 'Backspace')) {
+            let vendorInputsToClear = document.querySelectorAll('.cell-selected input.vendor-daily-cell:not([readonly])');
+            if (vendorInputsToClear.length > 0) {
+                e.preventDefault(); let changedVendor = false;
+                let wh = document.getElementById('checkoutWhSelect') ? document.getElementById('checkoutWhSelect').value.replace('倉','') : '大肚';
+                let vName = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '創新';
+                vendorInputsToClear.forEach(inp => {
+                    let d = inp.dataset.date, cat = inp.dataset.cat;
+                    if(window.customVendorCheckoutDB && window.customVendorCheckoutDB[wh] && window.customVendorCheckoutDB[wh][vName] && window.customVendorCheckoutDB[wh][vName][d]) {
+                        delete window.customVendorCheckoutDB[wh][vName][d][cat]; inp.value = ''; changedVendor = true;
+                    }
+                });
+                if (changedVendor) {
+                    try { window._origLocalStorageSetItem.call(localStorage, 'freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); } catch(err) {}
+                    if (typeof window.saveData === 'function') window.saveData(false);
+                    if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
+                    document.querySelectorAll('.cell-selected').forEach(el => el.classList.remove('cell-selected'));
+                    let summaryEl = document.getElementById('selection-summary'); if(summaryEl) summaryEl.classList.remove('show');
+                }
+            }
+        }
+    }, true);
+})();
+</script>
+<!-- ⚡ GOD MODE RUNTIME PATCH END -->
 </body>
 <style>
         /* 🎨 強制功能分頁頁籤按鈕同系列完美等寬、文字完美置中 */
