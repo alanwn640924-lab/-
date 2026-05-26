@@ -1917,7 +1917,7 @@
                 }
                 try { 
                     localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); 
-                    if (typeof window.saveData === 'function') { state.lastModified = Date.now(); window.saveData(false); }
+                    if (typeof window.saveData === 'function') { window.saveData(false); }
                 } catch(e) {}
             };
 
@@ -2076,7 +2076,10 @@
                             if (!window.customVendorCheckoutDB[selectedWh][selectedVendor]) window.customVendorCheckoutDB[selectedWh][selectedVendor] = {};
                             if (!window.customVendorCheckoutDB[selectedWh][selectedVendor][dStr]) window.customVendorCheckoutDB[selectedWh][selectedVendor][dStr] = {};
                             window.customVendorCheckoutDB[selectedWh][selectedVendor][dStr]['remark'] = cleanVal;
-                            try { localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); } catch(e) {}
+                            try { 
+                    localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); 
+                    if (typeof window.saveData === 'function') { window.saveData(false); }
+                } catch(e) {}
                         }
                     }
 
