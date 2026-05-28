@@ -561,12 +561,20 @@
         };
 
         let isInitialLoad = true;
-        window.initCloudSync = async function() {
+        window.initCloudSync = async function() { localStorage.setItem('user_firebase_config', JSON.stringify({
+  "apiKey": "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg",
+  "authDomain": "dddd-47af3.firebaseapp.com",
+  "projectId": "dddd-47af3",
+  "storageBucket": "dddd-47af3.firebasestorage.app",
+  "messagingSenderId": "448271048988",
+  "appId": "1:448271048988:web:10ec28118287c8a509dad9",
+  "measurementId": "G-E7G8SDN0BM"
+})); /* HARDCODED */ 
             let firebaseConfig = null, isCanvasEnv = false;
             const DEFAULT_CONFIG = { apiKey: "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg", authDomain: "dddd-47af3.firebaseapp.com", projectId: "dddd-47af3", storageBucket: "dddd-47af3.firebasestorage.app", messagingSenderId: "448271048988", appId: "1:448271048988:web:10ec28118287c8a509dad9", measurementId: "G-E7G8SDN0BM" };
-            if (typeof MY_FIREBASE_CONFIG !== 'undefined' && MY_FIREBASE_CONFIG) { firebaseConfig = MY_FIREBASE_CONFIG; appId = 'freight-system-115-pro-v2'; } 
+            if (typeof MY_FIREBASE_CONFIG !== 'undefined' && MY_FIREBASE_CONFIG) { firebaseConfig = MY_FIREBASE_CONFIG; appId = 'dadu-freight-system-final'; } 
             else if (typeof __firebase_config !== 'undefined') { firebaseConfig = JSON.parse(__firebase_config); appId = typeof __app_id !== 'undefined' ? __app_id : 'freight-system-115-pro-v2'; isCanvasEnv = true; } 
-            else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'freight-system-115-pro-v2'; }
+            else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'dadu-freight-system-final'; }
 
             let ind = document.getElementById("cloud-indicator"); if(ind){ ind.innerText = "☁️ 連線中..."; ind.style.backgroundColor = "#ffc107"; ind.style.color = "#333"; }
 
