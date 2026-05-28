@@ -562,6 +562,13 @@
 
         let isInitialLoad = true;
         window.initCloudSync = async function() { localStorage.setItem('user_firebase_config', JSON.stringify({
+  "apiKey": "AIzaSyCx...請在這裡補上您畫面中完整的碼...",
+  "authDomain": "dadu-frieght-syste-79e78.firebaseapp.com",
+  "projectId": "dadu-frieght-syste-79e78",
+  "storageBucket": "dadu-frieght-syste-79e78.firebasestorage.app",
+  "messagingSenderId": "596167823528",
+  "appId": "1:596167823528:web:7df41865c3bb7bd8a152fb"
+})); /* HARDCODED */  localStorage.setItem('user_firebase_config', JSON.stringify({
   "apiKey": "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg",
   "authDomain": "dddd-47af3.firebaseapp.com",
   "projectId": "dddd-47af3",
@@ -572,9 +579,9 @@
 })); /* HARDCODED */ 
             let firebaseConfig = null, isCanvasEnv = false;
             const DEFAULT_CONFIG = { apiKey: "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg", authDomain: "dddd-47af3.firebaseapp.com", projectId: "dddd-47af3", storageBucket: "dddd-47af3.firebasestorage.app", messagingSenderId: "448271048988", appId: "1:448271048988:web:10ec28118287c8a509dad9", measurementId: "G-E7G8SDN0BM" };
-            if (typeof MY_FIREBASE_CONFIG !== 'undefined' && MY_FIREBASE_CONFIG) { firebaseConfig = MY_FIREBASE_CONFIG; appId = 'dadu-freight-system-final'; } 
+            if (typeof MY_FIREBASE_CONFIG !== 'undefined' && MY_FIREBASE_CONFIG) { firebaseConfig = MY_FIREBASE_CONFIG; appId = 'freight-system-final-v2'; } 
             else if (typeof __firebase_config !== 'undefined') { firebaseConfig = JSON.parse(__firebase_config); appId = typeof __app_id !== 'undefined' ? __app_id : 'freight-system-115-pro-v2'; isCanvasEnv = true; } 
-            else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'dadu-freight-system-final'; }
+            else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'freight-system-final-v2'; }
 
             let ind = document.getElementById("cloud-indicator"); if(ind){ ind.innerText = "☁️ 連線中..."; ind.style.backgroundColor = "#ffc107"; ind.style.color = "#333"; }
 
