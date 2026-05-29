@@ -467,13 +467,18 @@
         window.prepareBudgetImport = (wh) => { window.targetBudgetWarehouse = wh; document.getElementById('excelFile').click(); };
 
         window.triggerAutoDailyReport = () => {
-            let d = new Date(), todayDateString = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-            let lastReportKey = 'sessionDailyReport_' + window.userRole, lastReportDate = sessionStorage.getItem(lastReportKey);
-            if (lastReportDate !== todayDateString) {
-                sessionStorage.setItem(lastReportKey, todayDateString); 
-                let picker = document.getElementById('reportDateSelect');
-                if(!picker.value) picker.value = `${YEAR}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                window.openDailyReportSafe();
+            let d = new Date();
+            let todayDateString = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            let dateInp = document.getElementById('reportDateSelect'); if(dateInp) { dateInp.value = todayDateString; }
+            
+            // 🎯 每日首次進入跳出提醒機制
+            let todayStr = new Date().toLocaleDateString();
+            let lastPopup = localStorage.getItem('last_daily_popup');
+            if (lastPopup !== todayStr) {
+                localStorage.setItem('last_daily_popup', todayStr);
+                if (typeof window.openDailyReportSafe === 'function') {
+                    window.openDailyReportSafe();
+                }
             }
         };
 
