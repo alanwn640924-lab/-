@@ -122,24 +122,22 @@
         /* ========================================================= */
         @media (max-width: 768px) {
             .header-controls {
-                display: flex !important;
-                flex-direction: row !important; /* 橫向排列 */
-                flex-wrap: wrap !important; /* 允許換行以區隔標題與按鈕 */
+                display: grid !important;
+                grid-template-columns: repeat(5, 1fr) !important; /* 強制切成 5 等份格子 */
                 gap: 5px !important;
                 padding: 10px !important;
                 margin-bottom: 8px !important;
-                justify-content: space-between !important;
             }
             
-            /* 打破舊包裝，讓子元素可以直接被 flex 控制排成一列 */
+            /* 打破舊包裝，讓子元素直接對齊網格 */
             .header-title-row, .actions {
                 display: contents !important;
             }
             
-            /* 標題區塊佔滿第一排 */
+            /* 標題區塊佔滿第一排所有格子 */
             .header-title-row h1 {
                 order: 1 !important;
-                width: 100% !important;
+                grid-column: 1 / -1 !important; /* 佔滿 5 格 */
                 font-size: 16px !important;
                 text-align: center !important;
                 margin: 0 0 5px 0 !important;
@@ -162,52 +160,64 @@
                 display: none !important; 
             }
             
-            /* 🏆 黃金 5 鍵：強制等比例排成第二排 (打死不換行) */
+            /* 🏆 黃金 5 鍵：強制填入第二排的 5 個格子，且內容絕對置中 */
             select#monthSelect, 
             #btnAdminReport, 
             .btn-success.circle-btn, 
             .btn-export.circle-btn, 
             #cloud-indicator {
-                order: 2 !important; 
-                flex: 1 1 0% !important; /* 平均分配五個等份 */
-                min-width: 0 !important; /* 允許字體縮小以擠進畫面 */
-                height: 36px !important; 
+                grid-column: span 1 !important; /* 每個佔 1 格 */
+                width: 100% !important;
+                min-width: 0 !important;
+                height: 38px !important; 
                 padding: 0 !important; 
                 margin: 0 !important; 
                 border-radius: 4px !important;
                 display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
+                flex-direction: row !important; /* 強制內容橫排，消除換行影響 */
+                justify-content: center !important; /* 水平置中 */
+                align-items: center !important; /* 垂直置中 */
                 box-sizing: border-box !important;
                 border: none !important;
+                line-height: normal !important;
             }
+            
+            /* 精準指定排列順序 */
+            select#monthSelect { order: 2 !important; }
+            #btnAdminReport { order: 3 !important; }
+            .btn-success.circle-btn { order: 4 !important; }
+            .btn-export.circle-btn { order: 5 !important; }
+            #cloud-indicator { order: 6 !important; }
             
             /* 針對各別按鈕精準微調 */
             select#monthSelect { 
                 font-size: 13px !important; 
                 border: 1px solid #ccc !important;
                 background-color: white !important;
-                padding-left: 2px !important;
+                text-align: center !important;
+                text-align-last: center !important;
+                appearance: none !important;
+                -webkit-appearance: none !important;
             }
             
             #btnAdminReport { font-size: 0 !important; background-color: #6f42c1 !important; color: white !important; }
-            #btnAdminReport::before { content: "📝重點"; font-size: 12px !important; }
+            #btnAdminReport::before { content: "📝重點"; font-size: 13px !important; font-weight: bold; }
 
             .btn-success.circle-btn { font-size: 0 !important; width: auto !important; background-color: #28a745 !important; color: white !important; }
-            .btn-success.circle-btn::before { content: "💾儲存"; font-size: 12px !important; }
+            .btn-success.circle-btn::before { content: "💾儲存"; font-size: 13px !important; font-weight: bold; }
 
             .btn-export.circle-btn { font-size: 0 !important; width: auto !important; background-color: #6c757d !important; color: white !important; }
-            .btn-export.circle-btn::before { content: "📤匯出"; font-size: 12px !important; }
+            .btn-export.circle-btn::before { content: "📤匯出"; font-size: 13px !important; font-weight: bold; }
 
             #cloud-indicator { 
                 font-size: 11px !important; 
+                font-weight: bold !important;
                 white-space: nowrap !important;
                 overflow: hidden !important;
                 padding: 0 2px !important;
-                /* 背景顏色由 JS 動態控制，不寫死 */
             }
             
-            /* 隱藏原本的換行符號 */
+            /* 隱藏原本會導致字體歪掉的換行符號 */
             .circle-btn br { display: none !important; }
         }
         
@@ -1667,9 +1677,16 @@
         }
 
         window.renderCheckoutTab = () => {
-            let startInput = document.getElementById('checkoutStartDate').value, endInput = document.getElementById('checkoutEndDate').value;
-            
-            if (!startInput || !endInput) return; 
+            let startInputEl = document.getElementById('checkoutStartDate'), endInputEl = document.getElementById('checkoutEndDate');
+            if (!startInputEl || !endInputEl) return;
+            if (!startInputEl.value || !endInputEl.value) { 
+                let m = state.currentMonth || (new Date().getMonth() + 1);
+                let prevM = m === 1 ? 12 : m - 1;
+                let prevY = m === 1 ? YEAR - 1 : YEAR; 
+                startInputEl.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`; 
+                endInputEl.value = `${YEAR}-${String(m).padStart(2,'0')}-25`; 
+            }
+            let startInput = startInputEl.value, endInput = endInputEl.value; 
             let start = new Date(startInput), end = new Date(endInput), totals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
             let current = new Date(start);
             
