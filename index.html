@@ -116,22 +116,6 @@
         .btn-admin-report:hover { background-color: #5a329c !important; transform: scale(1.05); }
         #tab1 .import-actions-row button { height: 38px; border-radius: 6px; }
         
-    
-        /* 📱 手機版面極致壓縮優化 */
-        @media (max-width: 768px) {
-            body { padding: 5px; } /* 縮小螢幕邊緣空白 */
-            .header-controls { padding: 10px; margin-bottom: 8px; } /* 縮小控制列上下留白 */
-            .header-title-row { margin-bottom: 5px; padding-bottom: 5px; flex-direction: column; align-items: flex-start; gap: 6px; }
-            .header-title-row h1 { font-size: 18px; line-height: 1.3; } /* 標題縮小 */
-            .header-title-row h1 span { font-size: 13px !important; padding: 2px 6px !important; }
-            .actions { gap: 6px; }
-            .actions button, .actions select { padding: 6px 10px; font-size: 13px; height: auto !important; margin: 0; } /* 縮小按鈕 */
-            .tabs { gap: 4px; margin-bottom: 5px; }
-            .tab-btn { padding: 8px 5px; font-size: 13px; width: 32% !important; flex: auto; } /* 分頁按鈕緊湊排列 */
-            .tab-content { padding: 10px; }
-            #wh-indicator-banner { font-size: 14px !important; padding: 6px !important; margin-bottom: 8px !important; }
-            th, td { padding: 4px 6px; font-size: 13px; } /* 稍微縮小表格留白 */
-        }
     </style>
 </head>
 <body>
@@ -592,7 +576,7 @@
             else if (typeof __firebase_config !== 'undefined') { firebaseConfig = JSON.parse(__firebase_config); appId = typeof __app_id !== 'undefined' ? __app_id : 'freight-system-115-pro-v2'; isCanvasEnv = true; } 
             else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'dadu-global-world-115'; }
 
-            let ind = document.getElementById("cloud-indicator"); if(ind){ ind.innerText = "☁️ 連線中..."; ind.style.backgroundColor = "#ffc107"; ind.style.color = "#333"; }
+            let ind = document.getElementById("cloud-indicator"); if(ind){ ind.innerText = "☁️連線中"; ind.style.backgroundColor = "#ffc107"; ind.style.color = "#333"; }
 
             try {
                 const app = initializeApp(firebaseConfig); auth = getAuth(app); db = getFirestore(app);
@@ -604,10 +588,10 @@
                 await Promise.race([authPromise, timeoutPromise]); onAuthStateChanged(auth, (u) => { user = u; });
             } catch(e) { console.warn("Firebase bypassed:", e); }
 
-            let syncTimeout = setTimeout(() => { if (isInitialLoad) { if(ind){ ind.innerText = "☁️ 本機模式 (逾時)"; ind.style.backgroundColor = "#6c757d"; ind.style.color = "white"; } isCloudSyncEnabled = false; isInitialLoad = false; window.isAppReady = true; window.checkAndTriggerStartupEvents(); } }, 5000);
+            let syncTimeout = setTimeout(() => { if (isInitialLoad) { if(ind){ ind.innerText = "☁️逾時"; ind.style.backgroundColor = "#6c757d"; ind.style.color = "white"; } isCloudSyncEnabled = false; isInitialLoad = false; window.isAppReady = true; window.checkAndTriggerStartupEvents(); } }, 5000);
 
             onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'freight_app', 'main_state'), (docSnap) => {
-                clearTimeout(syncTimeout); if(ind){ ind.innerText = "☁️ 雲端已連線 (即時同步)"; ind.style.backgroundColor = "#28a745"; ind.style.color = "white"; } isCloudSyncEnabled = true;
+                clearTimeout(syncTimeout); if(ind){ ind.innerText = "☁️已連線"; ind.style.backgroundColor = "#28a745"; ind.style.color = "white"; } isCloudSyncEnabled = true;
                 if (docSnap.exists()) {
                     let cloudData = docSnap.data();
                     if (!cloudData.warehouses) cloudData = { currentMonth: cloudData.currentMonth, lastModified: cloudData.lastModified, warehouses: { '大肚': { daily: cloudData.daily || {}, budget: cloudData.budget || {}, comments: cloudData.comments || {} }, '大溪': { daily: {}, budget: {}, comments: {} }, '岡山': { daily: {}, budget: {}, comments: {} } } };
@@ -642,7 +626,7 @@
             if (window.customVendorCheckoutDB) state.vendorDB = window.customVendorCheckoutDB;
             localStorage.setItem('freightData_115', JSON.stringify(state));
             let ind = document.getElementById("cloud-indicator");
-            if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️ 雲端寫入中..."; setTimeout(() => ind.innerText = originalText, 800); }
+            if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️寫入中"; setTimeout(() => ind.innerText = originalText, 800); }
             if (isCloudSyncEnabled) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'freight_app', 'main_state');
