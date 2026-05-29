@@ -569,20 +569,12 @@
   "messagingSenderId": "1045676264273",
   "appId": "1:1045676264273:web:8eabc5d30cd4bcf902e170",
   "measurementId": "G-3D512HWLCJ"
-})); /* HARDCODED */  localStorage.setItem('user_firebase_config', JSON.stringify({
-  "apiKey": "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg",
-  "authDomain": "dddd-47af3.firebaseapp.com",
-  "projectId": "dddd-47af3",
-  "storageBucket": "dddd-47af3.firebasestorage.app",
-  "messagingSenderId": "448271048988",
-  "appId": "1:448271048988:web:10ec28118287c8a509dad9",
-  "measurementId": "G-E7G8SDN0BM"
-})); /* HARDCODED */ 
-            let firebaseConfig = null, isCanvasEnv = false;
-            const DEFAULT_CONFIG = { apiKey: "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg", authDomain: "dddd-47af3.firebaseapp.com", projectId: "dddd-47af3", storageBucket: "dddd-47af3.firebasestorage.app", messagingSenderId: "448271048988", appId: "1:448271048988:web:10ec28118287c8a509dad9", measurementId: "G-E7G8SDN0BM" };
-            if (typeof MY_FIREBASE_CONFIG !== 'undefined' && MY_FIREBASE_CONFIG) { firebaseConfig = MY_FIREBASE_CONFIG; appId = 'freight-system-final-v2'; } 
+})); /* HARDCODED */
+ let firebaseConfig = null, isCanvasEnv = false;
+            const DEFAULT_CONFIG = { apiKey: "AIzaSyDDcNIfqbrJRD-4XedIZ7yF0Fbrz66Q9sM", authDomain: "alanwn-d898d.firebaseapp.com", projectId: "alanwn-d898d", storageBucket: "alanwn-d898d.firebasestorage.app", messagingSenderId: "1045676264273", appId: "1:1045676264273:web:8eabc5d30cd4bcf902e170", measurementId: "G-3D512HWLCJ" };
+            if (typeof MY_FIREBASE_CONFIG !== 'undefined' && MY_FIREBASE_CONFIG) { firebaseConfig = MY_FIREBASE_CONFIG; appId = 'dadu-global-world-115'; } 
             else if (typeof __firebase_config !== 'undefined') { firebaseConfig = JSON.parse(__firebase_config); appId = typeof __app_id !== 'undefined' ? __app_id : 'freight-system-115-pro-v2'; isCanvasEnv = true; } 
-            else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'freight-system-final-v2'; }
+            else { const userConfigStr = localStorage.getItem('user_firebase_config'); firebaseConfig = userConfigStr ? JSON.parse(userConfigStr) : DEFAULT_CONFIG; appId = 'dadu-global-world-115'; }
 
             let ind = document.getElementById("cloud-indicator"); if(ind){ ind.innerText = "☁️ 連線中..."; ind.style.backgroundColor = "#ffc107"; ind.style.color = "#333"; }
 
@@ -635,7 +627,7 @@
             localStorage.setItem('freightData_115', JSON.stringify(state));
             let ind = document.getElementById("cloud-indicator");
             if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️ 雲端寫入中..."; setTimeout(() => ind.innerText = originalText, 800); }
-            if (isCloudSyncEnabled && user) {
+            if (isCloudSyncEnabled) {
                 try {
                     const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'freight_app', 'main_state');
                     if (!forceOverwrite) { const snap = await getDoc(docRef); if (snap.exists()) { let cloudData = snap.data(); if (cloudData.lastModified > window.lastSyncTime) { showToast('⚠️ 警告：雲端有更新的資料！為防止覆蓋同事輸入的數據，已攔截本次存檔。請備份資料並重新整理網頁！', 8000); return; } } }
@@ -1580,9 +1572,16 @@
         }
 
         window.renderCheckoutTab = () => {
-            let startInput = document.getElementById('checkoutStartDate').value, endInput = document.getElementById('checkoutEndDate').value;
-            
-            if (!startInput || !endInput) return; 
+            let startInputEl = document.getElementById('checkoutStartDate'), endInputEl = document.getElementById('checkoutEndDate');
+            if (!startInputEl || !endInputEl) return;
+            if (!startInputEl.value || !endInputEl.value) { 
+                let m = state.currentMonth || (new Date().getMonth() + 1);
+                let prevM = m === 1 ? 12 : m - 1;
+                let prevY = m === 1 ? YEAR - 1 : YEAR; 
+                startInputEl.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`; 
+                endInputEl.value = `${YEAR}-${String(m).padStart(2,'0')}-25`; 
+            }
+            let startInput = startInputEl.value, endInput = endInputEl.value; 
             let start = new Date(startInput), end = new Date(endInput), totals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
             let current = new Date(start);
             
