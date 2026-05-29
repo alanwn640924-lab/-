@@ -118,8 +118,6 @@
         
     
         /* ========================================================= */
-        
-        /* ========================================================= */
         /* 📱 手機專屬黃金一排防彈排版 (保證只動手機，絕對橫向一排) */
         /* ========================================================= */
         @media (max-width: 768px) {
@@ -212,7 +210,8 @@
             /* 隱藏原本的換行符號 */
             .circle-btn br { display: none !important; }
         }
-        </style>
+        
+    </style>
 </head>
 <body>
       <div id="loginOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1e2b3c; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;">
@@ -1668,16 +1667,9 @@
         }
 
         window.renderCheckoutTab = () => {
-            let startInputEl = document.getElementById('checkoutStartDate'), endInputEl = document.getElementById('checkoutEndDate');
-            if (!startInputEl || !endInputEl) return;
-            if (!startInputEl.value || !endInputEl.value) { 
-                let m = state.currentMonth || (new Date().getMonth() + 1);
-                let prevM = m === 1 ? 12 : m - 1;
-                let prevY = m === 1 ? YEAR - 1 : YEAR; 
-                startInputEl.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`; 
-                endInputEl.value = `${YEAR}-${String(m).padStart(2,'0')}-25`; 
-            }
-            let startInput = startInputEl.value, endInput = endInputEl.value; 
+            let startInput = document.getElementById('checkoutStartDate').value, endInput = document.getElementById('checkoutEndDate').value;
+            
+            if (!startInput || !endInput) return; 
             let start = new Date(startInput), end = new Date(endInput), totals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
             let current = new Date(start);
             
