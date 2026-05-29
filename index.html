@@ -118,94 +118,101 @@
         
     
         /* ========================================================= */
-        /* 📱 手機專屬黃金一排防彈排版 (保證只動手機，橫向一排) */
+        
+        /* ========================================================= */
+        /* 📱 手機專屬黃金一排防彈排版 (保證只動手機，絕對橫向一排) */
         /* ========================================================= */
         @media (max-width: 768px) {
             .header-controls {
                 display: flex !important;
-                flex-direction: column !important; /* 標題跟按鈕區塊上下排 */
-                gap: 8px !important;
+                flex-direction: row !important; /* 橫向排列 */
+                flex-wrap: wrap !important; /* 允許換行以區隔標題與按鈕 */
+                gap: 5px !important;
                 padding: 10px !important;
-                margin-bottom: 10px !important;
+                margin-bottom: 8px !important;
+                justify-content: space-between !important;
             }
-            .header-title-row {
+            
+            /* 打破舊包裝，讓子元素可以直接被 flex 控制排成一列 */
+            .header-title-row, .actions {
+                display: contents !important;
+            }
+            
+            /* 標題區塊佔滿第一排 */
+            .header-title-row h1 {
+                order: 1 !important;
+                width: 100% !important;
+                font-size: 16px !important;
+                text-align: center !important;
+                margin: 0 0 5px 0 !important;
+                padding-bottom: 6px !important;
+                border-bottom: 1px solid #dee2e6 !important;
                 display: flex !important;
                 justify-content: center !important;
                 align-items: center !important;
-                border-bottom: 1px solid #dee2e6 !important;
-                padding-bottom: 8px !important;
-                margin: 0 !important;
-                width: 100% !important;
-            }
-            .header-title-row h1 {
-                font-size: 16px !important;
-                margin: 0 !important;
-                text-align: center !important;
+                flex-wrap: wrap !important;
+                gap: 4px !important;
             }
             .header-title-row h1 span {
                 font-size: 11px !important;
-                margin-left: 6px !important;
+                padding: 2px 4px !important;
+                margin: 0 !important;
             }
             
-            /* 隱藏無用標籤、檔案選擇器、備份按鈕等 */
+            /* 隱藏無用標籤與不重要的按鈕 */
             .actions label, .actions input[type="file"], .actions button[id^="btnImport"], .actions button[onclick^="document.getElementById('backupFile')"] { 
                 display: none !important; 
             }
             
-            /* 🏆 黃金 5 鍵：強制橫向排成一排 */
-            .actions {
-                display: flex !important;
-                flex-direction: row !important; /* 絕對橫向排列 */
-                flex-wrap: nowrap !important;   /* 打死不換行 */
-                align-items: stretch !important;
-                justify-content: space-between !important;
-                width: 100% !important;
-                gap: 4px !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            
-            /* 這 5 個元件平均分配寬度 */
-            .actions > * {
-                flex: 1 1 0% !important; /* 平均分配空間 */
-                min-width: 0 !important; /* 允許縮小以擠進畫面 */
-                height: 38px !important; 
-                margin: 0 !important; 
+            /* 🏆 黃金 5 鍵：強制等比例排成第二排 (打死不換行) */
+            select#monthSelect, 
+            #btnAdminReport, 
+            .btn-success.circle-btn, 
+            .btn-export.circle-btn, 
+            #cloud-indicator {
+                order: 2 !important; 
+                flex: 1 1 0% !important; /* 平均分配五個等份 */
+                min-width: 0 !important; /* 允許字體縮小以擠進畫面 */
+                height: 36px !important; 
                 padding: 0 !important; 
+                margin: 0 !important; 
                 border-radius: 4px !important;
                 display: flex !important;
                 justify-content: center !important;
                 align-items: center !important;
                 box-sizing: border-box !important;
+                border: none !important;
             }
             
-            /* 針對各別按鈕微調 */
+            /* 針對各別按鈕精準微調 */
             select#monthSelect { 
-                display: block !important;
                 font-size: 13px !important; 
+                border: 1px solid #ccc !important;
+                background-color: white !important;
                 padding-left: 2px !important;
             }
             
-            #btnAdminReport { font-size: 0 !important; /* 隱藏原文字 */ }
+            #btnAdminReport { font-size: 0 !important; background-color: #6f42c1 !important; color: white !important; }
             #btnAdminReport::before { content: "📝重點"; font-size: 12px !important; }
 
-            .btn-success.circle-btn { font-size: 0 !important; width: auto !important; }
+            .btn-success.circle-btn { font-size: 0 !important; width: auto !important; background-color: #28a745 !important; color: white !important; }
             .btn-success.circle-btn::before { content: "💾儲存"; font-size: 12px !important; }
 
-            .btn-export.circle-btn { font-size: 0 !important; width: auto !important; }
+            .btn-export.circle-btn { font-size: 0 !important; width: auto !important; background-color: #6c757d !important; color: white !important; }
             .btn-export.circle-btn::before { content: "📤匯出"; font-size: 12px !important; }
 
             #cloud-indicator { 
                 font-size: 11px !important; 
                 white-space: nowrap !important;
                 overflow: hidden !important;
+                padding: 0 2px !important;
+                /* 背景顏色由 JS 動態控制，不寫死 */
             }
             
-            /* 隱藏原本按鈕內的換行符號 */
+            /* 隱藏原本的換行符號 */
             .circle-btn br { display: none !important; }
         }
-        
-    </style>
+        </style>
 </head>
 <body>
       <div id="loginOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1e2b3c; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;">
