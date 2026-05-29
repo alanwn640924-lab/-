@@ -131,24 +131,32 @@
         </div>
     </div>
 
-    <div class="header-controls">
-        <div class="header-title-row">
-            <h1>🚛 【運務協作平台】 (115年度) <span style="font-size: 16px; background:#e8f0fe; color:#0056b3; padding:4px 8px; border-radius:4px; font-weight:bold; border: 1px solid #b8daff;">🛡️ 三倉智慧權限版</span></h1>
-            <span id="cloud-indicator" class="cloud-status" onclick="openCloudConfigModal()" title="點擊設定金鑰">系統載入中...</span>
+    
+    <style>
+        .custom-actions-row { display: flex !important; flex-wrap: nowrap !important; gap: 5px !important; width: 100% !important; align-items: stretch !important; padding-bottom: 2px !important; margin: 0 !important; overflow-x: auto; }
+        .custom-action-btn { flex: 1 !important; display: flex; justify-content: center !important; align-items: center !important; padding: 8px 2px !important; font-size: 13px !important; border-radius: 4px !important; min-width: 0 !important; white-space: nowrap !important; border: none !important; font-weight: bold !important; cursor: pointer !important; margin: 0 !important; box-sizing: border-box !important; }
+    </style>
+    <div class="header-controls" style="padding: 10px; margin-bottom: 8px; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div class="header-title-row" style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #dee2e6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+            <h1 style="font-size: 18px; margin: 0; color: #2c3e50; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;">
+                🚛 運務協作平台 
+                <span style="font-size: 12px; background:#e8f0fe; color:#0056b3; padding:2px 6px; border-radius:4px; font-weight:bold; border: 1px solid #b8daff;">🛡️ 三倉版</span>
+            </h1>
         </div>
-        <div class="actions">
-            <label><strong>📅 月份：</strong></label><select id="monthSelect"></select><button id="btnAdminReport" onclick="window.openDailyReportSafe()" style="display: none; margin-left: 10px;" class="btn-admin-report">📋 三倉重點</button>
+        
+        <!-- 📱 第一排：使用者指定的 5 大核心功能 (強制排成一排) -->
+        <div class="actions custom-actions-row">
+            <select id="monthSelect" style="padding: 6px 2px; font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 4px; flex: 0 0 auto; min-width: 50px; margin: 0; height: auto !important; display: block !important;"></select>
             
-            <button class="btn-success rw-only circle-btn" title="儲存同步" onclick="window.commitActiveInput(); if(document.activeElement &amp;&amp; document.activeElement.tagName==='INPUT') document.activeElement.blur(); saveData(true, true);">💾<br>儲存</button>
-            <button class="btn-export circle-btn" title="匯出報表" onclick="exportCurrentPage()">📤<br>匯出</button>
-            <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
+            <button id="btnAdminReport" onclick="window.openDailyReportSafe()" class="custom-action-btn" style="display: none; background-color: #6f42c1 !important; color: white !important;">📝重點</button>
             
+            <button class="btn-success rw-only custom-action-btn" onclick="window.commitActiveInput(); if(document.activeElement && document.activeElement.tagName==='INPUT') document.activeElement.blur(); saveData(true, true);" style="display: none; background-color: #28a745 !important; color: white !important;">💾儲存</button>
             
+            <button class="btn-export custom-action-btn" onclick="exportCurrentPage()" style="background-color: #6c757d !important; color: white !important;">📤匯出</button>
             
-            
-            
-            
+            <span id="cloud-indicator" class="cloud-status custom-action-btn" onclick="openCloudConfigModal()" style="background-color: #6c757d !important; color: white !important;">☁️連線中</span>
         </div>
+        <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden" style="display:none;">
     </div>
     
     <div class="tabs-wrapper">
