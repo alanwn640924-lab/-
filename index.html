@@ -118,6 +118,8 @@
         
     
         /* ========================================================= */
+        
+        /* ========================================================= */
         /* 📱 手機專屬黃金一排防彈排版 (保證只動手機，絕對橫向一排) */
         /* ========================================================= */
         @media (max-width: 768px) {
@@ -149,79 +151,85 @@
                 flex-wrap: wrap !important;
                 gap: 4px !important;
             }
-            .header-title-row h1 span {
-                font-size: 11px !important;
-                padding: 2px 4px !important;
-                margin: 0 !important;
-            }
+            .header-title-row h1 span { font-size: 11px !important; padding: 2px 4px !important; margin: 0 !important; }
             
             /* 隱藏無用標籤與不重要的按鈕 */
-            .actions label, .actions input[type="file"], .actions button[id^="btnImport"], .actions button[onclick^="document.getElementById('backupFile')"] { 
-                display: none !important; 
-            }
+            .actions label, .actions input[type="file"], .actions button[id^="btnImport"], .actions button[onclick^="document.getElementById('backupFile')"] { display: none !important; }
             
             /* 🏆 黃金 5 鍵：強制填入第二排的 5 個格子，且內容絕對置中 */
-            select#monthSelect, 
-            #btnAdminReport, 
-            .btn-success.circle-btn, 
-            .btn-export.circle-btn, 
-            #cloud-indicator {
-                grid-column: span 1 !important; /* 每個佔 1 格 */
-                width: 100% !important;
-                min-width: 0 !important;
-                height: 38px !important; 
-                padding: 0 !important; 
-                margin: 0 !important; 
-                border-radius: 4px !important;
-                display: flex !important;
-                flex-direction: row !important; /* 強制內容橫排，消除換行影響 */
-                justify-content: center !important; /* 水平置中 */
-                align-items: center !important; /* 垂直置中 */
-                box-sizing: border-box !important;
-                border: none !important;
-                line-height: normal !important;
+            select#monthSelect, #btnAdminReport, .btn-success.circle-btn, .btn-export.circle-btn, #cloud-indicator {
+                grid-column: span 1 !important; width: 100% !important; min-width: 0 !important; height: 38px !important; padding: 0 !important; margin: 0 !important; border-radius: 4px !important;
+                display: flex !important; flex-direction: row !important; justify-content: center !important; align-items: center !important; box-sizing: border-box !important; border: none !important; line-height: normal !important;
             }
             
             /* 精準指定排列順序 */
-            select#monthSelect { order: 2 !important; }
-            #btnAdminReport { order: 3 !important; }
-            .btn-success.circle-btn { order: 4 !important; }
-            .btn-export.circle-btn { order: 5 !important; }
-            #cloud-indicator { order: 6 !important; }
-            
-            /* 針對各別按鈕精準微調 */
-            select#monthSelect { 
-                font-size: 13px !important; 
-                border: 1px solid #ccc !important;
-                background-color: white !important;
-                text-align: center !important;
-                text-align-last: center !important;
-                appearance: none !important;
-                -webkit-appearance: none !important;
-            }
-            
-            #btnAdminReport { font-size: 0 !important; background-color: #6f42c1 !important; color: white !important; }
+            select#monthSelect { order: 2 !important; font-size: 13px !important; border: 1px solid #ccc !important; background-color: white !important; text-align: center !important; text-align-last: center !important; appearance: none !important; -webkit-appearance: none !important; }
+            #btnAdminReport { order: 3 !important; font-size: 0 !important; background-color: #6f42c1 !important; color: white !important; }
             #btnAdminReport::before { content: "📝重點"; font-size: 13px !important; font-weight: bold; }
-
-            .btn-success.circle-btn { font-size: 0 !important; width: auto !important; background-color: #28a745 !important; color: white !important; }
+            .btn-success.circle-btn { order: 4 !important; font-size: 0 !important; width: auto !important; background-color: #28a745 !important; color: white !important; }
             .btn-success.circle-btn::before { content: "💾儲存"; font-size: 13px !important; font-weight: bold; }
-
-            .btn-export.circle-btn { font-size: 0 !important; width: auto !important; background-color: #6c757d !important; color: white !important; }
+            .btn-export.circle-btn { order: 5 !important; font-size: 0 !important; width: auto !important; background-color: #6c757d !important; color: white !important; }
             .btn-export.circle-btn::before { content: "📤匯出"; font-size: 13px !important; font-weight: bold; }
+            #cloud-indicator { order: 6 !important; font-size: 11px !important; font-weight: bold !important; white-space: nowrap !important; overflow: hidden !important; padding: 0 2px !important; }
+            .circle-btn br { display: none !important; }
 
-            #cloud-indicator { 
-                font-size: 11px !important; 
-                font-weight: bold !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                padding: 0 2px !important;
+
+            /* ========================================================= */
+            /* 📱 登析具 頁籤群組 - 手機極致空間壓縮 (APP橫向滑動列)      */
+            /* ========================================================= */
+            .tabs-wrapper {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important; /* 絕對不換行 */
+                overflow-x: auto !important;  /* 開啟手指左右滑動 */
+                -webkit-overflow-scrolling: touch !important; /* 讓滑動更順暢 */
+                padding: 4px 2px !important;
+                gap: 6px !important;
+                margin-bottom: 8px !important;
+                /* 隱藏滾動條，讓畫面更乾淨 */
+                -ms-overflow-style: none !important;
+                scrollbar-width: none !important;
+            }
+            .tabs-wrapper::-webkit-scrollbar {
+                display: none !important;
             }
             
-            /* 隱藏原本會導致字體歪掉的換行符號 */
-            .circle-btn br { display: none !important; }
+            .tab-group {
+                display: flex !important;
+                flex-direction: row !important;
+                flex-wrap: nowrap !important;
+                gap: 4px !important;
+                align-items: center !important;
+                padding: 4px 6px !important;
+                flex-shrink: 0 !important; /* 確保內容不會被擠扁變形 */
+                border-radius: 8px !important;
+            }
+            
+            .tab-badge {
+                width: 24px !important;
+                height: 24px !important;
+                font-size: 12px !important;
+                line-height: 24px !important;
+                flex-shrink: 0 !important;
+                margin: 0 !important;
+            }
+            
+            .tab-btn {
+                padding: 6px 10px !important;
+                font-size: 13px !important;
+                height: 32px !important;
+                width: auto !important;
+                min-width: 0 !important;
+                border-radius: 6px !important;
+                white-space: nowrap !important;
+                flex-shrink: 0 !important;
+                margin: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
         }
-        
-    </style>
+        </style>
 </head>
 <body>
       <div id="loginOverlay" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #1e2b3c; z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;">
