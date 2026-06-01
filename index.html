@@ -721,12 +721,26 @@
                     cloudData.currentMonth = state.currentMonth;
                     if (isInitialLoad) {
                         if (state.lastModified && state.lastModified > (cloudData.lastModified || 0)) { isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); renderAll(); window.checkAndTriggerStartupEvents(); } 
-                        else { state = cloudData; if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = state.currentMonth; isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); renderAll(); window.checkAndTriggerStartupEvents(); }
+                        else { state = cloudData;
+                            // 🌟【同步關鍵補丁】雲端包裹一到，立刻同步解開並寫入本機抽屜，防止被本機空白覆蓋
+                            if (state && state.vendorDB) {
+                                window.customVendorCheckoutDB = JSON.parse(JSON.stringify(state.vendorDB));
+                                try { localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); } catch(e){}
+                            }
+                            try { localStorage.setItem('freightData_115', JSON.stringify(state)); } catch(e){}
+                            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = state.currentMonth; isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); renderAll(); window.checkAndTriggerStartupEvents(); }
                     } else if (JSON.stringify(state) !== JSON.stringify(cloudData)) {
                         if ((cloudData.lastModified || 0) > state.lastModified) {
                             const activeEl = document.activeElement; let fInfo = null, cVal = null;
                             if (activeEl && activeEl.classList.contains('data-cell') && activeEl.dataset.item !== '件數達成率') { fInfo = { d: activeEl.dataset.date, i: activeEl.dataset.item }; cVal = activeEl.value; }
-                            state = cloudData; window.lastSyncTime = cloudData.lastModified || Date.now();
+                            state = cloudData;
+                            // 🌟【同步關鍵補丁】雲端包裹一到，立刻同步解開並寫入本機抽屜，防止被本機空白覆蓋
+                            if (state && state.vendorDB) {
+                                window.customVendorCheckoutDB = JSON.parse(JSON.stringify(state.vendorDB));
+                                try { localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); } catch(e){}
+                            }
+                            try { localStorage.setItem('freightData_115', JSON.stringify(state)); } catch(e){}
+                            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } window.lastSyncTime = cloudData.lastModified || Date.now();
                             if (fInfo) { let p = parseVal(cVal); if (cVal === '' || isNaN(p)) { if (getDaily()[fInfo.d] && getDaily()[fInfo.d][fInfo.i] !== undefined) delete getDaily()[fInfo.d][fInfo.i]; } else { if (!getDaily()[fInfo.d]) getDaily()[fInfo.d] = {}; getDaily()[fInfo.d][fInfo.i] = p; } }
                             if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = state.currentMonth; renderAll();
                             if (fInfo) { const target = document.querySelector(`input[data-date="${fInfo.d}"][data-item="${fInfo.i}"]`); if (target) { target.focus(); target.value = cVal; } }
