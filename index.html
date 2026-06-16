@@ -537,6 +537,7 @@
         const BUDGET_MAPPING = { '主線': ['主線費用'], '加派車': ['爆量費用', '爆量自揹費用'], '回收車': ['回收費用', '回頭收費用'], '其他': ['其他專車費用', '特殊點專車費用', '新開店費用'], '違規罰款': ['違規罰款'], '離島': ['離島費用'], '轉運': ['轉運費用'] };
         
         let state = { currentMonth: new Date().getMonth() + 1, lastModified: 0, warehouses: { '大肚': { daily: {}, budget: {}, comments: {} }, '大溪': { daily: {}, budget: {}, comments: {} }, '岡山': { daily: {}, budget: {}, comments: {} } } };
+        Object.defineProperty(window, 'state', { get: () => state, set: (v) => state = v }); // 🚀 鎖死全域記憶體，徹底消滅 undefined Bug
         let currentActiveTab = 1; window.dashboardCharts = { tab2: [], tab3: [], tab5: [], gauge: [], pickupGauge: [], metricsGauge: [] }; Chart.defaults.color = '#e9ecef'; Chart.defaults.font.family = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
 
         const getDaily = () => state.warehouses[window.currentWarehouse].daily; const getBudget = () => state.warehouses[window.currentWarehouse].budget; const getComments = () => state.warehouses[window.currentWarehouse].comments;
