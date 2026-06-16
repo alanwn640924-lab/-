@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -703,6 +703,8 @@
                         if(!cloudData.warehouses[wh].daily) cloudData.warehouses[wh].daily = {}; if(!cloudData.warehouses[wh].comments) cloudData.warehouses[wh].comments = {};
                     });
                     cloudData.currentMonth = window.state.currentMonth;
+                    // 🚀 核心解耦手術 2：強行清除從雲端抓下來的舊版毒素，保護本機記憶體不被蓋台
+                    if (cloudData.vendorDB) delete cloudData.vendorDB;
                     
                     if (window.isInitialLoad) {
                         if (window.state.lastModified && window.state.lastModified > (cloudData.lastModified || 0)) { window.isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); window.renderAll(); window.checkAndTriggerStartupEvents(); } 
@@ -731,8 +733,8 @@
                         }
                     }
                 } else if (window.isInitialLoad) { 
-                    // 🌟 防護點 3：初次上傳時，確保把本機的 vendorDB 帶上去
-                    if (window.customVendorCheckoutDB) window.state.vendorDB = window.customVendorCheckoutDB;
+                    // 🚀 核心解耦手術 1：絕對禁止把 vendorDB 放入 state 塞上雲端
+                    delete window.state.vendorDB; 
                     setDoc(doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state'), window.state).catch(e => console.error("強制同步失敗", e)); window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = window.state.lastModified; window.checkAndTriggerStartupEvents(); 
                 }
             }, (error) => { clearTimeout(window.syncTimeout); if(ind){ ind.innerText = "☁️ 本機模式 (受阻)"; ind.style.backgroundColor = "#dc3545"; ind.style.color = "white"; } window.isCloudSyncEnabled = false; if (window.isInitialLoad) { window.isInitialLoad = false; window.isAppReady = true; window.checkAndTriggerStartupEvents(); } });
@@ -1944,35 +1946,37 @@
             };
 
             let renderPoolRows = (poolObj, group) => {
-                let rowsHtml = '';
-                let sortedKeys = Object.keys(poolObj).sort((a,b) => {
-                    let priA = getSortPriority(poolObj[a].label || poolObj[a].typeStr || '');
-                    let priB = getSortPriority(poolObj[b].label || poolObj[b].typeStr || '');
-                    if (priA !== priB) return priA - priB;
-                    return poolObj[a].price - poolObj[b].price;
-                });
+            let rowsHtml = '';
+            let sortedKeys = Object.keys(poolObj).sort((a,b) => {
+                let priA = typeof getSortPriority === 'function' ? getSortPriority(poolObj[a].label || poolObj[a].typeStr || '') : 0;
+                let priB = typeof getSortPriority === 'function' ? getSortPriority(poolObj[b].label || poolObj[b].typeStr || '') : 0;
+                if (priA !== priB) return priA - priB;
+                return poolObj[a].price - poolObj[b].price;
+            });
 
-                if (sortedKeys.length === 0) return genRow('尚無明細資料', '0', '', '0', false, '', '', group);
+            if (sortedKeys.length === 0) return genRow('尚無明細資料', '0', '', '0', false, '', '', group);
+            
+            sortedKeys.forEach(k => {
+                let item = poolObj[k];
+                let calcCost = item.trips * item.price;
+                let finalCost = calcCost !== 0 ? calcCost : item.cost;
                 
-                sortedKeys.forEach(k => {
-                    let item = poolObj[k];
-                    let calcCost = item.trips * item.price;
-                    let finalCost = calcCost !== 0 ? calcCost : item.cost;
-                    
-                    let displayLabel = item.label || item.typeStr || '';
-                    if (group === 'grp3' && (/^\d+/.test(displayLabel) || displayLabel.includes('km') || displayLabel.includes('里程'))) {
-                        displayLabel = displayLabel.replace(/里程類?/g, '').replace(/[()（）]/g, '').trim();
-                    }
+                let displayLabel = item.label || item.typeStr || '';
+                
+                // ⭐ 強制脫殼防呆：加派區 (grp3) 只要抓到有 km 或數字開頭，一律把「里程類」、「()」拔除！
+                if (group === 'grp3' && (displayLabel.includes('km') || displayLabel.includes('公里') || displayLabel.includes('以內') || /^\d/.test(displayLabel))) {
+                    displayLabel = displayLabel.replace(/里程類?/g, '').replace(/[()（）]/g, '').trim();
+                }
 
-                    if (displayLabel.includes('罰款') || displayLabel.includes('違規')) {
-                         finalCost = -Math.abs(finalCost);
-                         rowsHtml += genRow(displayLabel, item.trips || '0', item.price || '', finalCost || '0', false, '', item.color || '#d32f2f', group);
-                    } else {
-                         rowsHtml += genRow(displayLabel, item.trips || '0', item.price || '', finalCost || '0', false, '', item.color, group);
-                    }
-                });
-                return rowsHtml;
-            };
+                if (displayLabel.includes('罰款') || displayLabel.includes('違規')) {
+                     finalCost = -Math.abs(finalCost);
+                     rowsHtml += genRow(displayLabel, item.trips || '0', item.price || '', finalCost || '0', false, '', item.color || '#d32f2f', group);
+                } else {
+                     rowsHtml += genRow(displayLabel, item.trips || '0', item.price || '', finalCost || '0', false, '', item.color, group);
+                }
+            });
+            return rowsHtml;
+        }
 
             let tbody = `<tr><td colspan="2" style="text-align:left; font-weight:bold; border: 1px solid #000; background: #fdf5e6;">一、主線車輛運費</td><td colspan="2" style="text-align:right; font-weight:bold; border: 1px solid #000; background: #fdf5e6;">計價區間：${dateRange}</td></tr>` +
                 `<tr style="background:#e8e8e8;"><th style="width: 40%; border: 1px solid #000; padding: 4px;">專配里程級距</th><th style="width: 20%; border: 1px solid #000; padding: 4px;">車輛數</th><th style="width: 20%; border: 1px solid #000; padding: 4px;">結帳天數</th><th style="width: 20%; border: 1px solid #000; padding: 4px;">小計</th></tr>`;
@@ -3160,51 +3164,59 @@ setInterval(() => {
 
         // 🎯 智慧分類命名邏輯 (只針對爆量與回收類合併，上收必須保留里程分類)
         let getCleanLabel = (mainCat, typeStr, price) => {
-            let m = mainCat.trim(); let t = (typeStr || '').trim();
-            let p = Number(price);
+            let m = (mainCat || '').trim(); let t = (typeStr || '').trim(); let p = Number(price) || 0;
+            let combined = m + t;
+            let range = '';
             
-            // A. 回收類與爆量類 (加派車) 合併邏輯
-            if (m === '回頭收' || m === '回收' || m === '里程類' || m.includes('爆量') || m.includes('回收車')) {
-                if (p === 500 && (m.includes('回頭') || m.includes('里程') || t.includes('回頭'))) {
-                    return '回頭收';
-                }
-                if (p === 1590 && (m.includes('里程') || m.includes('回頭') || t.includes('100km') || t.includes('100公里') || t.includes('以內'))) {
-                    return '100km以內';
-                }
-                if (t.includes('100km') || t.includes('100公里') || t.includes('100公里以內')) {
-                    return '100km以內';
-                }
-                if (t.includes('101-150')) return '101-150km';
-                if (t.includes('151-200')) return '151-200km';
-                if (t.includes('201-250')) return '201-250km';
+            // 🎯 單價強制觸發里程判定
+            if (p === 1590 || combined.includes('100km') || combined.includes('100公里') || combined.includes('以內')) range = '100km以內';
+            else if (p === 1715 || combined.includes('101-150')) range = '101-150km';
+            else if (p === 1840 || combined.includes('151-200')) range = '151-200km';
+            else if (p === 1965 || combined.includes('201-250')) range = '201-250km';
+            else if (p === 2090 || combined.includes('251-300')) range = '251-300km';
+            else if (combined.includes('km') || combined.includes('公里')) {
+                range = combined.replace(/.*?里程類?/, '').replace(/[()（）]/g, '').trim();
             }
 
-            // B. 上收類 (獨立保留里程分類，絕不草率合併)
-            if (m === '上收' || t.includes('上收')) {
-                if (p === 2500 || t.includes('霧峰')) return '上收專車(霧峰新錦鋒)';
-                if (t.includes('回頭')) return '上收專車(回頭)';
+            let isReturn = combined.includes('回頭收') || p === 500;
+
+            // 🎯 上收區處理：靠攏單價強制合併
+            if (m === '上收' || combined.includes('B2C') || combined.includes('C2C') || t.includes('上收')) {
+                if (p === 2500 || combined.includes('霧峰')) return '上收專車 (霧峰新錦鋒)';
+                if (p === 500 || isReturn) return '上收 (回頭收)';
                 
-                let range = '';
-                if (t.includes('100km') || t.includes('100公里') || t.includes('以內')) range = '100km以內';
-                else if (t.includes('101-150')) range = '101-150km';
-                else if (t.includes('151-200')) range = '151-200km';
-                else if (t.includes('201-250')) range = '201-250km';
+                // ⭐ 只要單價吻合或判定為里程，全部無條件強制併入里程區間！解決「650件(含)以下 1590」不合併問題
+                if (range) return '上收 (' + range + ')';
                 
-                if (range) {
-                    return '上收 (' + range + ')';
+                if (combined.includes('件') || (p > 0 && p < 100)) {
+                    return t ? '上收件數 (' + t + ')' : '上收件數 (' + p + '元)';
                 }
-                if (t) {
-                    return '上收 (' + t + ')';
-                }
-                return '上收專車';
+                return t ? '上收 (' + t + ')' : '上收專車';
             }
 
-            // C. 其他常規項目 (如特殊專車、新開店等，按原樣呈現，不與里程合併)
-            if (t) {
-                return m + ' (' + t + ')';
+            // 🎯 特殊專車
+            if (combined.includes('特殊')) return range ? '特殊點專車 (' + range + ')' : (t ? '特殊點專車 (' + t + ')' : '特殊點專車');
+            
+            if (combined.includes('轉運')) return '轉運' + (t && t !== '轉運' ? ' (' + t + ')' : '');
+            if (combined.includes('離島')) return '離島' + (t && t !== '離島' ? ' (' + t + ')' : '');
+            if (combined.includes('罰款') || combined.includes('違規')) return '違規罰款';
+            if (combined.includes('新開店')) return '新開店';
+
+            // 🎯 店回處理
+            if (combined.includes('店回') || t.includes('店回') || m === '回收') {
+                return '店回收車費' + (range ? ' (' + range + ')' : '');
             }
-            return m;
-        };
+
+            // 🎯 加派區：里程與回頭
+            if (m === '回頭收' || m.includes('回收車') || m.includes('爆量') || m.includes('里程') || m.includes('加派') || range) {
+                if (p === 500 || isReturn) return '回頭收';
+                if (range) return range; 
+            }
+
+            if (combined.includes('里程')) return range || '其他專車';
+            
+            return t ? m + ' (' + t + ')' : m;
+        }
 
         let current = new Date(start);
         while(current <= end) {
@@ -3783,6 +3795,58 @@ setInterval(() => {
 
 })();
 </script>
-    
+<!-- 🚀 改良版：直接嵌入式救援模組 (已修復 undefined 錯誤) -->
+<script>
+    // 直接將功能綁定到 window，確保絕對能被呼叫
+    window.forcePushToCloud = async function() {
+        // 檢查必要變數是否存在
+        if (!window.dbFirebase || !window.appId) {
+            alert("⚠️ 尚未連線至 Firebase，無法強制推送。請先確保網頁已輸入存取碼登入。");
+            return;
+        }
+
+        if (!confirm("⚠️ 【最後確認】\n\n您確定要將「目前畫面上的資料」強制覆蓋雲端嗎？")) return;
+
+        let ind = document.getElementById("cloud-indicator");
+        if(ind) { ind.innerText = "☁️ 強制上傳中..."; ind.style.backgroundColor = "#ffc107"; }
+        
+        try {
+            // 匯入必要的 Firestore 工具 (確保從遠端載入)
+            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            
+            // 🚀 關鍵修復：不依賴全域變數，直接從本機硬碟抓取最原始、最安全的資料！
+            let localDataStr = localStorage.getItem('freightData_115');
+            if (!localDataStr) throw new Error("本機硬碟找不到暫存資料，無法上傳");
+            let cleanState = JSON.parse(localDataStr);
+            
+            // 淨化資料：徹底殺除造成 1MB 爆炸的廠商明細
+            delete cleanState.vendorDB;
+            cleanState.lastModified = Date.now() + 5000; 
+
+            const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
+            
+            await setDoc(docRef, cleanState);
+            
+            alert("✅ 強制覆蓋成功！被卡住的雲端通道已經打通。");
+            location.reload(); // 強制重整以確保所有裝置同步
+        } catch(e) {
+            console.error("寫入失敗:", e);
+            alert("❌ 寫入失敗！原因：" + e.message + "\n\n(若顯示 Permission denied，表示該瀏覽器無寫入權限，請確認是否已正確登入)");
+        }
+    };
+
+    // 自動檢查按鈕是否已產生，若無則強制補上
+    setInterval(() => {
+        let modal = document.querySelector('#cloudModal .modal-content');
+        if (modal && !document.getElementById('force-push-btn')) {
+            let btn = document.createElement('button');
+            btn.id = 'force-push-btn';
+            btn.innerHTML = '🚀 強制覆蓋雲端 (執行救援)';
+            btn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 15px; border-radius: 6px; width: 100%; margin-top: 15px; font-weight: bold; cursor: pointer;';
+            btn.onclick = window.forcePushToCloud;
+            modal.appendChild(btn);
+        }
+    }, 2000);
+</script>
 </body>
 </html>
