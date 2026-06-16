@@ -3796,64 +3796,71 @@ setInterval(() => {
 })();
 </script>
 <!-- ... existing code ... -->
-<!-- 🚀 改良版：直接嵌入式救援模組 -->
+<!-- 🚀 終極雲端同步雙向控制面板 -->
 <script>
-    // 直接將功能綁定到 window，確保絕對能被呼叫
+    // 1. 強制上傳 (本機 -> 雲端)
     window.forcePushToCloud = async function() {
-        // 檢查必要變數是否存在
-        if (!window.dbFirebase || !window.appId) {
-            alert("⚠️ 尚未連線至 Firebase，無法強制推送。請先確保網頁已輸入存取碼登入。");
-            return;
-        }
-
-        if (!confirm("⚠️ 【最後確認】\n\n您確定要將「目前畫面上的資料」強制覆蓋雲端嗎？")) return;
-
+        if (!window.dbFirebase || !window.appId) return alert("⚠️ 尚未連線至 Firebase");
+        if (!confirm("⚠️ 【最後確認】\n\n確定要把「目前畫面的資料」強制上傳並覆蓋雲端嗎？")) return;
+        
         let ind = document.getElementById("cloud-indicator");
         if(ind) { ind.innerText = "☁️ 強制上傳中..."; ind.style.backgroundColor = "#ffc107"; }
         
         try {
-            // 1. 強制確保當前正在輸入的格子寫入記憶體
             if (typeof window.commitActiveInput === 'function') window.commitActiveInput();
-
-            // 匯入必要的 Firestore 工具
             const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             
-            // 2. 🚀 終極解法：不讀硬碟，直接抓取「畫面正在顯示」的最即時記憶體資料
-            if (!window.state || !window.state.warehouses) throw new Error("畫面資料尚未就緒");
             let cleanState = JSON.parse(JSON.stringify(window.state));
-            
-            // 3. 淨化資料：徹底殺除造成 1MB 爆炸的廠商明細
             delete cleanState.vendorDB;
+            cleanState.lastModified = Date.now(); // 正常時間戳
             
-            // 4. 賦予霸王級時間戳 (保證絕對蓋過雲端的舊時間)
-            cleanState.lastModified = Date.now() + 9999999; 
-
             const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
             await setDoc(docRef, cleanState);
             
-            // 5. 順便把本機硬碟也強制更新，保持三方一致
             localStorage.setItem('freightData_115', JSON.stringify(cleanState));
-
-            alert("✅ 終極覆蓋成功！畫面上的最新資料已強勢登陸雲端。");
-            location.reload(); 
+            alert("✅ 上傳成功！\n\n現在請立刻去 GitHub 網頁，點擊「📥 2. 強制下載 (清除快取)」！");
         } catch(e) {
-            console.error("寫入失敗:", e);
             alert("❌ 寫入失敗！原因：" + e.message);
         }
     };
 
-    // 自動檢查按鈕是否已產生，若無則強制補上
+    // 2. 強制下載 (雲端 -> 本機，清除快取)
+    window.forcePullFromCloud = function() {
+        if (!confirm("⚠️ 【警告】\n\n這將會清除這個網頁目前的「頑固暫存」，並強制從雲端下載最新資料。\n確定要執行嗎？")) return;
+        
+        // 清除本機所有的主狀態快取，逼迫系統重新下載 (不會影響廠商結帳明細)
+        localStorage.removeItem('freightData_115');
+        alert("✅ 快取已清除！系統將重新載入雲端最新資料。");
+        location.reload();
+    };
+
+    // 自動將兩顆按鈕加到雲端設定視窗中
     setInterval(() => {
         let modal = document.querySelector('#cloudModal .modal-content');
-        if (modal && !document.getElementById('force-push-btn')) {
-            let btn = document.createElement('button');
-            btn.id = 'force-push-btn';
-            btn.innerHTML = '🚀 強制覆蓋雲端 (執行救援)';
-            btn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 15px; border-radius: 6px; width: 100%; margin-top: 15px; font-weight: bold; cursor: pointer;';
-            btn.onclick = window.forcePushToCloud;
-            modal.appendChild(btn);
+        if (modal && !document.getElementById('sync-control-panel')) {
+            // 移除舊版單一按鈕
+            let oldBtn = document.getElementById('force-push-btn');
+            if (oldBtn) oldBtn.remove();
+
+            let panel = document.createElement('div');
+            panel.id = 'sync-control-panel';
+            panel.style.cssText = 'display: flex; gap: 10px; margin-top: 15px;';
+            
+            let pushBtn = document.createElement('button');
+            pushBtn.innerHTML = '🚀 1. 強制上傳 (覆蓋雲端)';
+            pushBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 12px; border-radius: 6px; flex: 1; font-weight: bold; cursor: pointer;';
+            pushBtn.onclick = window.forcePushToCloud;
+
+            let pullBtn = document.createElement('button');
+            pullBtn.innerHTML = '📥 2. 強制下載 (清除快取)';
+            pullBtn.style.cssText = 'background-color: #17a2b8; color: white; border: none; padding: 12px; border-radius: 6px; flex: 1; font-weight: bold; cursor: pointer;';
+            pullBtn.onclick = window.forcePullFromCloud;
+
+            panel.appendChild(pushBtn);
+            panel.appendChild(pullBtn);
+            modal.appendChild(panel);
         }
-    }, 2000);
+    }, 1500);
 </script>
 </body>
 </html>
