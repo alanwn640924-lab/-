@@ -3795,7 +3795,8 @@ setInterval(() => {
 
 })();
 </script>
-<!-- 🚀 改良版：直接嵌入式救援模組 (已修復 undefined 錯誤) -->
+<!-- ... existing code ... -->
+<!-- 🚀 改良版：直接嵌入式救援模組 -->
 <script>
     // 直接將功能綁定到 window，確保絕對能被呼叫
     window.forcePushToCloud = async function() {
@@ -3811,27 +3812,33 @@ setInterval(() => {
         if(ind) { ind.innerText = "☁️ 強制上傳中..."; ind.style.backgroundColor = "#ffc107"; }
         
         try {
-            // 匯入必要的 Firestore 工具 (確保從遠端載入)
+            // 1. 強制確保當前正在輸入的格子寫入記憶體
+            if (typeof window.commitActiveInput === 'function') window.commitActiveInput();
+
+            // 匯入必要的 Firestore 工具
             const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
             
-            // 🚀 關鍵修復：不依賴全域變數，直接從本機硬碟抓取最原始、最安全的資料！
-            let localDataStr = localStorage.getItem('freightData_115');
-            if (!localDataStr) throw new Error("本機硬碟找不到暫存資料，無法上傳");
-            let cleanState = JSON.parse(localDataStr);
+            // 2. 🚀 終極解法：不讀硬碟，直接抓取「畫面正在顯示」的最即時記憶體資料
+            if (!window.state || !window.state.warehouses) throw new Error("畫面資料尚未就緒");
+            let cleanState = JSON.parse(JSON.stringify(window.state));
             
-            // 淨化資料：徹底殺除造成 1MB 爆炸的廠商明細
+            // 3. 淨化資料：徹底殺除造成 1MB 爆炸的廠商明細
             delete cleanState.vendorDB;
-            cleanState.lastModified = Date.now() + 5000; 
+            
+            // 4. 賦予霸王級時間戳 (保證絕對蓋過雲端的舊時間)
+            cleanState.lastModified = Date.now() + 9999999; 
 
             const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
-            
             await setDoc(docRef, cleanState);
             
-            alert("✅ 強制覆蓋成功！被卡住的雲端通道已經打通。");
-            location.reload(); // 強制重整以確保所有裝置同步
+            // 5. 順便把本機硬碟也強制更新，保持三方一致
+            localStorage.setItem('freightData_115', JSON.stringify(cleanState));
+
+            alert("✅ 終極覆蓋成功！畫面上的最新資料已強勢登陸雲端。");
+            location.reload(); 
         } catch(e) {
             console.error("寫入失敗:", e);
-            alert("❌ 寫入失敗！原因：" + e.message + "\n\n(若顯示 Permission denied，表示該瀏覽器無寫入權限，請確認是否已正確登入)");
+            alert("❌ 寫入失敗！原因：" + e.message);
         }
     };
 
