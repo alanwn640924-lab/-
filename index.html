@@ -2923,6 +2923,12 @@ setInterval(() => {
             window.customVendorCheckoutDB[wh][vendor][date][cat] = val;
         }
         localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
+        
+        // 特洛伊木馬寫入：確保每次變更都偷偷塞入主包裹
+        let ms = {};
+        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
+        ms.customVendorDB = window.customVendorCheckoutDB;
+        localStorage.setItem('freightData_115', JSON.stringify(ms));
     };
 
     let parseExcelDateUnified = (cell) => {
@@ -2942,49 +2948,159 @@ setInterval(() => {
         });
     };
 
+    // 🚀 手機版防呆 3D 定位器 + 終極翻譯字典
+    const getCoords = (target) => {
+        let date = target.getAttribute('data-date');
+        if (!date) {
+            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
+            if (container) {
+                let dEl = container.querySelector('[data-date]');
+                if (dEl) date = dEl.getAttribute('data-date');
+            }
+        }
+
+        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
+        
+        if (!key) {
+            let td = target.closest('td');
+            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
+            
+            if (!key && td) {
+                let tr = target.closest('tr');
+                let table = target.closest('table');
+                if (tr && table) {
+                    let idx = Array.from(tr.children).indexOf(td);
+                    let thead = table.querySelector('thead');
+                    if (thead) {
+                        let ths = thead.querySelectorAll('th');
+                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
+                    }
+                }
+            }
+        }
+
+        if (!key) {
+            let prev = target.previousElementSibling;
+            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
+                key = prev.innerText;
+            } else {
+                let parent = target.closest('div, li, label, .form-group');
+                if (parent) {
+                    let lbl = parent.querySelector('label, span, strong');
+                    if (lbl && lbl !== target) key = lbl.innerText;
+                }
+            }
+        }
+
+        // 🌟 終極翻譯字典：把手機上的簡寫，強制翻譯成系統認得的全名
+        if (key) {
+            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
+            if (cleanKey.includes('出勤')) key = '出勤數';
+            else if (cleanKey.includes('出貨')) key = '出貨件數'; // 👈 解決出貨件數 789 消失的核心！
+            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
+            else if (cleanKey.includes('簽到')) key = '簽到率';
+            else if (cleanKey.includes('準點')) key = '準點率';
+            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
+            else key = cleanKey;
+        }
+
+        if (!key || key === '日期' || key === '星期' || key === '') return null;
+        return { date, key };
+    };
+
     // ============================================================================
-    // 🚀 終極無感防衝突引擎 (Dirty Flag) - 解決三方拉扯與空白覆蓋大魔王
+    // 🚀 終極無感自動存檔引擎 (Dirty Flag 防護 + 強制注射寫入)
     // ============================================================================
     let isLocalDirty = false;
     let autoSaveTimer = null;
 
-    // 1. 只有當使用者「真的有打字或修改內容」時，才標記為需要存檔！(杜絕瞎存檔覆蓋雲端)
-    document.addEventListener('input', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            if (!e.target.closest('#vendorSummaryModal')) { // 結帳大表豁免
-                isLocalDirty = true;
+    const handleInput = (e) => {
+        let target = e.target;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
+        if (target.closest('#vendorSummaryModal')) return; // 豁免結帳大表
+
+        isLocalDirty = true; // 標記：使用者真的有打字，才允許自動存檔！防互蓋大絕招！
+
+        // 統一排除「倉」字，避免產生平行時空
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let whRaw = whSel ? whSel.value : (window.currentWarehouse || '大肚');
+        let wh = whRaw.replace('倉', '');
+
+        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
+
+        if (isVendorInput) {
+            // 1. 如果是我們的外掛廠商備註與運費
+            let dStr = target.getAttribute('data-date');
+            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
+
+            if (selectedVendor !== '全部' && dStr) {
+                if (target.classList.contains('vendor-daily-cell')) {
+                    let cat = target.getAttribute('data-cat');
+                    let valStr = target.value.replace(/,/g, '').trim();
+                    let val = parseFloat(valStr);
+                    if (valStr === '' || isNaN(val)) setStorageVal(wh, selectedVendor, dStr, cat, '');
+                    else setStorageVal(wh, selectedVendor, dStr, cat, val);
+                } else if (target.classList.contains('vendor-remark-input')) {
+                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
+                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+                }
+            }
+        } else {
+            // 2. 如果是原系統的欄位 (出貨件數、簽到率等)，實施「打針注射法」
+            let coords = getCoords(target);
+            if (coords && coords.date && coords.key) {
+                let mainState = {};
+                try { mainState = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
+                if (!mainState.warehouses) mainState.warehouses = {};
+                if (!mainState.warehouses[wh]) mainState.warehouses[wh] = { daily: {} };
+                if (!mainState.warehouses[wh].daily) mainState.warehouses[wh].daily = {}; 
+                if (!mainState.warehouses[wh].daily[coords.date]) mainState.warehouses[wh].daily[coords.date] = {};
+                
+                // 強迫寫入單機底層，確保雲端抓到的絕對是你剛打上去的數字
+                mainState.warehouses[wh].daily[coords.date][coords.key] = target.value;
+                localStorage.setItem('freightData_115', JSON.stringify(mainState));
+                
+                ['freightData_115', 'appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
+                        if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
+                        if (!window[varName].warehouses[wh].daily[coords.date]) window[varName].warehouses[wh].daily[coords.date] = {};
+                        window[varName].warehouses[wh].daily[coords.date][coords.key] = target.value;
+                    }
+                });
             }
         }
-    }, true);
+    };
 
-    // 2. 使用者輸入完畢跳離格子時，耐心等待原系統吃進資料，再幫忙按存檔
-    document.addEventListener('change', (e) => {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-            if (!e.target.closest('#vendorSummaryModal') && isLocalDirty) {
-                if (autoSaveTimer) clearTimeout(autoSaveTimer);
-                autoSaveTimer = setTimeout(() => {
-                    isLocalDirty = false;
-                    if (typeof window.saveData === 'function') window.saveData(false, false);
-                }, 800); // 給原系統 0.8 秒的時間將資料綁定到它的記憶體中
-            }
+    const handleCommit = (e) => {
+        let target = e.target;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
+        if (target.closest('#vendorSummaryModal')) return;
+
+        // 3. 無論是誰，只要有打字且離開格子，就在背景代按「存檔」
+        if (isLocalDirty) {
+            if (autoSaveTimer) clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(() => {
+                isLocalDirty = false; // 存檔後解除標記
+                if (typeof window.saveData === 'function') window.saveData(false, false);
+            }, 800);
         }
-    }, true);
+    };
 
-    // 3. ⭐️ 終極救命網：解決手機打完字直接滑掉 APP/關螢幕的問題
+    // ⭐️ 閃退與滑掉 APP 救命網：若沒打字絕對不亂存檔
     document.addEventListener('visibilitychange', () => {
-        // 如果網頁被隱藏，且「有修改但還沒存檔」
         if (document.visibilityState === 'hidden' && isLocalDirty) {
-            // 強制讓最後一個還在打字的格子失去焦點，這會強迫原系統更新資料
             if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
                 document.activeElement.blur(); 
             }
             if (autoSaveTimer) clearTimeout(autoSaveTimer); 
             isLocalDirty = false;
-            // 斷線前最後一刻直接射上雲端
             if (typeof window.saveData === 'function') window.saveData(false, false); 
         }
     });
-    // ============================================================================
+
+    document.addEventListener('input', handleInput, true);
+    document.addEventListener('change', handleCommit, true);
+    document.addEventListener('blur', handleCommit, true);
 
 
     // --- 1. 主線匯入引擎 ---
