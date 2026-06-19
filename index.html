@@ -3813,9 +3813,7 @@ setInterval(() => {
         let bd = document.getElementById('vendorDailyBody'); if(bd) bd.innerHTML = tbody;
         
         if (bd) {
-            bd.querySelectorAll('.vendor-daily-cell, .vendor-remark-input').forEach(inp => {
-                // 不在此綁定事件，統一由全域事件處理
-            });
+            // 事件綁定統一由全域處理
         }
     });
 
@@ -3989,7 +3987,7 @@ setInterval(() => {
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
 
-    // 🚀 木馬掛載：在每次原系統準備按下存檔時，強制把廠商備註包進去
+    // 🚀 在存檔前最後一刻，掛載木馬包裹，並確保深入系統骨髓
     let hookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
