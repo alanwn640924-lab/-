@@ -2892,10 +2892,10 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動無敵鎖對帳引擎與特洛伊木馬同步...");
+    console.log("🚀 啟動無敵鎖對帳引擎與溫和原生同步...");
     const LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // 🚀 特洛伊木馬啟動：網頁一打開，立刻去雲端下載來的包裹裡找我們的廠商運費資料
+    // 🚀 特洛伊木馬啟動：網頁打開時，去雲端包裹找我們專屬的廠商資料
     let mainStateInit = {};
     try { mainStateInit = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
     
@@ -2942,61 +2942,25 @@ setInterval(() => {
         });
     };
 
-    // --- 🚀 全新極簡無感自動存檔引擎 ---
-    let autoSaveTimer = null;
+    // --- 🚀 溫和無感代按存檔引擎 (絕不干擾原系統資料綁定，杜絕時差 Bug) ---
+    let gentleSaveTimer = null;
     
-    const triggerAutoSave = (e) => {
-        let target = e.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
-        if (target.closest('#vendorSummaryModal')) return; // 豁免結帳大表
-
-        // 1. 如果是我們的外掛廠商備註與費用，我們自己更新資料庫
-        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
-        if (isVendorInput) {
-            let dStr = target.getAttribute('data-date');
-            let whSel = document.getElementById('checkoutWhSelect') || document.getElementById('warehouseSelect');
-            let whRaw = whSel ? whSel.value : '大肚';
-            let selectedWh = whRaw.replace('倉', '');
-            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-
-            if (selectedVendor !== '全部' && dStr) {
-                if (target.classList.contains('vendor-daily-cell')) {
-                    let cat = target.getAttribute('data-cat');
-                    let valStr = target.value.replace(/,/g, '').trim();
-                    let val = parseFloat(valStr);
-                    if (valStr === '' || isNaN(val)) setStorageVal(selectedWh, selectedVendor, dStr, cat, '');
-                    else setStorageVal(selectedWh, selectedVendor, dStr, cat, val);
-                } else if (target.classList.contains('vendor-remark-input')) {
-                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                    setStorageVal(selectedWh, selectedVendor, dStr, 'remark', cleanVal);
-                }
-            }
-        }
-
-        // 2. 無論是誰的格子，只要打完字(change/blur)，就在背景幫你代按一次「存檔」
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(() => {
-            if (typeof window.saveData === 'function') window.saveData(false, false);
-        }, 500);
-    };
-
-    // ⭐️ 終極救命網：解決「手機打完字直接滑掉 APP/關螢幕，資料沒存到」的問題
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            // 強制讓還在打字的格子失去焦點，這會強迫原系統把剛剛打的字吃進去！
-            if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-                document.activeElement.blur(); 
-            }
-            // 在網頁死掉前最後一刻直接射上雲端
-            if (autoSaveTimer) clearTimeout(autoSaveTimer); 
-            if (typeof window.saveData === 'function') window.saveData(false, false); 
+    // 當游標離開任何輸入框時，給予原系統 1.5 秒的時間處理資料，然後再背景存檔
+    document.addEventListener('focusout', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            if (gentleSaveTimer) clearTimeout(gentleSaveTimer);
+            gentleSaveTimer = setTimeout(() => {
+                if (typeof window.saveData === 'function') window.saveData(false, false);
+            }, 1500); 
         }
     });
 
-    // 監聽變更與失去焦點事件 (拔除 input 逐字監聽，完全不干擾原系統的運作節奏)
-    document.addEventListener('change', triggerAutoSave, true);
-    document.addEventListener('blur', triggerAutoSave, true);
-
+    // ⭐️ 終極救命網：解決「手機打完字直接滑掉 APP/關螢幕，忘記按儲存」的問題
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            if (typeof window.saveData === 'function') window.saveData(false, false); 
+        }
+    });
 
     // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
@@ -3478,7 +3442,6 @@ setInterval(() => {
             return Number(String(v).replace(/,/g, '')).toLocaleString('en-US');
         };
 
-        // 復原原本最乾淨的分類邏輯，讓 B2C 和 C2C 乖乖併入「上收」
         let getCleanLabel = (mainCat, typeStr, price) => {
             let m = (mainCat || '').trim(); let t = (typeStr || '').trim(); let p = Number(price) || 0;
             let combined = m + t; let range = '';
@@ -3778,6 +3741,11 @@ setInterval(() => {
                 inp.addEventListener('change', (e) => {
                     let input = e.target; if (selectedVendor === '全部') return; 
                     let dStr = input.dataset.date;
+                    
+                    let whSel = document.getElementById('checkoutWhSelect') || document.getElementById('warehouseSelect');
+                    let whRaw = whSel ? whSel.value : '大肚';
+                    let selectedWh = whRaw.replace('倉', '');
+                    
                     if (input.classList.contains('vendor-daily-cell')) {
                         let cat = input.dataset.cat, valStr = input.value.replace(/,/g, '').trim(), val = parseFloat(valStr);
                         if (valStr === '' || isNaN(val)) setStorageVal(selectedWh, selectedVendor, dStr, cat, '');
@@ -3787,6 +3755,12 @@ setInterval(() => {
                         setStorageVal(selectedWh, selectedVendor, dStr, 'remark', cleanVal);
                     }
                     
+                    // ⭐️ 更新完我們的運費資料後，呼叫原系統在背景存檔
+                    if (gentleSaveTimer) clearTimeout(gentleSaveTimer);
+                    gentleSaveTimer = setTimeout(() => {
+                        if (typeof window.saveData === 'function') window.saveData(false, false);
+                    }, 500);
+
                     let catTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
                     bd.querySelectorAll('tr').forEach(tr => {
                         let rowTotal = 0;
@@ -4003,11 +3977,6 @@ setInterval(() => {
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
                 localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-                // 雙重保險：確保原系統在記憶體裡的資料也掛上木馬，避免系統只上傳記憶體而漏掉我們
-                if (window.appData) window.appData.customVendorDB = window.customVendorCheckoutDB;
-                if (window.mainState) window.mainState.customVendorDB = window.customVendorCheckoutDB;
-                if (window.vueData) window.vueData.customVendorDB = window.customVendorCheckoutDB;
 
                 return await origSave(showMsg, forceOverwrite); 
             });
