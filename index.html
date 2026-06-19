@@ -2935,6 +2935,80 @@ setInterval(() => {
         });
     };
 
+    // --- 🚀 終極守護：全域天羅地網攔截器 (完美抓取所有擴充欄位，避開結帳大表) ---
+    const skyNetInterceptor = (e) => {
+        let target = e.target;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
+        
+        // 🛡️ 絕對豁免區：只要是在結帳總表裡面的動作，直接放行不干涉！
+        if (target.closest('#vendorSummaryModal')) return;
+
+        // 找倉庫
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let wh = whSel ? whSel.value : (window.currentWarehouse || '大肚倉');
+        if (!wh) return;
+
+        // 🧭 尋路導航一：找日期座標
+        let date = target.getAttribute('data-date');
+        if (!date) {
+            let tr = target.closest('tr');
+            if (tr) {
+                let dateCell = tr.querySelector('[data-date]');
+                if (dateCell) date = dateCell.getAttribute('data-date');
+            }
+        }
+
+        // 🧭 尋路導航二：找欄位名稱座標 (即使原系統沒寫名字，也能自動往上找表頭)
+        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.getAttribute('data-cat') || target.name;
+        if (!key && target.classList.contains('vendor-remark-input')) key = 'remark';
+        if (!key) {
+            let td = target.closest('td');
+            let tr = target.closest('tr');
+            let table = target.closest('table');
+            if (td && tr && table) {
+                let idx = Array.from(tr.children).indexOf(td);
+                let thead = table.querySelector('thead');
+                if (thead) {
+                    let ths = thead.querySelectorAll('th');
+                    if (ths && ths[idx]) key = ths[idx].innerText.trim();
+                }
+            }
+        }
+
+        // 📦 如果成功定位到座標 (日期 + 欄位)，立刻啟動打包上傳
+        if (date && key) {
+            let mainState = {};
+            try { mainState = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
+            
+            if (!mainState.warehouses) mainState.warehouses = {};
+            if (!mainState.warehouses[wh]) mainState.warehouses[wh] = { daily: {} };
+            if (!mainState.warehouses[wh].daily) mainState.warehouses[wh].daily = {}; 
+            if (!mainState.warehouses[wh].daily[date]) mainState.warehouses[wh].daily[date] = {};
+            
+            mainState.warehouses[wh].daily[date][key] = target.value;
+            localStorage.setItem('freightData_115', JSON.stringify(mainState));
+            
+            // 同步餵給系統底層變數，防呆
+            ['freightData_115', 'appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
+                    if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
+                    if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
+                    window[varName].warehouses[wh].daily[date][key] = target.value;
+                }
+            });
+
+            // 呼叫存檔：微延遲 50ms 確保網頁原有畫面渲染完畢後，直接將打包好的資料射上雲端
+            if (typeof window.saveData === 'function') {
+                setTimeout(() => window.saveData(false, false), 50);
+            }
+        }
+    };
+
+    // 掛載全域監聽器 (使用 true 捕獲階段，防止任何按鍵事件被原生系統擋下來)
+    document.addEventListener('change', skyNetInterceptor, true);
+    document.addEventListener('blur', skyNetInterceptor, true);
+
+
     // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3122,7 +3196,7 @@ setInterval(() => {
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 3. 新增：每日明細下載引擎 (動態掃描備註欄寬度 + 禁止換行) ---
+    // --- 3. 每日明細下載引擎 (動態掃描備註欄寬度 + 禁止換行) ---
     makeInvincible('exportVendorDailyToExcel', function() {
         let vendorSel = document.getElementById('vendorSelect');
         let vendorName = vendorSel ? vendorSel.value : '創新';
@@ -3169,18 +3243,16 @@ setInterval(() => {
         let ws = XLSX.utils.table_to_sheet(tableEl, {raw: true});
         let range = XLSX.utils.decode_range(ws['!ref']);
 
-        // 🚀 動態計算備註欄(第13欄，索引12)的最長字數，以自動撐開寬度
         let maxRemarkLen = 20; 
 
         for (let R = range.s.r; R <= range.e.r; ++R) {
             
-            // 掃描備註欄計算長度
             let remarkCellRef = XLSX.utils.encode_cell({r:R, c:12});
             if (ws[remarkCellRef] && ws[remarkCellRef].v) {
                 let str = String(ws[remarkCellRef].v);
                 let len = 0;
                 for(let i=0; i<str.length; i++) {
-                    len += str.charCodeAt(i) > 255 ? 2.2 : 1.2; // 中文算2.2寬，英文算1.2寬，加大寬裕度
+                    len += str.charCodeAt(i) > 255 ? 2.2 : 1.2; 
                 }
                 if (len > maxRemarkLen) maxRemarkLen = len;
             }
@@ -3241,7 +3313,6 @@ setInterval(() => {
                         }
                     }
                     
-                    // 🚀 備註靠左，明確禁止自動換行，讓 Excel 隨寬度延伸
                     if (C === 12 && R > 1 && R < range.e.r) {
                         cellStyle.alignment.horizontal = "left"; 
                         cellStyle.alignment.wrapText = false; 
@@ -3252,14 +3323,13 @@ setInterval(() => {
             }
         }
 
-        // 確保寬度上限，並加上安全邊距 5
         maxRemarkLen = Math.min(Math.max(maxRemarkLen + 5, 20), 200);
 
         ws['!cols'] = [
             { wch: 12 }, { wch: 8 }, 
             { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, 
             { wch: 14 }, 
-            { wch: Math.ceil(maxRemarkLen) }  // 🚀 動態套用最長備註的寬度！
+            { wch: Math.ceil(maxRemarkLen) }  
         ];
 
         let wb = XLSX.utils.book_new();
@@ -3419,6 +3489,7 @@ setInterval(() => {
             return Number(String(v).replace(/,/g, '')).toLocaleString('en-US');
         };
 
+        // 復原原本最乾淨的分類邏輯，讓 B2C 和 C2C 乖乖併入「上收」
         let getCleanLabel = (mainCat, typeStr, price) => {
             let m = (mainCat || '').trim(); let t = (typeStr || '').trim(); let p = Number(price) || 0;
             let combined = m + t; let range = '';
@@ -3443,7 +3514,7 @@ setInterval(() => {
             if (combined.includes('特殊')) return range ? '特殊點專車 (' + range + ')' : (t ? '特殊點專車 (' + t + ')' : '特殊點專車');
             if (combined.includes('轉運')) return '轉運' + (t && t !== '轉運' ? ' (' + t + ')' : '');
             if (combined.includes('離島')) return '離島' + (t && t !== '離島' ? ' (' + t + ')' : '');
-            if (combined.includes('罰款') || combined.includes('違規')) return '違規罰款';
+            if (combined.includes('罰款') || combined.includes('違規')) return '违規罰款';
             if (combined.includes('新開店')) return '新開店';
 
             if (m === '回頭收' || combined.includes('店回') || m.includes('回收') || m.includes('爆量') || m.includes('里程') || m.includes('加派') || range) {
@@ -3859,10 +3930,8 @@ setInterval(() => {
             let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
             let b3 = document.querySelector('button[onclick*="openVendorSummaryModal"]');
             
-            // 🚀 動態注入「匯出每日明細」按鈕，統一取消所有按鈕的浮動特效並強制置中
             if (b3 && b3.parentNode && !document.getElementById('btnExportDaily')) {
                 
-                // 動態加上一段輕量 CSS，拔除所有按鈕的浮動動畫，並將文字絕對置中
                 if (!document.getElementById('custom-btn-styles')) {
                     let style = document.createElement('style');
                     style.id = 'custom-btn-styles';
@@ -3872,7 +3941,6 @@ setInterval(() => {
                             border-color: #e67e22 !important;
                             color: white !important;
                         }
-                        /* 🚀 強制拔除這四顆按鈕的 hover 浮動特效與陰影，統一為平貼狀態 */
                         #btnExportDaily, 
                         button[onclick*="handleMainlineExcelImport"],
                         button[onclick*="handleVendorCheckoutExcelImportNew"],
@@ -3891,7 +3959,6 @@ setInterval(() => {
                 let newBtn = document.createElement('button');
                 newBtn.id = 'btnExportDaily';
                 
-                // 完全拷貝 b3 的 class，讓動畫屬性一模一樣，然後再加上我們的顏色 class
                 newBtn.className = b3.className + ' custom-export-btn'; 
                 
                 newBtn.innerHTML = '📊 3. 匯出每日明細';
@@ -3900,7 +3967,6 @@ setInterval(() => {
                 b3.innerHTML = b3.innerHTML.replace('3.', '4.');
                 b3.parentNode.insertBefore(newBtn, b3);
 
-                // 🚀 強迫這 4 顆按鈕 (如果存在的話) 完美置中與設定間距，並清除可能自帶的 float classes
                 [b1, b2, newBtn, b3].forEach(btn => {
                     if (btn) {
                         btn.style.width = '180px';
@@ -3910,7 +3976,6 @@ setInterval(() => {
                         btn.style.alignItems = 'center';
                         btn.style.textAlign = 'center';
                         
-                        // 移除可能造成浮動的 tailwind 或自定義動畫 classes
                         btn.className = btn.className.replace(/hover:-translate-y-\d+|hover:shadow-\w+|shadow-\w+/g, '');
                     }
                 });
@@ -3944,8 +4009,58 @@ setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             makeInvincible('saveData', async function(showMsg, forceOverwrite) {
-                // 🚀 重大修復：拔除盲目的強制覆蓋 (true)。
-                // 恢復原生雲端防呆校驗，這樣沒重新整理的舊電腦，就不會再把別人手機剛 Key 好的資料洗掉了！
+                // 存檔前做最後一次安全掃描，確保所有手輸欄位(包含新增的擴充欄)都有被捕捉並更新到 localStorage
+                try {
+                    let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+                    let wh = whSel ? whSel.value : (window.currentWarehouse || '大肚倉');
+                    if (wh) {
+                        let mainState = JSON.parse(localStorage.getItem('freightData_115') || '{}');
+                        let modified = false;
+                        
+                        document.querySelectorAll('input, textarea').forEach(inp => {
+                            // 結帳大表豁免區
+                            if (inp.closest('#vendorSummaryModal')) return;
+                            
+                            let date = inp.getAttribute('data-date');
+                            if (!date) {
+                                let tr = inp.closest('tr');
+                                if (tr) {
+                                    let dateCell = tr.querySelector('[data-date]');
+                                    if (dateCell) date = dateCell.getAttribute('data-date');
+                                }
+                            }
+
+                            let key = inp.getAttribute('data-key') || inp.getAttribute('data-col') || inp.getAttribute('data-cat') || inp.name;
+                            if (!key && inp.classList.contains('vendor-remark-input')) key = 'remark';
+                            if (!key) {
+                                let td = inp.closest('td');
+                                let tr = inp.closest('tr');
+                                let table = inp.closest('table');
+                                if (td && tr && table) {
+                                    let idx = Array.from(tr.children).indexOf(td);
+                                    let th = table.querySelectorAll('thead th')[idx];
+                                    if (th) key = th.innerText.trim();
+                                }
+                            }
+
+                            if (date && key) {
+                                if (!mainState.warehouses) mainState.warehouses = {};
+                                if (!mainState.warehouses[wh]) mainState.warehouses[wh] = { daily: {} };
+                                if (!mainState.warehouses[wh].daily) mainState.warehouses[wh].daily = {};
+                                if (!mainState.warehouses[wh].daily[date]) mainState.warehouses[wh].daily[date] = {};
+                                
+                                if (mainState.warehouses[wh].daily[date][key] !== inp.value) {
+                                    mainState.warehouses[wh].daily[date][key] = inp.value;
+                                    modified = true;
+                                }
+                            }
+                        });
+                        if (modified) {
+                            localStorage.setItem('freightData_115', JSON.stringify(mainState));
+                        }
+                    }
+                } catch (e) { console.warn(e); }
+
                 return await origSave(showMsg, forceOverwrite); 
             });
             window.saveData._isHooked = true;
