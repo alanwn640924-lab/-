@@ -1924,9 +1924,12 @@
             }
             
             let genRow = (col1, col2, col3, col4, isSub = false, id = '', color = '', group = '', readonlyPrice = false) => {
-                if(isSub) return `<tr><td colspan="3" style="text-align: left; font-weight: bold; color:#0056b3; border:1px solid #ccc;">${col1}</td><td style="border:1px solid #ccc;"><input type="text" class="csv-subtotal ${col4}" id="${id}" value="${col2}" readonly tabindex="-1" style="color:#0056b3; width:100%; border:none; text-align:center; background:transparent;"></td></tr>`;
-                return `<tr><td style="text-align: left; border:1px solid #ccc; ${color?`color:${color};`:''}">${col1}</td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input row-trips" value="${col2}" ${color?`style="color:${color}; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"`:'style="width:100%; border:none; text-align:center; background:transparent;"'}></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input row-price" value="${col3}" ${readonlyPrice?'readonly tabindex="-1"':''} ${color?`style="color:${color}; width:100%; border:none; text-align:center; background:transparent;"`:'style="width:100%; border:none; text-align:center; background:transparent;"'}></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-subtotal csv-calc row-subtotal" data-group="${group}" value="${col4}" ${color?`style="color:${color}; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"`:'style="width:100%; border:none; text-align:center; background:transparent;"'}></td></tr>`;
-            };
+            // 小計與總計 (大肚倉小計等) 維持靠左對齊，並增加左側留白讓排版更美觀
+            if(isSub) return '<tr><td colspan="3" style="text-align: left; font-weight: bold; color:#0056b3; border:1px solid #000; padding-left: 8px;">' + col1 + '</td><td style="border:1px solid #000;"><input type="text" class="csv-subtotal ' + col4 + '" id="' + id + '" value="' + col2 + '" readonly tabindex="-1" style="color:#0056b3; text-align:center; font-weight:bold; width:100%; border:none; background:transparent;"></td></tr>';
+            
+            // 一般項目 (100km以內、3.5噸等中標題) 強制置中對齊！
+            return '<tr><td style="text-align: center; font-weight: bold; border:1px solid #000; ' + (color ? 'color:' + color + ';' : '') + '">' + col1 + '</td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-trips" value="' + col2 + '" ' + (color ? 'style="color:' + color + '; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-price" value="' + col3 + '" ' + (readonlyPrice ? 'readonly tabindex="-1"' : '') + ' ' + (color ? 'style="color:' + color + '; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-subtotal csv-calc row-subtotal" data-group="' + group + '" value="' + col4 + '" ' + (color ? 'style="color:' + color + '; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td></tr>';
+        };
 
             let getSortPriority = (label) => {
                 let l = label.trim();
@@ -2907,7 +2910,6 @@ setInterval(() => {
         if (!window.customVendorCheckoutDB[wh][vendor]) window.customVendorCheckoutDB[wh][vendor] = {};
         if (!window.customVendorCheckoutDB[wh][vendor][date]) window.customVendorCheckoutDB[wh][vendor][date] = {};
         
-        // 🛡️ 允許存入陣列 (Array) 與物件，避免 MIS 明細被誤判刪除
         if (val === '' || val === null || (typeof val !== 'object' && isNaN(val))) {
             delete window.customVendorCheckoutDB[wh][vendor][date][cat];
         } else {
@@ -2994,7 +2996,7 @@ setInterval(() => {
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 2. MIS 非主線匯入引擎 (智慧群組加總壓縮 + 防止 undefined 產生) ---
+    // --- 2. MIS 非主線匯入引擎 ---
     makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3059,7 +3061,6 @@ setInterval(() => {
                     if (reason.includes('主線')) continue; 
                     if (cost === 0 && trips === 0) continue;
                     
-                    // 🧠 智慧分類邏輯 (原因 > 價格)
                     let mainCat = '';
                     if (reason.includes('上收') || reason.includes('B2C') || reason.includes('C2C')) mainCat = '上收';
                     else if (reason.includes('回頭收') || reason.includes('店回') || reason.includes('回收')) mainCat = '回頭收';
@@ -3077,11 +3078,10 @@ setInterval(() => {
                             setStorageVal(selectedWh, targetVendor, dateStr, c, '');
                             setStorageVal(selectedWh, targetVendor, dateStr, c+'_trips', '');
                         });
-                        setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', []); // 初始化為乾淨陣列
+                        setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', []); 
                         clearedDates.add(key);
                     }
 
-                    // 📦 智慧群組加總壓縮：如果同一天已經有相同原因、級距、單價的紀錄，直接累加，不重複長出新行，體積縮小95%！
                     let misDetails = getStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS');
                     if (!Array.isArray(misDetails)) misDetails = [];
                     
@@ -3094,7 +3094,6 @@ setInterval(() => {
                     }
                     setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', misDetails);
 
-                    // ♻️ 同步寫入單格數據
                     let legacyCat = '';
                     if (mainCat === '里程類') legacyCat = '爆量';
                     else if (mainCat === '回頭收') legacyCat = '回收';
@@ -3123,7 +3122,152 @@ setInterval(() => {
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 3. 另存新檔 Excel 引擎 ---
+    // --- 3. 新增：每日明細下載引擎 (動態掃描備註欄寬度 + 禁止換行) ---
+    makeInvincible('exportVendorDailyToExcel', function() {
+        let vendorSel = document.getElementById('vendorSelect');
+        let vendorName = vendorSel ? vendorSel.value : '創新';
+        
+        let whSel = document.getElementById('checkoutWhSelect');
+        let whName = whSel ? whSel.value.replace('倉', '') : '大肚';
+        
+        let startInput = document.getElementById('checkoutStartDate').value; 
+        let endInput = document.getElementById('checkoutEndDate').value; 
+        let dateRange = (startInput && endInput) ? `${startInput.substring(5).replace('-','')}_${endInput.substring(5).replace('-','')}` : '';
+
+        let tableEl = document.createElement('table');
+        let headHtml = document.getElementById('vendorDailyHead') ? document.getElementById('vendorDailyHead').innerHTML : '';
+        let bodyHtml = document.getElementById('vendorDailyBody') ? document.getElementById('vendorDailyBody').innerHTML : '';
+        let footHtml = document.getElementById('vendorDailyFoot') ? document.getElementById('vendorDailyFoot').innerHTML : '';
+        
+        tableEl.innerHTML = `<thead>${headHtml}</thead><tbody>${bodyHtml}</tbody><tfoot>${footHtml}</tfoot>`;
+
+        tableEl.querySelectorAll('input').forEach(inp => {
+            let td = inp.closest('td');
+            if (td) {
+                let val = inp.value;
+                td.innerText = (val === '' || val === null) ? '\u00A0' : val;
+            }
+        });
+
+        let thead = tableEl.querySelector('thead');
+        if (thead) {
+            let titleTr = document.createElement('tr');
+            let titleTd = document.createElement('td');
+            titleTd.colSpan = 13; 
+            titleTd.innerText = vendorName + '物流股份有限公司(專配+日翊) - 每日對帳明細';
+            titleTd.setAttribute('data-header', 'true');
+            titleTr.appendChild(titleTd);
+            thead.insertBefore(titleTr, thead.firstChild);
+        }
+
+        tableEl.querySelectorAll('td, th').forEach(cell => {
+            if (!cell.innerText || cell.innerText.trim() === '') {
+                cell.innerText = '\u00A0';
+            }
+        });
+
+        let ws = XLSX.utils.table_to_sheet(tableEl, {raw: true});
+        let range = XLSX.utils.decode_range(ws['!ref']);
+
+        // 🚀 動態計算備註欄(第13欄，索引12)的最長字數，以自動撐開寬度
+        let maxRemarkLen = 20; 
+
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            
+            // 掃描備註欄計算長度
+            let remarkCellRef = XLSX.utils.encode_cell({r:R, c:12});
+            if (ws[remarkCellRef] && ws[remarkCellRef].v) {
+                let str = String(ws[remarkCellRef].v);
+                let len = 0;
+                for(let i=0; i<str.length; i++) {
+                    len += str.charCodeAt(i) > 255 ? 2.2 : 1.2; // 中文算2.2寬，英文算1.2寬，加大寬裕度
+                }
+                if (len > maxRemarkLen) maxRemarkLen = len;
+            }
+
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let cellRef = XLSX.utils.encode_cell({r:R, c:C});
+                if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '\u00A0' };
+                let cell = ws[cellRef];
+
+                if (typeof cell.v === 'string') {
+                    let cleanStr = cell.v.replace(/,/g, '').trim();
+                    if (cleanStr === '' || cleanStr === String.fromCharCode(160)) {
+                        cell.v = ''; 
+                    } else if (!isNaN(cleanStr) && cleanStr !== '-') {
+                        cell.v = Number(cleanStr); cell.t = 'n';
+                    }
+                }
+
+                let borderStyle = { style: "thin", color: { rgb: "000000" } };
+                let cellStyle = {
+                    font: { name: '微軟正黑體', sz: 12, color: { rgb: "000000" } },
+                    alignment: { vertical: "center", horizontal: "center" },
+                    border: { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle }
+                };
+
+                if (cell.t === 'n') cell.z = '#,##0_ ;[Red]-#,##0 ';
+
+                let htmlRow = tableEl.rows[R];
+                let originCell = null;
+                if (htmlRow) {
+                    let colOffset = 0;
+                    for (let i = 0; i < htmlRow.cells.length; i++) {
+                        let td = htmlRow.cells[i];
+                        let span = td.colSpan || 1;
+                        if (C >= colOffset && C < colOffset + span) {
+                            originCell = td; 
+                            break;
+                        }
+                        colOffset += span;
+                    }
+                }
+
+                if (originCell) {
+                    if (originCell.getAttribute('data-header') === 'true') {
+                        cellStyle.font.bold = true; 
+                        cellStyle.font.sz = 18; 
+                        cellStyle.border = {}; 
+                    } else if (R === 1) { 
+                        cellStyle.font.bold = true;
+                        cellStyle.fill = { fgColor: { rgb: "DDEBF7" } };
+                        if (C === 11) cellStyle.fill = { fgColor: { rgb: "FFF2CC" } }; 
+                    } else if (R === range.e.r) { 
+                        cellStyle.font.bold = true;
+                        cellStyle.fill = { fgColor: { rgb: "FDE293" } };
+                        if (C === 11) {
+                            cellStyle.fill = { fgColor: { rgb: "EA8600" } };
+                            cellStyle.font.color = { rgb: "FFFFFF" };
+                        }
+                    }
+                    
+                    // 🚀 備註靠左，明確禁止自動換行，讓 Excel 隨寬度延伸
+                    if (C === 12 && R > 1 && R < range.e.r) {
+                        cellStyle.alignment.horizontal = "left"; 
+                        cellStyle.alignment.wrapText = false; 
+                    }
+                }
+
+                cell.s = cellStyle;
+            }
+        }
+
+        // 確保寬度上限，並加上安全邊距 5
+        maxRemarkLen = Math.min(Math.max(maxRemarkLen + 5, 20), 200);
+
+        ws['!cols'] = [
+            { wch: 12 }, { wch: 8 }, 
+            { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, 
+            { wch: 14 }, 
+            { wch: Math.ceil(maxRemarkLen) }  // 🚀 動態套用最長備註的寬度！
+        ];
+
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "每日明細");
+        XLSX.writeFile(wb, `${vendorName}_每日對帳明細_${whName}倉_${dateRange}.xlsx`);
+    });
+
+    // --- 4. 另存新檔 Excel 引擎 (結帳大表) ---
     makeInvincible('exportSummaryToExcel', function() {
         let table = document.querySelector('#vendorSummaryModal .csv-table');
         if(!table) return; 
@@ -3134,14 +3278,122 @@ setInterval(() => {
         let vendorName = vendorSel ? vendorSel.value : '創新'; 
         let startInput = document.getElementById('checkoutStartDate').value; 
         let endInput = document.getElementById('checkoutEndDate').value; 
-        let dateRange = '';
-        if(startInput && endInput) { dateRange = `${startInput.substring(5).replace('-','')}_${endInput.substring(5).replace('-','')}`; }
+        let dateRange = (startInput && endInput) ? `${startInput.substring(5).replace('-','')}_${endInput.substring(5).replace('-','')}` : '';
         
-        let wb = XLSX.utils.table_to_book(table, { sheet: "結帳大表" }); 
+        let cloneTable = table.cloneNode(true);
+        cloneTable.querySelectorAll('input').forEach(inp => {
+            let td = inp.closest('td');
+            if (td) {
+                let val = inp.value;
+                td.innerText = (val === '' || val === null) ? '\u00A0' : val;
+                
+                if(inp.style.color === 'rgb(211, 47, 47)' || inp.style.color === '#d32f2f' || inp.style.color === 'red') {
+                    td.setAttribute('data-color', 'D32F2F');
+                } else if(inp.style.color === 'rgb(0, 86, 179)' || inp.style.color === '#0056b3') {
+                    td.setAttribute('data-color', '0056B3');
+                }
+                if(inp.id && inp.id.startsWith('final-')) {
+                    td.setAttribute('data-total-num', 'true');
+                }
+            }
+        });
+
+        let titleTr = cloneTable.insertRow(0);
+        let titleTd = titleTr.insertCell(0);
+        titleTd.colSpan = 4;
+        titleTd.innerText = vendorName + '物流股份有限公司(專配+日翊)';
+        titleTd.setAttribute('data-header', 'true');
+
+        let ws = XLSX.utils.table_to_sheet(cloneTable, {raw: true});
+        let range = XLSX.utils.decode_range(ws['!ref']);
+        
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                let cellRef = XLSX.utils.encode_cell({r:R, c:C});
+                if (!ws[cellRef]) ws[cellRef] = { t: 's', v: '' };
+                let cell = ws[cellRef];
+
+                if (typeof cell.v === 'string') {
+                    let cleanStr = cell.v.replace(/,/g, '').trim();
+                    if (cleanStr === '') {
+                        cell.v = ''; 
+                    } else if (!isNaN(cleanStr) && cleanStr !== '-') {
+                        cell.v = Number(cleanStr); cell.t = 'n';
+                    }
+                }
+
+                let borderStyle = { style: "thin", color: { rgb: "000000" } };
+                let cellStyle = {
+                    font: { name: '微軟正黑體', sz: 12, color: { rgb: "000000" } },
+                    alignment: { vertical: "center", horizontal: "center" },
+                    border: { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle }
+                };
+                if (cell.t === 'n') cell.z = '#,##0_ ;[Red]-#,##0 '; 
+
+                let text = String(cell.v).trim();
+                let htmlRow = cloneTable.rows[R];
+                
+                let originCell = null;
+                if (htmlRow) {
+                    let colOffset = 0;
+                    for (let i = 0; i < htmlRow.cells.length; i++) {
+                        let td = htmlRow.cells[i];
+                        let span = td.colSpan || 1;
+                        if (C >= colOffset && C < colOffset + span) {
+                            originCell = td; 
+                            break;
+                        }
+                        colOffset += span;
+                    }
+                }
+
+                if (C === 0) cellStyle.alignment.horizontal = "left"; 
+
+                if (text.startsWith('一、') || text.startsWith('二、') || text.startsWith('三、')) { cellStyle.font.bold = true; cellStyle.fill = { fgColor: { rgb: "FDF5E6" } }; }
+                if (text.startsWith('計價區間：')) { cellStyle.font.bold = true; cellStyle.fill = { fgColor: { rgb: "FDF5E6" } }; cellStyle.alignment.horizontal = "right"; }
+                if (['專配里程級距', '車輛數', '結帳天數', '小計', '日翊里程級距', '派車原因', '趟數', '單價', `${whName}倉-項目`].includes(text)) { cellStyle.font.bold = true; cellStyle.fill = { fgColor: { rgb: "E8E8E8" } }; cellStyle.alignment.horizontal = "center"; }
+                if (text.includes('小計') || text === '總計') { cellStyle.font.bold = true; if(C === 0) cellStyle.font.color = { rgb: "0056B3" }; }
+
+                if (originCell) {
+                    if (originCell.getAttribute('data-header') === 'true') {
+                        cellStyle.font.bold = true; cellStyle.font.sz = 18; cellStyle.border = {}; cellStyle.alignment.horizontal = "center";
+                    }
+                    if (originCell.getAttribute('data-total-num') === 'true') {
+                        cellStyle.font.bold = true; cellStyle.font.sz = 14; 
+                    }
+                    if (originCell.getAttribute('data-color')) {
+                        cellStyle.font.color = { rgb: originCell.getAttribute('data-color') };
+                    }
+                    if (originCell.getAttribute('data-no-border') === 'true') {
+                        cellStyle.border = {};
+                    }
+
+                    let originText = originCell.innerText || '';
+                    if (['合計運費：', '當月運費(未稅)：', '稅額：', '當月運費(含稅)：'].some(k => originText.includes(k))) {
+                        cellStyle.font.bold = true; cellStyle.font.sz = 12; 
+                        cellStyle.fill = { fgColor: { rgb: "F8F9FA" } };
+                        if (originText.includes('當月運費(含稅)：')) { cellStyle.fill = { fgColor: { rgb: "E8F0FE" } }; cellStyle.font.color = { rgb: "0056B3" }; }
+                    }
+                }
+
+                cell.s = cellStyle;
+            }
+        }
+
+        ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 18 }, { wch: 18 }]; 
+        
+        if(!ws['!pageSetup']) ws['!pageSetup'] = {};
+        ws['!pageSetup'].paperSize = 9; 
+        ws['!pageSetup'].orientation = 'portrait';
+        ws['!pageSetup'].fitToWidth = 1; 
+        ws['!pageSetup'].fitToHeight = 0;
+
+        let wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "結帳大表");
         XLSX.writeFile(wb, `${vendorName}_運費對帳結帳大表_${whName}倉_${dateRange}.xlsx`);
     });
 
-    // --- 4. 結帳總表輸出引擎 (A4置頂 + 原因優先 + 動態生成) ---
+    // --- 5. 結帳總表輸出顯示引擎 ---
     makeInvincible('openVendorSummaryModal', function() {
         let whSel = document.getElementById('checkoutWhSelect');
         let vendorSel = document.getElementById('vendorSelect');
@@ -3159,70 +3411,54 @@ setInterval(() => {
         let targetMonth = end.getMonth() + 1; 
 
         let sum35_cost = 0, sum8_cost = 0, max35_cars = 0, max8_cars = 0, daysCount = 0;
-        
-        let sec2Pool = {}; 
-        let sec3Pool = {}; 
+        let sec2Pool = {}; let sec3Pool = {}; 
 
-        // 🎯 智慧分類命名邏輯 (只針對爆量與回收類合併，上收必須保留里程分類)
+        let fmt = (v) => {
+            if (v === 0 || v === '0') return '0';
+            if (!v || isNaN(String(v).replace(/,/g, ''))) return v || '';
+            return Number(String(v).replace(/,/g, '')).toLocaleString('en-US');
+        };
+
         let getCleanLabel = (mainCat, typeStr, price) => {
             let m = (mainCat || '').trim(); let t = (typeStr || '').trim(); let p = Number(price) || 0;
-            let combined = m + t;
-            let range = '';
+            let combined = m + t; let range = '';
             
-            // 🎯 單價強制觸發里程判定
             if (p === 1590 || combined.includes('100km') || combined.includes('100公里') || combined.includes('以內')) range = '100km以內';
             else if (p === 1715 || combined.includes('101-150')) range = '101-150km';
             else if (p === 1840 || combined.includes('151-200')) range = '151-200km';
             else if (p === 1965 || combined.includes('201-250')) range = '201-250km';
             else if (p === 2090 || combined.includes('251-300')) range = '251-300km';
-            else if (combined.includes('km') || combined.includes('公里')) {
-                range = combined.replace(/.*?里程類?/, '').replace(/[()（）]/g, '').trim();
-            }
+            else if (combined.includes('km') || combined.includes('公里')) { range = combined.replace(/.*?里程類?/, '').replace(/[()（）]/g, '').trim(); }
 
             let isReturn = combined.includes('回頭收') || p === 500;
 
-            // 🎯 上收區處理：靠攏單價強制合併
             if (m === '上收' || combined.includes('B2C') || combined.includes('C2C') || t.includes('上收')) {
                 if (p === 2500 || combined.includes('霧峰')) return '上收專車 (霧峰新錦鋒)';
                 if (p === 500 || isReturn) return '上收 (回頭收)';
-                
-                // ⭐ 只要單價吻合或判定為里程，全部無條件強制併入里程區間！解決「650件(含)以下 1590」不合併問題
                 if (range) return '上收 (' + range + ')';
-                
-                if (combined.includes('件') || (p > 0 && p < 100)) {
-                    return t ? '上收件數 (' + t + ')' : '上收件數 (' + p + '元)';
-                }
+                if (combined.includes('件') || (p > 0 && p < 100)) return t ? '上收件數 (' + t + ')' : '上收件數 (' + p + '元)';
                 return t ? '上收 (' + t + ')' : '上收專車';
             }
 
-            // 🎯 特殊專車
             if (combined.includes('特殊')) return range ? '特殊點專車 (' + range + ')' : (t ? '特殊點專車 (' + t + ')' : '特殊點專車');
-            
             if (combined.includes('轉運')) return '轉運' + (t && t !== '轉運' ? ' (' + t + ')' : '');
             if (combined.includes('離島')) return '離島' + (t && t !== '離島' ? ' (' + t + ')' : '');
             if (combined.includes('罰款') || combined.includes('違規')) return '違規罰款';
             if (combined.includes('新開店')) return '新開店';
 
-            // 🎯 店回處理
-            if (combined.includes('店回') || t.includes('店回') || m === '回收') {
-                return '店回收車費' + (range ? ' (' + range + ')' : '');
-            }
-
-            // 🎯 加派區：里程與回頭
-            if (m === '回頭收' || m.includes('回收車') || m.includes('爆量') || m.includes('里程') || m.includes('加派') || range) {
-                if (p === 500 || isReturn) return '回頭收';
+            if (m === '回頭收' || combined.includes('店回') || m.includes('回收') || m.includes('爆量') || m.includes('里程') || m.includes('加派') || range) {
                 if (range) return range; 
+                if (p === 500 || isReturn) return '回頭收'; 
+                if (combined.includes('店回') || m === '回收') return '店回收車費'; 
             }
 
             if (combined.includes('里程')) return range || '其他專車';
-            
             return t ? m + ' (' + t + ')' : m;
-        }
+        };
 
         let current = new Date(start);
         while(current <= end) {
-            daysCount++;
-            let m = current.getMonth()+1, d = current.getDate();
+            daysCount++; let m = current.getMonth()+1, d = current.getDate();
             let dStr = current.getFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
             
             sum35_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
@@ -3244,13 +3480,11 @@ setInterval(() => {
 
                     if (cat === '上收') {
                         if (!sec3Pool[poolKey]) sec3Pool[poolKey] = { label: cleanLabel, price: p, trips: 0, cost: 0, color: '' };
-                        sec3Pool[poolKey].trips += dt.trips;
-                        sec3Pool[poolKey].cost += dt.cost;
+                        sec3Pool[poolKey].trips += dt.trips; sec3Pool[poolKey].cost += dt.cost;
                     } else {
                         let rowColor = (cat === '違規罰款') ? '#d32f2f' : '';
                         if (!sec2Pool[poolKey]) sec2Pool[poolKey] = { label: cleanLabel, price: p, trips: 0, cost: 0, color: rowColor };
-                        sec2Pool[poolKey].trips += dt.trips;
-                        sec2Pool[poolKey].cost += dt.cost;
+                        sec2Pool[poolKey].trips += dt.trips; sec2Pool[poolKey].cost += dt.cost;
                     }
                 });
             }
@@ -3258,11 +3492,23 @@ setInterval(() => {
         }
         
         let genRow = (col1, col2, col3, col4, isSub = false, id = '', color = '', group = '', readonlyPrice = false) => {
-            if(isSub) return '<tr><td colspan="3" style="text-align: left; font-weight: bold; color:#0056b3; border:1px solid #000;">' + col1 + '</td><td style="border:1px solid #000;"><input type="text" class="csv-subtotal ' + col4 + '" id="' + id + '" value="' + col2 + '" readonly tabindex="-1" style="color:#0056b3; text-align:center; font-weight:bold; width:100%; border:none; background:transparent;"></td></tr>';
-            return '<tr><td style="text-align: left; border:1px solid #000; ' + (color ? 'color:' + color + ';' : '') + '">' + col1 + '</td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-trips" value="' + col2 + '" ' + (color ? 'style="color:' + color + '; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-price" value="' + col3 + '" ' + (readonlyPrice ? 'readonly tabindex="-1"' : '') + ' ' + (color ? 'style="color:' + color + '; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-subtotal csv-calc row-subtotal" data-group="' + group + '" value="' + col4 + '" ' + (color ? 'style="color:' + color + '; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td></tr>';
+            if(isSub) return '<tr><td colspan="3" style="text-align: left; font-weight: bold; color:#0056b3; border:1px solid #000; padding-left: 8px;">' + col1 + '</td><td style="border:1px solid #000;"><input type="text" class="csv-subtotal ' + col4 + '" id="' + id + '" value="' + col2 + '" readonly tabindex="-1" style="color:#0056b3; text-align:center; font-weight:bold; width:100%; border:none; background:transparent;"></td></tr>';
+            return '<tr><td style="text-align: center; font-weight: bold; border:1px solid #000; ' + (color ? 'color:' + color + ';' : '') + '">' + col1 + '</td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-trips" value="' + col2 + '" ' + (color ? 'style="color:' + color + '; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-price" value="' + col3 + '" ' + (readonlyPrice ? 'readonly tabindex="-1"' : '') + ' ' + (color ? 'style="color:' + color + '; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td><td style="border:1px solid #000; padding:0;"><input type="text" class="csv-subtotal csv-calc row-subtotal" data-group="' + group + '" value="' + col4 + '" ' + (color ? 'style="color:' + color + '; font-weight:bold; width:100%; border:none; text-align:center; background:transparent;"' : 'style="width:100%; border:none; text-align:center; background:transparent;"') + '></td></tr>';
         };
 
-        // 🎯 智慧原因優先排序優先級 (大類優先)
+        let appendEmptyRows = (grp) => {
+            let html = '';
+            for(let i=0; i<2; i++){
+                html += '<tr>' +
+                    '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" value=""></td>' +
+                    '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-trips" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" value=""></td>' +
+                    '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-price" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" value=""></td>' +
+                    '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-subtotal csv-calc row-subtotal" data-group="' + grp + '" value="" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" readonly tabindex="-1"></td>' +
+                '</tr>';
+            }
+            return html;
+        };
+
         let getSortPriority = (label) => {
             let l = label.trim();
             if (l.includes('特殊點專車') || l.includes('特殊專車')) return 30; 
@@ -3272,80 +3518,71 @@ setInterval(() => {
             if (l.includes('離島')) return 70; 
             if (l.includes('轉運')) return 80; 
             if (l.includes('其他專車')) return 40; 
-            return 10; // 里程類兜底
+            return 10; 
         };
 
         let renderPoolRows = (poolObj, group) => {
             let rowsHtml = '';
-            // 🎯 分類優先級 (原因) 排序 ＋ 單價雙重排序演算法 (整齊劃一版)
             let sortedKeys = Object.keys(poolObj).sort((a,b) => {
-                let priA = getSortPriority(poolObj[a].label);
-                let priB = getSortPriority(poolObj[b].label);
-                if (priA !== priB) return priA - priB;
-                return poolObj[a].price - poolObj[b].price;
+                let priA = getSortPriority(poolObj[a].label); let priB = getSortPriority(poolObj[b].label);
+                if (priA !== priB) return priA - priB; return poolObj[a].price - poolObj[b].price;
             });
-
             if (sortedKeys.length === 0) return genRow('尚無明細資料', '0', '', '0', false, '', '', group);
-            
             sortedKeys.forEach(k => {
-                let item = poolObj[k];
-                let calcCost = item.trips * item.price;
-                let finalCost = calcCost !== 0 ? calcCost : item.cost;
+                let item = poolObj[k]; let calcCost = item.trips * item.price; let finalCost = calcCost !== 0 ? calcCost : item.cost;
                 if (item.label === '違規罰款') finalCost = -Math.abs(finalCost);
-                rowsHtml += genRow(item.label, item.trips || '0', item.price || '', finalCost || '0', false, '', item.color, group);
+                rowsHtml += genRow(item.label, fmt(item.trips), fmt(item.price), fmt(finalCost), false, '', item.color, group);
             });
             return rowsHtml;
         };
 
-        let tbody = '<tr><td colspan="2" style="text-align:left; font-weight:bold; border: 1px solid #000; background: #fdf5e6;">一、主線車輛運費</td><td colspan="2" style="text-align:right; font-weight:bold; border: 1px solid #000; background: #fdf5e6;">計價區間：' + dateRange + '</td></tr>' +
-            '<tr style="background:#e8e8e8;"><th style="width: 40%; padding:4px;">專配里程級距</th><th style="width: 20%; padding:4px;">車輛數</th><th style="width: 20%; padding:4px;">結帳天數</th><th style="width: 20%; padding:4px;">小計</th></tr>';
+        let tbody = '<tr><td colspan="2" style="text-align:left; font-weight:bold; border: 1px solid #000; background: #fdf5e6; padding-left: 8px;">一、主線車輛運費</td><td colspan="2" style="text-align:right; font-weight:bold; border: 1px solid #000; background: #fdf5e6; padding-right: 8px;">計價區間：' + dateRange + '</td></tr>' +
+            '<tr style="background:#e8e8e8;"><th style="width: 40%; padding:4px; border: 1px solid #000; text-align: center;">專配里程級距</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">車輛數</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">結帳天數</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">小計</th></tr>';
 
-        for(let i=0; i<5; i++) {
-            tbody += '<tr><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; background:transparent;"></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; background:transparent;"></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; background:transparent;"></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-subtotal csv-calc" value="0" style="width:100%; border:none; text-align:center; background:transparent;"></td></tr>';
-        }
+        tbody += appendEmptyRows('grp1');
+        tbody += genRow('專配' + whName + '倉小計', '0', '', 'group-total', true, 'grp1');
 
-        tbody += genRow('專配' + whName + '倉小計', '0', '', 'group-total', true, 'grp1') +
-            '<tr style="background:#e8e8e8;"><th>日翊里程級距</th><th>車輛數</th><th>結帳天數</th><th>小計</th></tr>' +
-            genRow('3.5噸', max35_cars || '', daysCount, sum35_cost || '0', false, '', '#0056b3', 'grp2', true) +
-            genRow('8噸', max8_cars || '', daysCount, sum8_cost || '0', false, '', '#0056b3', 'grp2', true);
+        tbody += '<tr style="background:#e8e8e8;"><th style="padding:4px; border: 1px solid #000; text-align: center;">日翊里程級距</th><th style="padding:4px; border: 1px solid #000; text-align: center;">車輛數</th><th style="padding:4px; border: 1px solid #000; text-align: center;">結帳天數</th><th style="padding:4px; border: 1px solid #000; text-align: center;">小計</th></tr>';
+        tbody += genRow('3.5噸', fmt(max35_cars), fmt(daysCount), fmt(sum35_cost), false, '', '', 'grp2', true);
+        tbody += genRow('8噸', fmt(max8_cars), fmt(daysCount), fmt(sum8_cost), false, '', '', 'grp2', true);
+        
+        tbody += appendEmptyRows('grp2');
+        tbody += genRow('日翊' + whName + '倉小計', fmt((sum35_cost+sum8_cost)||0), '', 'group-total', true, 'grp2');
 
-        for(let i=0; i<2; i++) {
-            tbody += '<tr><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; background:transparent;"></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; background:transparent;"></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; background:transparent;"></td><td style="border:1px solid #ccc; padding:0;"><input type="text" class="csv-subtotal csv-calc" value="0" style="width:100%; border:none; text-align:center; background:transparent;"></td></tr>';
-        }
+        tbody += '<tr><td colspan="4" data-no-border="true" style="border:none; height:10px;"></td></tr>';
 
-        tbody += genRow('日翊' + whName + '倉小計', (sum35_cost+sum8_cost)||'0', '', 'group-total', true, 'grp2') +
-            genRow('總計', (sum35_cost+sum8_cost)||'0', '', 'final-group-total', true, 'grp1-2') +
-            '<tr><td colspan="4" style="border-left:none; border-right:none; height:10px;"></td></tr>' +
-            '<tr><td colspan="4" style="text-align: left; font-weight: bold; border-right:none; border-left:none; border:1px solid #000;">二、加派車輛計價</td></tr>' +
-            '<tr style="background:#e8e8e8;"><th>派車原因</th><th>趟數</th><th>單價</th><th>小計</th></tr>' +
-            renderPoolRows(sec2Pool, 'grp3') +
-            genRow('', '', '', '0', false, '', '', 'grp3') +
-            genRow('', '', '', '0', false, '', '', 'grp3') +
-            genRow(whName + '倉小計', '0', '', 'group-total', true, 'grp3') +
-            genRow('總計', '0', '', 'final-group-total', true, 'grp3-4') +
-            '<tr><td colspan="4" style="border-left:none; border-right:none; height:10px;"></td></tr>' +
-            '<tr><td colspan="4" style="text-align: left; font-weight: bold; border-right:none; border-left:none; border:1px solid #000;">三、其他費用</td></tr>' +
-            '<tr style="background:#e8e8e8;"><th style="border: 1px solid #000; padding: 4px;">' + whName + '倉-項目</th><th style="border: 1px solid #000; padding: 4px;">趟數</th><th style="border: 1px solid #000; padding: 4px;">單價</th><th style="border: 1px solid #000; padding: 4px;">小計</th></tr>' +
-            renderPoolRows(sec3Pool, 'grp5') +
-            genRow('', '', '', '0', false, '', '', 'grp5') +
-            genRow('', '', '', '0', false, '', '', 'grp5') +
-            genRow(whName + '倉小計', '0', '', 'group-total', true, 'grp5') +
-            genRow('總計', '0', '', 'final-group-total', true, 'grp5-6') +
-            '<tr><td colspan="4" style="border-left:none; border-right:none; height:10px;"></td></tr>' +
-            '<tr><td colspan="2" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#f8f9fa; padding:4px;">小計運費：</td><td style="border:1px solid #000; padding:0;"><input type="text" id="final-subtotal" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; color:#d32f2f; font-size:16px; width:100%; border:none; background:transparent;"></td></tr>' +
-            '<tr><td colspan="2" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#f8f9fa; padding:4px;">當月運費(未稅)：</td><td style="border:1px solid #000; padding:0;"><input type="text" id="final-net" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; width:100%; border:none; background:transparent;"></td></tr>' +
-            '<tr><td colspan="2" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#f8f9fa; padding:4px;">稅額：</td><td style="border:1px solid #000; padding:0;"><input type="text" id="final-tax" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; width:100%; border:none; background:transparent;"></td></tr>' +
-            '<tr style="background:#e8f0fe;"><td colspan="2" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#e8f0fe; padding:4px; color:#0056b3;">當月運費(含稅)：</td><td style="border:1px solid #000; background:#e8f0fe; padding:0;"><input type="text" id="final-gross" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; font-size:18px; color:#0056b3; width:100%; border:none; background:transparent;"></td></tr>';
+        tbody += '<tr><td colspan="4" style="text-align: left; font-weight: bold; border-right:none; border-left:none; border:1px solid #000; padding-left: 8px;">二、加派車輛計價</td></tr>';
+        tbody += '<tr style="background:#e8e8e8;"><th style="padding:4px; border: 1px solid #000; text-align: center;">派車原因</th><th style="padding:4px; border: 1px solid #000; text-align: center;">趟數</th><th style="padding:4px; border: 1px solid #000; text-align: center;">單價</th><th style="padding:4px; border: 1px solid #000; text-align: center;">小計</th></tr>';
+        tbody += renderPoolRows(sec2Pool, 'grp3');
+        
+        tbody += appendEmptyRows('grp3');
+        tbody += genRow(whName + '倉小計', '0', '', 'group-total', true, 'grp3');
+
+        tbody += '<tr><td colspan="4" data-no-border="true" style="border:none; height:10px;"></td></tr>';
+
+        tbody += '<tr><td colspan="4" style="text-align: left; font-weight: bold; border-right:none; border-left:none; border:1px solid #000; padding-left: 8px;">三、其他費用</td></tr>';
+        tbody += '<tr style="background:#e8e8e8;"><th style="border: 1px solid #000; padding: 4px; text-align: center;">' + whName + '倉-項目</th><th style="border: 1px solid #000; padding: 4px; text-align: center;">趟數</th><th style="border: 1px solid #000; padding: 4px; text-align: center;">單價</th><th style="border: 1px solid #000; padding: 4px; text-align: center;">小計</th></tr>';
+        tbody += renderPoolRows(sec3Pool, 'grp5');
+        
+        tbody += appendEmptyRows('grp5');
+        tbody += genRow(whName + '倉小計', '0', '', 'group-total', true, 'grp5');
+
+        tbody += '<tr><td colspan="4" data-no-border="true" style="border:none; height:10px;"></td></tr>';
+
+        tbody += '<tr><td colspan="2" data-no-border="true" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#f8f9fa; padding:4px;">合計運費：</td><td style="border:1px solid #000; padding:0;"><input type="text" id="final-subtotal" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; color:#d32f2f; font-size: 14px; width:100%; border:none; background:transparent;"></td></tr>';
+        tbody += '<tr><td colspan="4" data-no-border="true" style="border:none; height:10px;"></td></tr>';
+        tbody += '<tr><td colspan="2" data-no-border="true" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#f8f9fa; padding:4px;">當月運費(未稅)：</td><td style="border:1px solid #000; padding:0;"><input type="text" id="final-net" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; font-size: 14px; width:100%; border:none; background:transparent;"></td></tr>';
+        tbody += '<tr><td colspan="2" data-no-border="true" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#f8f9fa; padding:4px;">稅額：</td><td style="border:1px solid #000; padding:0;"><input type="text" id="final-tax" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; font-size: 14px; width:100%; border:none; background:transparent;"></td></tr>';
+        tbody += '<tr style="background:#e8f0fe;"><td colspan="2" data-no-border="true" style="border:none;"></td><td style="text-align: left; font-weight: bold; border:1px solid #000; background:#e8f0fe; padding:4px; color:#0056b3;">當月運費(含稅)：</td><td style="border:1px solid #000; background:#e8f0fe; padding:0;"><input type="text" id="final-gross" value="0" class="csv-subtotal" readonly style="text-align:center; font-weight:bold; font-size: 15px; color:#0056b3; width:100%; border:none; background:transparent;"></td></tr>';
 
         let html = '<div style="background: #f8f9fa; padding: 15px 20px; border-bottom: 2px solid #dee2e6; display: flex; justify-content: space-between; align-items: center; z-index: 10; border-radius: 8px 8px 0 0; flex-shrink: 0;">' +
             '<div><h2 style="margin: 0; color: #ea8600; font-size: 22px;">🧮 ' + vendorName + '結帳運費總表 (' + whName + '倉)</h2><div style="font-size: 14px; color: #666; margin-top: 5px; font-weight:bold;">計價區間：' + dateRange + '</div></div>' +
             '<div class="no-print" style="display: flex; gap: 10px;">' +
-                '<button onclick="window.exportSummaryToExcel()" style="width: 120px; background-color: #17a2b8; color: white; border: none; padding: 10px 15px; font-size: 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">另存新檔</button>' +
-                '<button onclick="document.getElementById(\'vendorSummaryModal\').style.display=\'none\'" style="width: 120px; background-color: #6c757d; color: white; border: none; padding: 10px 15px; font-size: 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">關閉</button>' +
+                '<button onclick="window.exportSummaryToExcel()" style="width: 120px; background-color: #17a2b8; color: white; border: none; padding: 10px 15px; font-size: 16px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; text-align: center;">另存新檔</button>' +
+                '<button onclick="document.getElementById(\'vendorSummaryModal\').style.display=\'none\'" style="width: 120px; background-color: #6c757d; color: white; border: none; padding: 10px 15px; font-size: 16px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; text-align: center;">關閉</button>' +
             '</div>' +
             '</div>' +
             '<div class="print-container" style="flex: 1; overflow-y: auto; padding: 20px; background: white; border-radius: 0 0 8px 8px;">' +
-                '<div style="font-size: 16pt; font-weight: bold; margin-bottom: 15px; text-align:center;">' + vendorName + '物流股份有限公司(專配+日翊)</div>' +
                 '<table class="csv-table">' + tbody + '</table>' +
             '</div>';
 
@@ -3364,24 +3601,14 @@ setInterval(() => {
                 let s1 = 0, s2 = 0, s3 = 0, s5 = 0;
                 document.querySelectorAll('.csv-calc[data-group="grp1"]').forEach(inp => s1 += Number(String(inp.value).replace(/,/g,'')) || 0);
                 document.querySelectorAll('.csv-calc[data-group="grp2"]').forEach(inp => s2 += Number(String(inp.value).replace(/,/g,'')) || 0);
-                
-                document.querySelectorAll('.csv-calc[data-group="grp3"]').forEach(inp => {
-                    let v = Number(String(inp.value).replace(/,/g,'')) || 0;
-                    if (String(inp.value).includes('-') && v > 0) s3 -= v; else s3 += v;
-                });
-                
-                document.querySelectorAll('.csv-calc[data-group="grp5"]').forEach(inp => {
-                    let v = Number(String(inp.value).replace(/,/g,'')) || 0;
-                    if (String(inp.value).includes('-') && v > 0) s5 -= v; else s5 += v;
-                });
+                document.querySelectorAll('.csv-calc[data-group="grp3"]').forEach(inp => { let v = Number(String(inp.value).replace(/,/g,'')) || 0; if (String(inp.value).includes('-') && v > 0) s3 -= v; else s3 += v; });
+                document.querySelectorAll('.csv-calc[data-group="grp5"]').forEach(inp => { let v = Number(String(inp.value).replace(/,/g,'')) || 0; if (String(inp.value).includes('-') && v > 0) s5 -= v; else s5 += v; });
                 
                 let g1 = document.getElementById('grp1'); if(g1) g1.value = s1.toLocaleString('en-US');
                 let g2 = document.getElementById('grp2'); if(g2) g2.value = s2.toLocaleString('en-US');
                 let g12 = document.getElementById('grp1-2'); if(g12) g12.value = (s1+s2).toLocaleString('en-US');
-                
                 let g3 = document.getElementById('grp3'); if(g3) g3.value = s3.toLocaleString('en-US');
                 let g34 = document.getElementById('grp3-4'); if(g34) g34.value = s3.toLocaleString('en-US');
-                
                 let g5 = document.getElementById('grp5'); if(g5) g5.value = s5.toLocaleString('en-US');
                 let g56 = document.getElementById('grp5-6'); if(g56) g56.value = s5.toLocaleString('en-US');
                 
@@ -3396,26 +3623,31 @@ setInterval(() => {
                 inp.addEventListener('input', (e) => {
                     let tr = e.target.closest('tr');
                     if (tr && (e.target.classList.contains('row-trips') || e.target.classList.contains('row-price'))) {
-                        let tStr = tr.querySelector('.row-trips').value;
-                        let pStr = tr.querySelector('.row-price').value;
+                        let tStr = String(tr.querySelector('.row-trips').value).replace(/,/g, '');
+                        let pStr = String(tr.querySelector('.row-price').value).replace(/,/g, '');
                         if (tStr !== '' && pStr !== '') {
-                            let t = parseFloat(tStr) || 0;
-                            let p = parseFloat(pStr) || 0;
                             let sub = tr.querySelector('.row-subtotal');
                             if (sub) {
-                                let cost = t * p;
+                                let cost = (parseFloat(tStr) || 0) * (parseFloat(pStr) || 0);
                                 let label = tr.children[0].innerText;
                                 if (label.includes('罰款') || label.includes('違規')) cost = -Math.abs(cost);
-                                sub.value = cost;
+                                sub.value = fmt(cost);
                             }
                         }
                     }
                     calcTotal();
                 });
+                
+                inp.addEventListener('blur', (e) => {
+                    let val = String(e.target.value).replace(/,/g, '');
+                    if (val !== '' && !isNaN(val)) {
+                        e.target.value = Number(val).toLocaleString('en-US');
+                    }
+                });
             });
             calcTotal(); 
         }
-    });;
+    });
 
     makeInvincible('calcVendorDailyTable', function() { /* 保留空殼 */ });
 
@@ -3496,7 +3728,6 @@ setInterval(() => {
                     }
                     if (typeof window.saveData === 'function') window.saveData(false);
                     
-                    // 重算
                     let catTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
                     bd.querySelectorAll('tr').forEach(tr => {
                         let rowTotal = 0;
@@ -3515,7 +3746,6 @@ setInterval(() => {
                 });
             });
             
-            // 初次重算
             let catTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
             bd.querySelectorAll('tr').forEach(tr => {
                 let rowTotal = 0;
@@ -3534,34 +3764,6 @@ setInterval(() => {
         }
     });
 
-    makeInvincible('calcVendorDailyTable', function() {
-        let catTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
-        let bd = document.getElementById('vendorDailyBody');
-        if(!bd) return;
-        bd.querySelectorAll('tr').forEach(tr => {
-            let rowTotal = 0;
-            tr.querySelectorAll('.vendor-daily-cell').forEach(input => {
-                let cat = input.dataset.cat, valStr = input.value.replace(/,/g, '').trim(), val = parseFloat(valStr);
-                if(!isNaN(val) && valStr !== '') {
-                    if (valStr.includes('-') && val > 0) rowTotal -= val; else rowTotal += val;
-                    catTotals[input.dataset.cat] += val;
-                }
-            });
-            let rt = tr.querySelector('.daily-row-total'); if(rt) rt.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
-            grandTotal += rowTotal;
-        });
-
-        let tfootHtml = `<tr>
-            <td colspan="2" style="text-align:center; font-weight:bold; background:#fde293; color:#b06000; border: 1px solid var(--border-color);">合計</td>
-            ${Object.keys(catTotals).map(cat => `<td style="text-align:center; font-weight:bold; background:#fde293; color:#b06000; border: 1px solid var(--border-color);" id="vd-tot-${cat}">${catTotals[cat] !== 0 ? catTotals[cat].toLocaleString('en-US') : '0'}</td>`).join('')}
-            <td style="text-align:center; font-weight:bold; background:#ea8600; color:white; font-size:16px; border: 1px solid var(--border-color);">${grandTotal !== 0 ? grandTotal.toLocaleString('en-US') : '0'}</td>
-            <td style="background:#fde293; border: 1px solid var(--border-color);"></td>
-        </tr>`;
-        let ft = document.getElementById('vendorDailyFoot'); if(ft) ft.innerHTML = tfootHtml;
-        window.vendorDailyTotals = catTotals; 
-    });
-
-    // --- 5. 系統比對大表與結帳總表輸出引擎 (徹底修正，週累計大表日期與天數自動累計累加) ---
     makeInvincible('renderCheckoutTab', function() {
         let startInputEl = document.getElementById('checkoutStartDate');
         let endInputEl = document.getElementById('checkoutEndDate');
@@ -3570,7 +3772,6 @@ setInterval(() => {
         let startInput = startInputEl.value;
         let endInput = endInputEl.value;
         
-        // 賦予預設值 (如果使用者還沒點擊日期)
         if (!startInput || !endInput) {
             let d = new Date();
             let m = d.getMonth() + 1;
@@ -3587,7 +3788,6 @@ setInterval(() => {
         let totals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
         let current = new Date(start);
         
-        // 讀取當前倉別的日別資料，用來渲染「系統資料合計」
         let mainState = {};
         try { mainState = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
         let whSel = document.getElementById('checkoutWhSelect');
@@ -3632,11 +3832,9 @@ setInterval(() => {
         if(headEl) headEl.innerHTML = sysThead;
         if(bodyEl) bodyEl.innerHTML = sysTbody;
 
-        // 呼叫渲染下方的廠商單獨每日比對表
         window.renderVendorDailyTable(start, end, totals);
     });
 
-   
     const initAll = () => {
         let vSel = document.getElementById('vendorSelect');
         if (vSel && !vSel.querySelector('option[value="全部"]')) {
@@ -3656,12 +3854,68 @@ setInterval(() => {
             vSel.dataset.hasListener = "true"; 
         }
         
-        // 綁定按鈕
         setTimeout(() => {
             let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
             let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
             let b3 = document.querySelector('button[onclick*="openVendorSummaryModal"]');
             
+            // 🚀 動態注入「匯出每日明細」按鈕，統一取消所有按鈕的浮動特效並強制置中
+            if (b3 && b3.parentNode && !document.getElementById('btnExportDaily')) {
+                
+                // 動態加上一段輕量 CSS，拔除所有按鈕的浮動動畫，並將文字絕對置中
+                if (!document.getElementById('custom-btn-styles')) {
+                    let style = document.createElement('style');
+                    style.id = 'custom-btn-styles';
+                    style.innerHTML = `
+                        .custom-export-btn {
+                            background-color: #e67e22 !important;
+                            border-color: #e67e22 !important;
+                            color: white !important;
+                        }
+                        /* 🚀 強制拔除這四顆按鈕的 hover 浮動特效與陰影，統一為平貼狀態 */
+                        #btnExportDaily, 
+                        button[onclick*="handleMainlineExcelImport"],
+                        button[onclick*="handleVendorCheckoutExcelImportNew"],
+                        button[onclick*="openVendorSummaryModal"] {
+                            transform: none !important;
+                            box-shadow: none !important;
+                            transition: none !important;
+                            display: inline-flex !important;
+                            justify-content: center !important;
+                            align-items: center !important;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                let newBtn = document.createElement('button');
+                newBtn.id = 'btnExportDaily';
+                
+                // 完全拷貝 b3 的 class，讓動畫屬性一模一樣，然後再加上我們的顏色 class
+                newBtn.className = b3.className + ' custom-export-btn'; 
+                
+                newBtn.innerHTML = '📊 3. 匯出每日明細';
+                newBtn.onclick = window.exportVendorDailyToExcel;
+                
+                b3.innerHTML = b3.innerHTML.replace('3.', '4.');
+                b3.parentNode.insertBefore(newBtn, b3);
+
+                // 🚀 強迫這 4 顆按鈕 (如果存在的話) 完美置中與設定間距，並清除可能自帶的 float classes
+                [b1, b2, newBtn, b3].forEach(btn => {
+                    if (btn) {
+                        btn.style.width = '180px';
+                        btn.style.marginRight = '8px';
+                        btn.style.display = 'inline-flex';
+                        btn.style.justifyContent = 'center';
+                        btn.style.alignItems = 'center';
+                        btn.style.textAlign = 'center';
+                        
+                        // 移除可能造成浮動的 tailwind 或自定義動畫 classes
+                        btn.className = btn.className.replace(/hover:-translate-y-\d+|hover:shadow-\w+|shadow-\w+/g, '');
+                    }
+                });
+            }
+
             if (!document.getElementById('mainlineExcelFile_v6')) {
                 let i1 = document.createElement('input'); i1.type = 'file'; i1.id = 'mainlineExcelFile_v6'; i1.accept = '.xlsx, .xls, .csv'; i1.style.display = 'none';
                 document.body.appendChild(i1);
@@ -3686,12 +3940,13 @@ setInterval(() => {
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
 
-    // --- 7. 強制停止跳出舊資料覆蓋警告 ---
     let hookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             makeInvincible('saveData', async function(showMsg, forceOverwrite) {
-                return await origSave(showMsg, true); 
+                // 🚀 重大修復：拔除盲目的強制覆蓋 (true)。
+                // 恢復原生雲端防呆校驗，這樣沒重新整理的舊電腦，就不會再把別人手機剛 Key 好的資料洗掉了！
+                return await origSave(showMsg, forceOverwrite); 
             });
             window.saveData._isHooked = true;
             clearInterval(hookInterval);
@@ -3699,169 +3954,6 @@ setInterval(() => {
     }, 500);
 
 })();
-</script>
-<!-- 🛡️ 雲端防爆與資料保護模組 -->
-<script id="firebase-antibomb-patch">
-(function() {
-    console.log('🛡️ 雲端防爆模組啟動中...');
-
-    // 攔截並覆寫 window.saveData，防止將龐大的 vendorDB 塞入 window.state
-    if (typeof window.saveData === 'function') {
-        let originalSaveData = window.saveData;
-        window.saveData = async function(showMsg = false, forceOverwrite = false) {
-            if (window.isSaving) return; window.isSaving = true;
-            window.state.lastModified = Date.now();
-            
-            // 🚨 防爆點 1：將龐大的 Excel 明細獨立存放在 localStorage，絕對不放入 window.state！
-            if (window.customVendorCheckoutDB) {
-                try {
-                    localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
-                } catch(e) {
-                    console.error("Local Storage is full:", e);
-                }
-                // 確保 window.state 裡面沒有 vendorDB，避免撐爆 Firebase 1MB 上限
-                delete window.state.vendorDB; 
-            }
-
-            localStorage.setItem('freightData_115', JSON.stringify(window.state));
-            
-            let ind = document.getElementById("cloud-indicator");
-            if (ind && ind.innerText.includes("雲端已連線")) {
-                let originalText = ind.innerText;
-                ind.innerText = "☁️寫入中";
-                setTimeout(() => ind.innerText = originalText, 800);
-            }
-
-            if (window.isCloudSyncEnabled && window.dbFirebase && window.appId) {
-                try {
-                    // Firebase v11 syntax
-                    const { doc, getDoc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-                    const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
-                    
-                    if (!forceOverwrite) {
-                        const snap = await getDoc(docRef);
-                        if (snap.exists()) {
-                            let cloudData = snap.data();
-                            if ((cloudData.lastModified || 0) > window.state.lastModified) {
-                                if(confirm('雲端有較新的資料，是否要強制覆寫？\n(取消則會載入雲端資料)')) {
-                                    window.state.lastModified = Date.now();
-                                } else {
-                                    window.isSaving = false;
-                                    location.reload();
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                    
-                    await setDoc(docRef, window.state);
-                    if (showMsg) window.showToast('☁️ 雲端寫入成功！');
-                } catch (err) {
-                    console.error("Firebase sync error:", err);
-                    window.showToast('⚠️ 雲端寫入失敗，已暫存於本機');
-                    if (ind) {
-                        ind.innerText = "☁️ 本機模式 (受阻)";
-                        ind.style.backgroundColor = "#dc3545";
-                        ind.style.color = "white";
-                        window.isCloudSyncEnabled = false;
-                    }
-                }
-            } else {
-                if (showMsg) window.showToast('💾 已暫存於本機');
-            }
-            window.isSaving = false;
-        };
-    }
-
-    // 保護載入時的資料，防止舊雲端資料洗掉本機已存的 customVendorCheckoutDB
-    let protectInterval = setInterval(() => {
-        if (window.customVendorCheckoutDB && Object.keys(window.customVendorCheckoutDB).length > 0) {
-            // 如果本機有資料，我們要在這裡建立防護網
-            // 防止 initCloudSync 裡面的 JSON.stringify(window.state.vendorDB) 把它洗掉
-            let cachedDB = JSON.parse(JSON.stringify(window.customVendorCheckoutDB));
-            
-            // 監聽 storage 變化，如果 freight_vendor_db 被意外清空，馬上補回去
-            window.addEventListener('storage', (e) => {
-                if (e.key === 'freightData_115') {
-                    // 當雲端覆寫主資料時，強制回存結帳資料
-                    try {
-                        localStorage.setItem('freight_vendor_db', JSON.stringify(cachedDB));
-                        window.customVendorCheckoutDB = cachedDB;
-                    } catch(ex){}
-                }
-            });
-            clearInterval(protectInterval);
-        }
-    }, 1000);
-
-})();
-</script>
-<!-- ... existing code ... -->
-<!-- 🚀 終極雲端同步雙向控制面板 -->
-<script>
-    // 1. 強制上傳 (本機 -> 雲端)
-    window.forcePushToCloud = async function() {
-        if (!window.dbFirebase || !window.appId) return alert("⚠️ 尚未連線至 Firebase");
-        if (!confirm("⚠️ 【最後確認】\n\n確定要把「目前畫面的資料」強制上傳並覆蓋雲端嗎？")) return;
-        
-        let ind = document.getElementById("cloud-indicator");
-        if(ind) { ind.innerText = "☁️ 強制上傳中..."; ind.style.backgroundColor = "#ffc107"; }
-        
-        try {
-            if (typeof window.commitActiveInput === 'function') window.commitActiveInput();
-            const { doc, setDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-            
-            let cleanState = JSON.parse(JSON.stringify(window.state));
-            delete cleanState.vendorDB;
-            cleanState.lastModified = Date.now(); // 正常時間戳
-            
-            const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
-            await setDoc(docRef, cleanState);
-            
-            localStorage.setItem('freightData_115', JSON.stringify(cleanState));
-            alert("✅ 上傳成功！\n\n現在請立刻去 GitHub 網頁，點擊「📥 2. 強制下載 (清除快取)」！");
-        } catch(e) {
-            alert("❌ 寫入失敗！原因：" + e.message);
-        }
-    };
-
-    // 2. 強制下載 (雲端 -> 本機，清除快取)
-    window.forcePullFromCloud = function() {
-        if (!confirm("⚠️ 【警告】\n\n這將會清除這個網頁目前的「頑固暫存」，並強制從雲端下載最新資料。\n確定要執行嗎？")) return;
-        
-        // 清除本機所有的主狀態快取，逼迫系統重新下載 (不會影響廠商結帳明細)
-        localStorage.removeItem('freightData_115');
-        alert("✅ 快取已清除！系統將重新載入雲端最新資料。");
-        location.reload();
-    };
-
-    // 自動將兩顆按鈕加到雲端設定視窗中
-    setInterval(() => {
-        let modal = document.querySelector('#cloudModal .modal-content');
-        if (modal && !document.getElementById('sync-control-panel')) {
-            // 移除舊版單一按鈕
-            let oldBtn = document.getElementById('force-push-btn');
-            if (oldBtn) oldBtn.remove();
-
-            let panel = document.createElement('div');
-            panel.id = 'sync-control-panel';
-            panel.style.cssText = 'display: flex; gap: 10px; margin-top: 15px;';
-            
-            let pushBtn = document.createElement('button');
-            pushBtn.innerHTML = '🚀 1. 強制上傳 (覆蓋雲端)';
-            pushBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 12px; border-radius: 6px; flex: 1; font-weight: bold; cursor: pointer;';
-            pushBtn.onclick = window.forcePushToCloud;
-
-            let pullBtn = document.createElement('button');
-            pullBtn.innerHTML = '📥 2. 強制下載 (清除快取)';
-            pullBtn.style.cssText = 'background-color: #17a2b8; color: white; border: none; padding: 12px; border-radius: 6px; flex: 1; font-weight: bold; cursor: pointer;';
-            pullBtn.onclick = window.forcePullFromCloud;
-
-            panel.appendChild(pushBtn);
-            panel.appendChild(pullBtn);
-            modal.appendChild(panel);
-        }
-    }, 1500);
 </script>
 </body>
 </html>
