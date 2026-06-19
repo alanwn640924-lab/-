@@ -2895,16 +2895,14 @@ setInterval(() => {
     console.log("🚀 啟動無敵鎖對帳引擎與特洛伊木馬同步...");
     const LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // 🚀 特洛伊木馬啟動：網頁一打開，立刻去雲端下載來的包裹裡找我們的資料
+    // 🚀 特洛伊木馬啟動：網頁一打開，立刻去雲端下載來的包裹裡找我們的廠商運費資料
     let mainStateInit = {};
     try { mainStateInit = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
     
     if (mainStateInit.customVendorDB) {
-        // 如果雲端包裹裡有我們的資料，直接解壓縮使用！(這解決了跨設備看不見的問題)
         window.customVendorCheckoutDB = mainStateInit.customVendorDB;
         localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
     } else {
-        // 如果雲端沒有，就讀取單機原本的
         try { window.customVendorCheckoutDB = JSON.parse(localStorage.getItem('freight_vendor_db') || '{}'); }
         catch(e) { window.customVendorCheckoutDB = {}; }
     }
@@ -2926,14 +2924,11 @@ setInterval(() => {
         }
         localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
         
-        // 🚀 特洛伊木馬寫入：每次更新費用或備註，就偷偷塞進原系統的包裹裡等待上傳
+        // 寫入時順便掛載到原系統變數，等待上傳
         let ms = {};
         try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
         ms.customVendorDB = window.customVendorCheckoutDB;
         localStorage.setItem('freightData_115', JSON.stringify(ms));
-        ['freightData_115', 'appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-            if (window[varName]) window[varName].customVendorDB = window.customVendorCheckoutDB;
-        });
     };
 
     let parseExcelDateUnified = (cell) => {
@@ -2953,124 +2948,38 @@ setInterval(() => {
         });
     };
 
-    // 🚀 手機版專屬 3D 定位器：絕對不抓錯欄位
-    const getCoords = (target) => {
-        let date = target.getAttribute('data-date');
-        if (!date) {
-            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li');
-            if (container) {
-                let dEl = container.querySelector('[data-date]');
-                if (dEl) date = dEl.getAttribute('data-date');
-            }
-        }
-
-        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
-        
-        // 1. RWD 手機版特定： data-label
-        if (!key) {
-            let td = target.closest('td');
-            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
-            
-            // 2. 傳統電腦版表格：透過表頭 index 尋找
-            if (!key && td) {
-                let tr = target.closest('tr');
-                let table = target.closest('table');
-                if (tr && table) {
-                    let idx = Array.from(tr.children).indexOf(td);
-                    let thead = table.querySelector('thead');
-                    if (thead) {
-                        let ths = thead.querySelectorAll('th');
-                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
-                    }
-                }
-            }
-        }
-
-        // 3. 手機卡片盲抓：找旁邊的文字
-        if (!key) {
-            let prev = target.previousElementSibling;
-            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
-                key = prev.innerText;
-            } else {
-                let parent = target.closest('div, li, label');
-                if (parent) {
-                    let lbl = parent.querySelector('label, span, strong');
-                    if (lbl && lbl !== target) key = lbl.innerText;
-                }
-            }
-        }
-
-        if (key) {
-            key = key.replace(/[\n\r]/g, '').replace(/[:：]/g, '').trim();
-            // 自動校正
-            if (key.includes('簽到')) key = '簽到率';
-            else if (key.includes('準點')) key = '準點率';
-            else if (key.includes('回收')) key = '回收件數';
-            else if (key.includes('備註') && !key.includes('車數')) key = '備註';
-        }
-
-        if (!key || key === '日期' || key === '星期' || key === '') return null;
-        return { date, key };
-    };
-
-    // --- 🚀 無感背景同步器 (Auto-Save) ---
+    // --- 🚀 全新無感自動存檔引擎 (不干擾原系統的欄位判定) ---
     let autoSaveTimer = null;
     
-    const skyNetInterceptor = (e) => {
+    const triggerAutoSave = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
-        if (target.closest('#vendorSummaryModal')) return;
+        if (target.closest('#vendorSummaryModal')) return; // 豁免結帳大表
 
-        // 如果是外掛的運費表格，它有自己的儲存邏輯(包含特洛伊木馬)，所以攔截器不用重複寫入 localStorage
-        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
-
-        if (!isVendorInput) {
-            let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-            let wh = whSel ? whSel.value : (window.currentWarehouse || '大肚倉');
-            if (wh) {
-                let coords = getCoords(target);
-                if (coords && coords.date && coords.key) {
-                    let mainState = {};
-                    try { mainState = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
-                    if (!mainState.warehouses) mainState.warehouses = {};
-                    if (!mainState.warehouses[wh]) mainState.warehouses[wh] = { daily: {} };
-                    if (!mainState.warehouses[wh].daily) mainState.warehouses[wh].daily = {}; 
-                    if (!mainState.warehouses[wh].daily[coords.date]) mainState.warehouses[wh].daily[coords.date] = {};
-                    
-                    mainState.warehouses[wh].daily[coords.date][coords.key] = target.value;
-                    localStorage.setItem('freightData_115', JSON.stringify(mainState));
-                    
-                    ['freightData_115', 'appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                        if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
-                            if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
-                            if (!window[varName].warehouses[wh].daily[coords.date]) window[varName].warehouses[wh].daily[coords.date] = {};
-                            window[varName].warehouses[wh].daily[coords.date][coords.key] = target.value;
-                        }
-                    });
-                }
-            }
-        }
-
-        // 不管是原系統欄位還是我們的運費欄位，打完字都強制呼叫雲端上傳
+        // 只要發生內容改變，1.5 秒後在背景幫你按一次「存檔」
         if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        let delay = (e.type === 'input') ? 1500 : 100;
         autoSaveTimer = setTimeout(() => {
             if (typeof window.saveData === 'function') window.saveData(false, false);
-        }, delay);
+        }, 1500);
     };
 
+    // 只監聽「改變」和「失去焦點」，不監聽「逐字輸入」，確保原系統有時間更新自己的資料庫名字
+    document.addEventListener('change', triggerAutoSave, true);
+    document.addEventListener('blur', triggerAutoSave, true);
+
+    // ⭐️ 終極救命網：解決「打完字直接關閉網頁/滑掉 APP，資料沒存到」的問題
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
-            if (autoSaveTimer) {
-                clearTimeout(autoSaveTimer); 
-                if (typeof window.saveData === 'function') window.saveData(false, false); 
+            // 1. 強制讓還在打字的格子失去焦點，這會強迫原系統把字吃進去
+            if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+                document.activeElement.blur(); 
             }
+            // 2. 取消原本的倒數，在網頁死掉前最後一刻直接射上雲端
+            if (autoSaveTimer) clearTimeout(autoSaveTimer); 
+            if (typeof window.saveData === 'function') window.saveData(false, false); 
         }
     });
 
-    document.addEventListener('input', skyNetInterceptor, true);
-    document.addEventListener('change', skyNetInterceptor, true);
-    document.addEventListener('blur', skyNetInterceptor, true);
 
     // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
@@ -3552,6 +3461,7 @@ setInterval(() => {
             return Number(String(v).replace(/,/g, '')).toLocaleString('en-US');
         };
 
+        // 復原原本最乾淨的分類邏輯，讓 B2C 和 C2C 乖乖併入「上收」
         let getCleanLabel = (mainCat, typeStr, price) => {
             let m = (mainCat || '').trim(); let t = (typeStr || '').trim(); let p = Number(price) || 0;
             let combined = m + t; let range = '';
@@ -3860,6 +3770,12 @@ setInterval(() => {
                         setStorageVal(selectedWh, selectedVendor, dStr, 'remark', cleanVal);
                     }
                     
+                    // ⭐️ 更新完我們的運費資料後，也自動背景存檔一次
+                    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+                    autoSaveTimer = setTimeout(() => {
+                        if (typeof window.saveData === 'function') window.saveData(false, false);
+                    }, 100);
+
                     let catTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
                     bd.querySelectorAll('tr').forEach(tr => {
                         let rowTotal = 0;
@@ -4066,7 +3982,7 @@ setInterval(() => {
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
 
-    // 🚀 在存檔前最後一刻，確保木馬包裹就緒
+    // 🚀 在存檔前最後一刻，掛載木馬包裹
     let hookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
