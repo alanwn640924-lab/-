@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極萬能同步引擎：強制打針 + 閃退救援 + 全頻翻譯 + 總計修復 + 無情瘦身...");
+    console.log("🚀 啟動終極純淨同步引擎：回歸原生上傳 + 隱形欄位校正 + 雷達常駐...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     // 1. 初始化廠商資料庫
@@ -2943,223 +2943,92 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：精準定位與防呆翻譯機
+    // 🚀 核心一：底層隱形翻譯與包裹夾帶 (絕不破壞原生 Vue 反應機制)
     // ============================================================================
-    var getCoords = (target) => {
-        let date = target.getAttribute('data-date');
-        if (!date) {
-            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
-            if (container) {
-                let dEl = container.querySelector('[data-date]');
-                if (dEl) date = dEl.getAttribute('data-date');
-            }
-        }
-
-        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
-        if (!key) {
-            let td = target.closest('td');
-            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
-            if (!key && td) {
-                let tr = target.closest('tr');
-                let table = target.closest('table');
-                if (tr && table) {
-                    let idx = Array.from(tr.children).indexOf(td);
-                    let thead = table.querySelector('thead');
-                    if (thead) {
-                        let ths = thead.querySelectorAll('th');
-                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
+    const origSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, val) {
+        if (key === 'freightData_115') {
+            try {
+                let ms = JSON.parse(val);
+                ms.customVendorDB = window.customVendorCheckoutDB; // 夾帶廠商備註
+                
+                // 💡 隱形校正：在存檔的最後一刻，同步「手機出貨」與「電腦出貨件數」
+                if (ms.warehouses) {
+                    for (let w in ms.warehouses) {
+                        if (ms.warehouses[w].daily) {
+                            for (let d in ms.warehouses[w].daily) {
+                                let dayData = ms.warehouses[w].daily[d];
+                                
+                                if (dayData['出貨件數'] !== undefined && dayData['出貨'] === undefined) dayData['出貨'] = dayData['出貨件數'];
+                                else if (dayData['出貨'] !== undefined && dayData['出貨件數'] === undefined) dayData['出貨件數'] = dayData['出貨'];
+                                
+                                if (dayData['回收件數'] !== undefined && dayData['回收'] === undefined) dayData['回收'] = dayData['回收件數'];
+                                else if (dayData['回收'] !== undefined && dayData['回收件數'] === undefined) dayData['回收件數'] = dayData['回收'];
+                            }
+                        }
                     }
                 }
-            }
+                val = JSON.stringify(ms);
+            } catch(e) {}
         }
-        if (!key) {
-            let prev = target.previousElementSibling;
-            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
-                key = prev.innerText;
-            } else {
-                let parent = target.closest('div, li, label, .form-group');
-                if (parent) {
-                    let lbl = parent.querySelector('label, span, strong');
-                    if (lbl && lbl !== target) key = lbl.innerText;
-                }
-            }
-        }
-
-        if (key) {
-            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
-            if (cleanKey.includes('出勤')) key = '出勤數';
-            else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
-            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
-            else if (cleanKey.includes('簽到')) key = '簽到率';
-            else if (cleanKey.includes('準點')) key = '準點率';
-            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
-            else key = cleanKey;
-        }
-
-        if (!key || key === '日期' || key === '星期' || key === '') return null;
-        return { date, key };
-    };
-
-    var forceInjectState = (wh, date, key, val) => {
-        let ms = {};
-        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
-        if (!ms.warehouses) ms.warehouses = {};
-        if (!ms.warehouses[wh]) ms.warehouses[wh] = { daily: {} };
-        if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
-        if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
-        
-        ms.warehouses[wh].daily[date][key] = val;
-        ms.customVendorDB = window.customVendorCheckoutDB; 
-        localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-        ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-            if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
-                if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
-                if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
-                window[varName].warehouses[wh].daily[date][key] = val;
-                window[varName].customVendorDB = window.customVendorCheckoutDB;
-            }
-        });
+        origSetItem.apply(this, [key, val]);
     };
 
     // ============================================================================
-    // 🚀 核心三：自動存檔引擎與閃退防護
+    // 🚀 核心二：專屬廠商欄位處理與閃退防護
     // ============================================================================
-    var isLocalDirty = false;
-    var autoSaveTimer = null;
-    var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
-
-    setInterval(() => {
-        if (isLocalDirty) return; 
-        try {
-            let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
-            if (ms.customVendorDB) {
-                let cloudStr = JSON.stringify(ms.customVendorDB);
-                if (cloudStr !== lastCloudVendorStr && cloudStr !== '{}') {
-                    window.customVendorCheckoutDB = ms.customVendorDB;
-                    localStorage.setItem('freight_vendor_db', cloudStr);
-                    lastCloudVendorStr = cloudStr;
-                    if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-                }
-            }
-        } catch(e) {}
-    }, 2000);
-
-    window.handleAction = (e) => {
+    document.addEventListener('input', (e) => {
         let target = e.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
-        if (target.closest('#vendorSummaryModal')) return;
-
-        isLocalDirty = true; 
+        if (!target.classList.contains('vendor-daily-cell') && !target.classList.contains('vendor-remark-input')) return;
         
         let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
         let whRaw = whSel ? whSel.value : '大肚';
         let wh = whRaw.replace('倉', '');
+        let dStr = target.getAttribute('data-date');
+        let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
+        
+        if (selectedVendor !== '全部' && dStr) {
+            if (target.classList.contains('vendor-daily-cell')) {
+                let cat = target.getAttribute('data-cat');
+                let val = parseFloat(target.value.replace(/,/g, '').trim());
+                setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
 
-        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
-
-        if (isVendorInput) {
-            let dStr = target.getAttribute('data-date');
-            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-            if (selectedVendor !== '全部' && dStr) {
-                if (target.classList.contains('vendor-daily-cell')) {
-                    let cat = target.getAttribute('data-cat');
-                    let valStr = target.value.replace(/,/g, '').trim();
-                    let val = parseFloat(valStr);
-                    setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
-
-                    let tr = target.closest('tr');
-                    if (tr) {
-                        let rowTotal = 0;
-                        tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
-                            let cellVal = parseFloat(inp.value.replace(/,/g, ''));
-                            if (!isNaN(cellVal)) rowTotal += cellVal;
-                        });
-                        let totCell = tr.querySelector('.daily-row-total');
-                        if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
-                    }
-
-                } else if (target.classList.contains('vendor-remark-input')) {
-                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+                let tr = target.closest('tr');
+                if (tr) {
+                    let rowTotal = 0;
+                    tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
+                        let cellVal = parseFloat(inp.value.replace(/,/g, ''));
+                        if (!isNaN(cellVal)) rowTotal += cellVal;
+                    });
+                    let totCell = tr.querySelector('.daily-row-total');
+                    if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
                 }
+            } else if (target.classList.contains('vendor-remark-input')) {
+                let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
+                setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
             }
-        } else {
-            let coords = getCoords(target);
-            if (coords && coords.date && coords.key) {
-                forceInjectState(wh, coords.date, coords.key, target.value);
-            }
+            // 觸發原系統存檔，把廠商備註一起包上雲端
+            if (typeof window.saveData === 'function') setTimeout(() => window.saveData(false, false), 1000);
         }
+    }, true);
 
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        let delay = (e.type === 'input') ? 1500 : 500;
-        autoSaveTimer = setTimeout(() => {
-            if (isLocalDirty && typeof window.saveData === 'function') {
-                isLocalDirty = false;
-                window.saveData(true, true);
-            }
-        }, delay);
-    };
-
-    document.addEventListener('input', window.handleAction, true);
-    document.addEventListener('change', window.handleAction, true);
-    document.addEventListener('focusout', window.handleAction, true);
-
+    // ⭐️ 閃退救命網：解決「最後一格直接關網頁」資料不見的痛點
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                let coords = getCoords(activeEl);
-                let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-                let whRaw = whSel ? whSel.value : '大肚';
-                let wh = whRaw.replace('倉', '');
-                
-                if (coords && coords.date && coords.key) {
-                    forceInjectState(wh, coords.date, coords.key, activeEl.value);
-                }
+                // 強迫觸發原生 change 事件，讓系統大腦吞下最後一個數字並存檔
+                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
                 activeEl.blur(); 
-            }
-            if (isLocalDirty && typeof window.saveData === 'function') {
-                if (autoSaveTimer) clearTimeout(autoSaveTimer); 
-                isLocalDirty = false;
-                window.saveData(true, true); 
             }
         }
     });
 
-    var syncHookInterval = setInterval(() => {
-        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
-            let origSave = window.saveData;
-            
-            window.saveData = async function(...args) {
-                let activeEl = document.activeElement;
-                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-
-                let ms = {};
-                try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
-                ms.customVendorDB = window.customVendorCheckoutDB;
-                localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) { 
-                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                    }
-                });
-
-                return await origSave.apply(this, args); 
-            };
-            window.saveData._isHooked = true;
-            clearInterval(syncHookInterval);
-        }
-    }, 500);
-
     // ============================================================================
-    // 💡 核心四：動態尋找「雲端連線設定」，並將瘦身按鈕藏在儲存按鈕旁邊
+    // 💡 核心三：按鈕常駐巡邏雷達 (確保 GitHub 上按鈕絕對不會消失)
     // ============================================================================
+    
+    // 1. 巡邏雷達：雲端連線設定裡的「瘦身按鈕」
     setInterval(() => {
         if (document.getElementById('btnCleanJunkModal')) return;
 
@@ -3173,93 +3042,133 @@ setInterval(() => {
         }
 
         if (targetBtn && targetBtn.parentNode) {
-            let cleanBtn = document.createElement('button');
-            cleanBtn.id = 'btnCleanJunkModal';
-            cleanBtn.innerHTML = '🧹 雲端瘦身 (清垃圾)';
-            cleanBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 6px 12px; font-size: 14px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);';
-            
-            cleanBtn.onclick = function(e) {
-                e.preventDefault(); 
+            if (!targetBtn.parentNode.querySelector('#btnCleanJunkModal')) {
+                let cleanBtn = document.createElement('button');
+                cleanBtn.id = 'btnCleanJunkModal';
+                cleanBtn.innerHTML = '🧹 雲端瘦身 (清垃圾)';
+                cleanBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 6px 12px; font-size: 14px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);';
                 
-                if(!confirm('這將清除整個系統遺留的「全空白/全為0」的無效幽靈資料，為雲端減肥加速。\n絕對不會刪除您已輸入的任何有效數字！\n是否執行？')) return;
-                
-                let deletedDays = new Set();
-                
-                // 💡 無情過濾器：無視 Vue 的 __ob__，並將空物件、NaN、0 等同視為垃圾
-                const isGarbage = (record) => {
-                    if (!record || typeof record !== 'object') return false;
-                    for (let key in record) {
-                        // 忽略 Vue 的內建變數與可能的系統日期標籤
-                        if (['__ob__', 'date', '日期', 'id', 'wh', 'warehouse', '倉別'].includes(key)) continue;
-                        
-                        let val = record[key];
-                        if (Array.isArray(val) && val.length === 0) continue; // 空陣列
-                        if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue; // 空物件
-                        
-                        // 檢查是否為真實資料
-                        if (val !== '' && val !== 0 && val !== '0' && val !== null && val !== undefined) {
-                            if (typeof val === 'string' && val.trim() === '') continue; // 純空白字串
-                            if (typeof val === 'string' && val.trim() === '0') continue;
-                            if (typeof val === 'number' && isNaN(val)) continue; // 無效數字 NaN
-                            
-                            // 只要有一格是真實數據，就不是垃圾
-                            return false; 
-                        }
-                    }
-                    return true;
-                };
-
-                let db = window.customVendorCheckoutDB || {};
-                
-                // 1. 清理廠商備註資料庫
-                for (let wh in db) {
-                    for (let vendor in db[wh]) {
-                        for (let date in db[wh][vendor]) {
-                            if (isGarbage(db[wh][vendor][date])) { 
-                                delete db[wh][vendor][date]; 
-                                deletedDays.add(`vendor_${wh}_${date}`); 
+                cleanBtn.onclick = function(e) {
+                    e.preventDefault(); 
+                    if(!confirm('這將清除系統遺留的「全空白/全為0」無效日期包裹。\n(若該日已有預算資料則會保留)\n絕對不會刪除您已輸入的任何數字！是否執行？')) return;
+                    
+                    let deletedDays = new Set();
+                    const isGarbage = (record) => {
+                        if (!record || typeof record !== 'object') return false;
+                        for (let key in record) {
+                            if (['__ob__', 'date', '日期', 'id', 'wh', 'warehouse', '倉別'].includes(key)) continue;
+                            let val = record[key];
+                            if (Array.isArray(val) && val.length === 0) continue;
+                            if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue;
+                            if (val !== '' && val !== 0 && val !== '0' && val !== null && val !== undefined) {
+                                if (typeof val === 'string' && val.trim() === '') continue;
+                                if (typeof val === 'string' && val.trim() === '0') continue;
+                                if (typeof val === 'number' && isNaN(val)) continue;
+                                return false; // 找到任何有效資料，包含預算，就不刪除
                             }
                         }
-                    }
-                }
-                window.customVendorCheckoutDB = db;
-                localStorage.setItem('freight_vendor_db', JSON.stringify(db));
+                        return true;
+                    };
 
-                // 2. 清理主線大包裹
-                let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
-                let memoryTargets = [ms];
-                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) { 
-                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                        memoryTargets.push(window[varName]);
-                    }
-                });
-
-                memoryTargets.forEach(target => {
-                    if (target && target.warehouses) {
-                        for (let w in target.warehouses) {
-                            if (target.warehouses[w].daily) {
-                                for (let d in target.warehouses[w].daily) {
-                                    if (isGarbage(target.warehouses[w].daily[d])) {
-                                        delete target.warehouses[w].daily[d]; 
-                                        deletedDays.add(`main_${w}_${d}`);
-                                    }
+                    let db = window.customVendorCheckoutDB || {};
+                    for (let wh in db) {
+                        for (let vendor in db[wh]) {
+                            for (let date in db[wh][vendor]) {
+                                if (isGarbage(db[wh][vendor][date])) { 
+                                    delete db[wh][vendor][date]; 
+                                    deletedDays.add(`v_${wh}_${date}`); 
                                 }
                             }
                         }
                     }
-                });
-                localStorage.setItem('freightData_115', JSON.stringify(ms));
+                    window.customVendorCheckoutDB = db;
+                    localStorage.setItem('freight_vendor_db', JSON.stringify(db));
 
-                let count = deletedDays.size;
+                    let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
+                    ms.customVendorDB = db;
+                    let memoryTargets = [ms];
+                    ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                        if (window[varName]) { memoryTargets.push(window[varName]); }
+                    });
 
-                if(window.saveData) window.saveData(true, true);
-                alert(`✅ 雲端大掃除成功！\n共無情地清除了 ${count} 個無效的幽靈日期包裹。\n請等待 2 秒後重新整理網頁，您的存檔速度將大幅提升！`);
-            };
-            
-            targetBtn.parentNode.appendChild(cleanBtn);
+                    memoryTargets.forEach(target => {
+                        if (target && target.warehouses) {
+                            for (let w in target.warehouses) {
+                                if (target.warehouses[w].daily) {
+                                    for (let d in target.warehouses[w].daily) {
+                                        if (isGarbage(target.warehouses[w].daily[d])) {
+                                            delete target.warehouses[w].daily[d]; 
+                                            deletedDays.add(`m_${w}_${d}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+                    let count = deletedDays.size;
+                    if(window.saveData) window.saveData(true, true);
+                    alert(`✅ 雲端大掃除成功！\n共清除了 ${count} 個無效的日期包裹。\n請等待 2 秒後重新整理網頁！`);
+                };
+                targetBtn.parentNode.appendChild(cleanBtn);
+            }
         }
-    }, 1500);
+    }, 1000);
+
+    // 2. 巡邏雷達：廠商結帳區的「匯出每日明細」按鈕
+    setInterval(() => {
+        let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
+        let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
+        let b3 = document.querySelector('button[onclick*="openVendorSummaryModal"]');
+        
+        if (b3 && b3.parentNode && !document.getElementById('btnExportDaily')) {
+            if (!document.getElementById('custom-btn-styles')) {
+                let style = document.createElement('style');
+                style.id = 'custom-btn-styles';
+                style.innerHTML = `
+                    .custom-export-btn { background-color: #e67e22 !important; border-color: #e67e22 !important; color: white !important; }
+                    #btnExportDaily, button[onclick*="handleMainlineExcelImport"], button[onclick*="handleVendorCheckoutExcelImportNew"], button[onclick*="openVendorSummaryModal"] {
+                        transform: none !important; box-shadow: none !important; transition: none !important; display: inline-flex !important; justify-content: center !important; align-items: center !important;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            let newBtn = document.createElement('button');
+            newBtn.id = 'btnExportDaily';
+            newBtn.className = b3.className + ' custom-export-btn'; 
+            newBtn.innerHTML = '📊 3. 匯出每日明細';
+            newBtn.onclick = window.exportVendorDailyToExcel;
+            
+            b3.innerHTML = b3.innerHTML.replace('3.', '4.');
+            b3.parentNode.insertBefore(newBtn, b3);
+
+            [b1, b2, newBtn, b3].forEach(btn => {
+                if (btn) {
+                    btn.style.width = '180px'; btn.style.marginRight = '8px'; btn.style.display = 'inline-flex';
+                    btn.style.justifyContent = 'center'; btn.style.alignItems = 'center'; btn.style.textAlign = 'center';
+                    btn.className = btn.className.replace(/hover:-translate-y-\d+|hover:shadow-\w+|shadow-\w+/g, '');
+                }
+            });
+
+            if (!document.getElementById('mainlineExcelFile_v6')) {
+                let i1 = document.createElement('input'); i1.type = 'file'; i1.id = 'mainlineExcelFile_v6'; i1.accept = '.xlsx, .xls, .csv'; i1.style.display = 'none'; document.body.appendChild(i1);
+            }
+            if (!document.getElementById('vendorCheckoutExcelFile_new')) {
+                let i2 = document.createElement('input'); i2.type = 'file'; i2.id = 'vendorCheckoutExcelFile_new'; i2.accept = '.xlsx, .xls, .csv'; i2.style.display = 'none'; document.body.appendChild(i2);
+            }
+
+            if(b1) { b1.onclick = null; b1.addEventListener('click', () => document.getElementById('mainlineExcelFile_v6').click()); }
+            if(b2) { b2.onclick = null; b2.addEventListener('click', () => document.getElementById('vendorCheckoutExcelFile_new').click()); }
+            if(b3) { b3.onclick = null; b3.addEventListener('click', window.openVendorSummaryModal); }
+            
+            let f1 = document.getElementById('mainlineExcelFile_v6');
+            if(f1) { f1.onchange = null; f1.addEventListener('change', window.handleMainlineExcelImport); }
+            let f2 = document.getElementById('vendorCheckoutExcelFile_new');
+            if(f2) { f2.onchange = null; f2.addEventListener('change', window.handleVendorCheckoutExcelImportNew); }
+        }
+    }, 1000);
 
     // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
@@ -4159,83 +4068,6 @@ setInterval(() => {
             vSel.addEventListener('change', () => { if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab(); }); 
             vSel.dataset.hasListener = "true"; 
         }
-
-        setTimeout(() => {
-            let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
-            let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
-            let b3 = document.querySelector('button[onclick*="openVendorSummaryModal"]');
-            
-            if (b3 && b3.parentNode && !document.getElementById('btnExportDaily')) {
-                
-                if (!document.getElementById('custom-btn-styles')) {
-                    let style = document.createElement('style');
-                    style.id = 'custom-btn-styles';
-                    style.innerHTML = `
-                        .custom-export-btn {
-                            background-color: #e67e22 !important;
-                            border-color: #e67e22 !important;
-                            color: white !important;
-                        }
-                        #btnExportDaily, 
-                        button[onclick*="handleMainlineExcelImport"],
-                        button[onclick*="handleVendorCheckoutExcelImportNew"],
-                        button[onclick*="openVendorSummaryModal"] {
-                            transform: none !important;
-                            box-shadow: none !important;
-                            transition: none !important;
-                            display: inline-flex !important;
-                            justify-content: center !important;
-                            align-items: center !important;
-                        }
-                    `;
-                    document.head.appendChild(style);
-                }
-
-                let newBtn = document.createElement('button');
-                newBtn.id = 'btnExportDaily';
-                
-                newBtn.className = b3.className + ' custom-export-btn'; 
-                
-                newBtn.innerHTML = '📊 3. 匯出每日明細';
-                newBtn.onclick = window.exportVendorDailyToExcel;
-                
-                b3.innerHTML = b3.innerHTML.replace('3.', '4.');
-                b3.parentNode.insertBefore(newBtn, b3);
-
-                [b1, b2, newBtn, b3].forEach(btn => {
-                    if (btn) {
-                        btn.style.width = '180px';
-                        btn.style.marginRight = '8px';
-                        btn.style.display = 'inline-flex';
-                        btn.style.justifyContent = 'center';
-                        btn.style.alignItems = 'center';
-                        btn.style.textAlign = 'center';
-                        
-                        btn.className = btn.className.replace(/hover:-translate-y-\d+|hover:shadow-\w+|shadow-\w+/g, '');
-                    }
-                });
-            }
-
-            if (!document.getElementById('mainlineExcelFile_v6')) {
-                let i1 = document.createElement('input'); i1.type = 'file'; i1.id = 'mainlineExcelFile_v6'; i1.accept = '.xlsx, .xls, .csv'; i1.style.display = 'none';
-                document.body.appendChild(i1);
-            }
-            if (!document.getElementById('vendorCheckoutExcelFile_new')) {
-                let i2 = document.createElement('input'); i2.type = 'file'; i2.id = 'vendorCheckoutExcelFile_new'; i2.accept = '.xlsx, .xls, .csv'; i2.style.display = 'none';
-                document.body.appendChild(i2);
-            }
-
-            if(b1) { b1.onclick = null; b1.addEventListener('click', () => document.getElementById('mainlineExcelFile_v6').click()); }
-            if(b2) { b2.onclick = null; b2.addEventListener('click', () => document.getElementById('vendorCheckoutExcelFile_new').click()); }
-            if(b3) { b3.onclick = null; b3.addEventListener('click', window.openVendorSummaryModal); }
-            
-            let f1 = document.getElementById('mainlineExcelFile_v6');
-            if(f1) { f1.onchange = null; f1.addEventListener('change', window.handleMainlineExcelImport); }
-            let f2 = document.getElementById('vendorCheckoutExcelFile_new');
-            if(f2) { f2.onchange = null; f2.addEventListener('change', window.handleVendorCheckoutExcelImportNew); }
-
-            if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-        }, 1000);
     };
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
