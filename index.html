@@ -2943,7 +2943,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：精準定位與防呆翻譯機 (消滅手機版縮寫造成的平行時空)
+    // 🚀 核心一：精準定位與防呆翻譯機
     // ============================================================================
     var getCoords = (target) => {
         let date = target.getAttribute('data-date');
@@ -2985,7 +2985,6 @@ setInterval(() => {
             }
         }
 
-        // 🌟 強制翻譯：統一轉換為雲端標準欄位名稱
         if (key) {
             let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
             if (cleanKey.includes('出勤')) key = '出勤數';
@@ -3001,9 +3000,6 @@ setInterval(() => {
         return { date, key };
     };
 
-    // ============================================================================
-    // 🚀 核心二：強制記憶體打針 (確保雲端包裹裡有你打的數字！)
-    // ============================================================================
     var forceInjectState = (wh, date, key, val) => {
         let ms = {};
         try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
@@ -3012,7 +3008,6 @@ setInterval(() => {
         if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
         if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
         
-        // 💉 致命一擊：強行寫入即將被上傳的雲端包裹
         ms.warehouses[wh].daily[date][key] = val;
         ms.customVendorDB = window.customVendorCheckoutDB; 
         localStorage.setItem('freightData_115', JSON.stringify(ms));
@@ -3034,7 +3029,6 @@ setInterval(() => {
     var autoSaveTimer = null;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
-    // 📡 雲端雷達：背景同步備註
     setInterval(() => {
         if (isLocalDirty) return; 
         try {
@@ -3056,7 +3050,7 @@ setInterval(() => {
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
 
-        isLocalDirty = true; // 標記有新資料
+        isLocalDirty = true; 
         
         let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
         let whRaw = whSel ? whSel.value : '大肚';
@@ -3074,7 +3068,6 @@ setInterval(() => {
                     let val = parseFloat(valStr);
                     setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
 
-                    // 💡 即時視覺更新：廠商結帳區輸入時，立刻更新右側的「每日總計」
                     let tr = target.closest('tr');
                     if (tr) {
                         let rowTotal = 0;
@@ -3092,14 +3085,12 @@ setInterval(() => {
                 }
             }
         } else {
-            // 👉 當你打字，這裡會立刻啟動打針，把它強制塞進上傳包裹裡！
             let coords = getCoords(target);
             if (coords && coords.date && coords.key) {
                 forceInjectState(wh, coords.date, coords.key, target.value);
             }
         }
 
-        // 倒數自動存檔
         if (autoSaveTimer) clearTimeout(autoSaveTimer);
         let delay = (e.type === 'input') ? 1500 : 500;
         autoSaveTimer = setTimeout(() => {
@@ -3114,11 +3105,9 @@ setInterval(() => {
     document.addEventListener('change', handleAction, true);
     document.addEventListener('focusout', handleAction, true);
 
-    // ⭐️ 閃退救命網：解決「最後一格直接關網頁」資料不見的痛點
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
-            // 抓出那格還沒結算的格子，強制打針注射！
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
                 let coords = getCoords(activeEl);
                 let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
@@ -3130,7 +3119,6 @@ setInterval(() => {
                 }
                 activeEl.blur(); 
             }
-            // 強制送出
             if (isLocalDirty && typeof window.saveData === 'function') {
                 if (autoSaveTimer) clearTimeout(autoSaveTimer); 
                 isLocalDirty = false;
@@ -3139,19 +3127,31 @@ setInterval(() => {
         }
     });
 
-    // --- 🚀 安全木馬掛載 (附帶外掛備註) ---
+    // --- 🚀 關鍵木馬安全掛載 (解決最後一格沒存到與備註遺失) ---
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = async function(...args) {
+                // 💡 終極對策：強制系統吞下還在輸入的數字 (解決 9999 消失的問題)
+                let activeEl = document.activeElement;
+                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                    // 發送變更事件給 Vue 系統，強迫它更新大腦
+                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    // 給原系統 50 毫秒消化時間
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
                 localStorage.setItem('freightData_115', JSON.stringify(ms));
 
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
+                    if (window[varName]) { 
+                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
+                    }
                 });
 
                 return await origSave.apply(this, args); 
@@ -3759,7 +3759,7 @@ setInterval(() => {
         };
 
         let tbody = '<tr><td colspan="2" style="text-align:left; font-weight:bold; border: 1px solid #000; background: #fdf5e6; padding-left: 8px;">一、主線車輛運費</td><td colspan="2" style="text-align:right; font-weight:bold; border: 1px solid #000; background: #fdf5e6; padding-right: 8px;">計價區間：' + dateRange + '</td></tr>' +
-            '<tr style="background:#e8e8e8;"><th style="width: 40%; padding:4px; border: 1px solid #000; text-align: center;">專配里程級距</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">車輛數</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">結帳天數</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">小計</th></tr>';
+            '<tr style="background:#e8e8e8;"><th style="width: 40%; padding:4px; border: 1px solid #000; text-align: center;">專配里程級距</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">車輛數</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">結天數</th><th style="width: 20%; padding:4px; border: 1px solid #000; text-align: center;">小計</th></tr>';
 
         tbody += appendEmptyRows('grp1');
         tbody += genRow('專配' + whName + '倉小計', '0', '', 'group-total', true, 'grp1');
@@ -3888,7 +3888,6 @@ setInterval(() => {
         let selectedWh = document.getElementById('checkoutWhSelect') ? document.getElementById('checkoutWhSelect').value.replace('倉', '') : '大肚';
         let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
 
-        // 💡 新增：用來儲存各科目的總計金額
         let colTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 };
         let grandTotal = 0;
 
@@ -3911,7 +3910,7 @@ setInterval(() => {
                     });
                     displayVal = hasData ? (sum !== 0 ? sum.toLocaleString('en-US') : '0') : '';
                     rowTotal += sum; 
-                    colTotals[cat] += sum; // 💡 累加各科目總計
+                    colTotals[cat] += sum; 
                     isRo = 'readonly tabindex="-1"'; styleBg = 'background-color:#f1f3f4; color:#5f6368; font-weight:bold;';
                 } else {
                     let vCost = getStorageVal(selectedWh, selectedVendor, dateStr, cat);
@@ -3919,13 +3918,13 @@ setInterval(() => {
                     if (vCost !== '') {
                         let costNum = Number(vCost);
                         rowTotal += costNum; 
-                        colTotals[cat] += costNum; // 💡 累加各科目總計
+                        colTotals[cat] += costNum; 
                     }
                 }
                 tbody += `<td style="padding:0; border: 1px solid var(--border-color); ${styleBg}"><input type="text" class="vendor-daily-cell" data-date="${dateStr}" data-cat="${cat}" ${isRo} style="width:100%; border:none; text-align:center; padding:6px; outline:none; background:transparent; ${styleBg}" value="${displayVal}"></td>`;
             });
 
-            grandTotal += rowTotal; // 💡 累加最右側的每日總金額到最終總計
+            grandTotal += rowTotal; 
 
             let displayRemark = '';
             if (selectedVendor === '全部') {
@@ -3951,7 +3950,6 @@ setInterval(() => {
             current.setDate(current.getDate() + 1);
         }
         
-        // 💡 新增：生成最下方的各科目總計列，並套用醒目的顏色
         let tfootHtml = `<tr>
             <td colspan="2" style="text-align:center; font-weight:bold; background:#FDE293; color:#b06000; border: 1px solid var(--border-color); padding: 8px;">各科目總計</td>`;
         categories.forEach(cat => {
@@ -3964,12 +3962,11 @@ setInterval(() => {
         let hd = document.getElementById('vendorDailyHead'); if(hd) hd.innerHTML = thead;
         let bd = document.getElementById('vendorDailyBody'); if(bd) bd.innerHTML = tbody;
         
-        // 💡 將總計列完美塞回表格底部
         let ft = document.getElementById('vendorDailyFoot'); 
         if(ft) { 
             ft.innerHTML = tfootHtml; 
         } else if(bd) { 
-            bd.innerHTML += tfootHtml; // 如果舊系統沒有 tfoot 標籤，就強制接在最後一行
+            bd.innerHTML += tfootHtml; 
         }
     });
 
@@ -4142,32 +4139,6 @@ setInterval(() => {
     };
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
-
-    // --- 🚀 關鍵木馬安全掛載 (解決最後一格沒存到與備註遺失) ---
-    var syncHookInterval = setInterval(() => {
-        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
-            let origSave = window.saveData;
-            makeInvincible('saveData', async function(...args) {
-                
-                // 1. 將外掛廠商備註「強力打針」進系統所有的變數裡，解決「昨天打的備註今天不見」的問題
-                let ms = {};
-                try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
-                ms.customVendorDB = window.customVendorCheckoutDB;
-                localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) {
-                        // 讓原系統以為 customVendorDB 是它親生的
-                        window[varName].customVendorDB = window.customVendorCheckoutDB;
-                    }
-                });
-
-                return await origSave.apply(this, args); 
-            });
-            window.saveData._isHooked = true;
-            clearInterval(syncHookInterval);
-        }
-    }, 500);
 
 })();
 </script>
