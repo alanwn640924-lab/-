@@ -2892,10 +2892,10 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極大統合 (大道至簡：移除干擾，回歸原生存檔)...");
+    console.log("🚀 啟動終極萬能同步引擎：強制打針 + 閃退救援 + 全頻翻譯 + 總計修復...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // 1. 初始化廠商資料庫 (專門管我們外掛的備註與運費)
+    // 1. 初始化廠商資料庫
     var mainStateInit = {};
     try { mainStateInit = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
     
@@ -2943,13 +2943,98 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：無感背景存檔引擎 (絕對不干涉原生資料綁定)
+    // 🚀 核心一：精準定位與防呆翻譯機 (消滅手機版縮寫造成的平行時空)
+    // ============================================================================
+    var getCoords = (target) => {
+        let date = target.getAttribute('data-date');
+        if (!date) {
+            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
+            if (container) {
+                let dEl = container.querySelector('[data-date]');
+                if (dEl) date = dEl.getAttribute('data-date');
+            }
+        }
+
+        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
+        if (!key) {
+            let td = target.closest('td');
+            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
+            if (!key && td) {
+                let tr = target.closest('tr');
+                let table = target.closest('table');
+                if (tr && table) {
+                    let idx = Array.from(tr.children).indexOf(td);
+                    let thead = table.querySelector('thead');
+                    if (thead) {
+                        let ths = thead.querySelectorAll('th');
+                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
+                    }
+                }
+            }
+        }
+        if (!key) {
+            let prev = target.previousElementSibling;
+            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
+                key = prev.innerText;
+            } else {
+                let parent = target.closest('div, li, label, .form-group');
+                if (parent) {
+                    let lbl = parent.querySelector('label, span, strong');
+                    if (lbl && lbl !== target) key = lbl.innerText;
+                }
+            }
+        }
+
+        // 🌟 強制翻譯：統一轉換為雲端標準欄位名稱
+        if (key) {
+            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
+            if (cleanKey.includes('出勤')) key = '出勤數';
+            else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
+            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
+            else if (cleanKey.includes('簽到')) key = '簽到率';
+            else if (cleanKey.includes('準點')) key = '準點率';
+            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
+            else key = cleanKey;
+        }
+
+        if (!key || key === '日期' || key === '星期' || key === '') return null;
+        return { date, key };
+    };
+
+    // ============================================================================
+    // 🚀 核心二：強制記憶體打針 (確保雲端包裹裡有你打的數字！)
+    // ============================================================================
+    var forceInjectState = (wh, date, key, val) => {
+        let ms = {};
+        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
+        if (!ms.warehouses) ms.warehouses = {};
+        if (!ms.warehouses[wh]) ms.warehouses[wh] = { daily: {} };
+        if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
+        if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
+        
+        // 💉 致命一擊：強行寫入即將被上傳的雲端包裹
+        ms.warehouses[wh].daily[date][key] = val;
+        ms.customVendorDB = window.customVendorCheckoutDB; 
+        localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+        ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+            if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
+                if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
+                if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
+                window[varName].warehouses[wh].daily[date][key] = val;
+                window[varName].customVendorDB = window.customVendorCheckoutDB;
+            }
+        });
+    };
+
+    // ============================================================================
+    // 🚀 核心三：自動存檔引擎與閃退防護
     // ============================================================================
     var isLocalDirty = false;
     var autoSaveTimer = null;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
-    // 📡 雲端雷達：如果別台電腦更新了廠商備註，自動拉下來顯示
+    // 📡 雲端雷達：背景同步備註
     setInterval(() => {
         if (isLocalDirty) return; 
         try {
@@ -2966,37 +3051,55 @@ setInterval(() => {
         } catch(e) {}
     }, 2000);
 
-    var handleInput = (e) => {
+    var handleAction = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
 
-        isLocalDirty = true; // 標記防互蓋通行證
+        isLocalDirty = true; // 標記有新資料
         
-        // 👉 只有我們「自己擴充的廠商欄位」，我們才自己處理
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let whRaw = whSel ? whSel.value : '大肚';
+        let wh = whRaw.replace('倉', '');
+
         let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
+
         if (isVendorInput) {
-            let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-            let whRaw = whSel ? whSel.value : '大肚';
-            let wh = whRaw.replace('倉', '');
             let dStr = target.getAttribute('data-date');
             let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-            
             if (selectedVendor !== '全部' && dStr) {
                 if (target.classList.contains('vendor-daily-cell')) {
                     let cat = target.getAttribute('data-cat');
                     let valStr = target.value.replace(/,/g, '').trim();
                     let val = parseFloat(valStr);
                     setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+
+                    // 💡 即時視覺更新：廠商結帳區輸入時，立刻更新右側的「每日總計」
+                    let tr = target.closest('tr');
+                    if (tr) {
+                        let rowTotal = 0;
+                        tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
+                            let cellVal = parseFloat(inp.value.replace(/,/g, ''));
+                            if (!isNaN(cellVal)) rowTotal += cellVal;
+                        });
+                        let totCell = tr.querySelector('.daily-row-total');
+                        if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
+                    }
+
                 } else if (target.classList.contains('vendor-remark-input')) {
                     let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
                     setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
                 }
             }
+        } else {
+            // 👉 當你打字，這裡會立刻啟動打針，把它強制塞進上傳包裹裡！
+            let coords = getCoords(target);
+            if (coords && coords.date && coords.key) {
+                forceInjectState(wh, coords.date, coords.key, target.value);
+            }
         }
-        // 👉 原系統的欄位 (出貨、回收等)，我們【什麼都不做】，完全交給原系統大腦處理！
 
-        // 啟動無感存檔倒數
+        // 倒數自動存檔
         if (autoSaveTimer) clearTimeout(autoSaveTimer);
         let delay = (e.type === 'input') ? 1500 : 500;
         autoSaveTimer = setTimeout(() => {
@@ -3007,19 +3110,27 @@ setInterval(() => {
         }, delay);
     };
 
-    // 掛載監聽器
-    document.addEventListener('input', handleInput, true);
-    document.addEventListener('change', handleInput, true);
-    document.addEventListener('focusout', handleInput, true);
+    document.addEventListener('input', handleAction, true);
+    document.addEventListener('change', handleAction, true);
+    document.addEventListener('focusout', handleAction, true);
 
-    // ⭐️ 閃退救命網：解決你說的「打完最後一格直接關閉，資料就不見」的終極解法
+    // ⭐️ 閃退救命網：解決「最後一格直接關網頁」資料不見的痛點
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
+            // 抓出那格還沒結算的格子，強制打針注射！
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                // 強迫把游標踢出格子，逼迫原系統大腦吞下最後一筆數字
+                let coords = getCoords(activeEl);
+                let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+                let whRaw = whSel ? whSel.value : '大肚';
+                let wh = whRaw.replace('倉', '');
+                
+                if (coords && coords.date && coords.key) {
+                    forceInjectState(wh, coords.date, coords.key, activeEl.value);
+                }
                 activeEl.blur(); 
             }
+            // 強制送出
             if (isLocalDirty && typeof window.saveData === 'function') {
                 if (autoSaveTimer) clearTimeout(autoSaveTimer); 
                 isLocalDirty = false;
@@ -3028,16 +3139,12 @@ setInterval(() => {
         }
     });
 
-    // ============================================================================
-    // 🚀 核心二：安全掛載木馬 (把廠商備註塞進原系統包裹)
-    // ============================================================================
+    // --- 🚀 安全木馬掛載 (附帶外掛備註) ---
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
-            // 安全接管存檔流程
             window.saveData = async function(...args) {
-                // 將我們外掛的備註打包
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
@@ -3047,7 +3154,6 @@ setInterval(() => {
                     if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
                 });
 
-                // 呼叫原系統原生上傳 (保證不當機)
                 return await origSave.apply(this, args); 
             };
             window.saveData._isHooked = true;
@@ -3782,6 +3888,10 @@ setInterval(() => {
         let selectedWh = document.getElementById('checkoutWhSelect') ? document.getElementById('checkoutWhSelect').value.replace('倉', '') : '大肚';
         let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
 
+        // 💡 新增：用來儲存各科目的總計金額
+        let colTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 };
+        let grandTotal = 0;
+
         while (current <= endDate && !isNaN(current.getTime())) {
             let m = current.getMonth() + 1, d = current.getDate(), dow = LOCAL_DOW[current.getDay()];
             let dateStr = `${current.getFullYear()}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -3789,19 +3899,33 @@ setInterval(() => {
                 <td style="text-align:center; font-weight:bold; color:#333; border: 1px solid var(--border-color); background:#f8f9fa;">${m}/${d}</td>
                 <td style="text-align:center; color:#555; border: 1px solid var(--border-color); background:#f8f9fa;">${dow}</td>`;
             
+            let rowTotal = 0;
+
             categories.forEach(cat => {
                 let displayVal = ''; let isRo = ''; let styleBg = '';
                 if (selectedVendor === '全部') {
                     let sum = 0, hasData = false;
-                    ['創新', '峻富', '華碩'].forEach(vName => { let vCost = getStorageVal(selectedWh, vName, dateStr, cat); if (vCost !== '') { sum += Number(vCost); hasData = true; } });
+                    ['創新', '峻富', '華碩'].forEach(vName => { 
+                        let vCost = getStorageVal(selectedWh, vName, dateStr, cat); 
+                        if (vCost !== '') { sum += Number(vCost); hasData = true; } 
+                    });
                     displayVal = hasData ? (sum !== 0 ? sum.toLocaleString('en-US') : '0') : '';
+                    rowTotal += sum; 
+                    colTotals[cat] += sum; // 💡 累加各科目總計
                     isRo = 'readonly tabindex="-1"'; styleBg = 'background-color:#f1f3f4; color:#5f6368; font-weight:bold;';
                 } else {
                     let vCost = getStorageVal(selectedWh, selectedVendor, dateStr, cat);
                     displayVal = (vCost !== '') ? Number(vCost).toLocaleString('en-US') : '';
+                    if (vCost !== '') {
+                        let costNum = Number(vCost);
+                        rowTotal += costNum; 
+                        colTotals[cat] += costNum; // 💡 累加各科目總計
+                    }
                 }
                 tbody += `<td style="padding:0; border: 1px solid var(--border-color); ${styleBg}"><input type="text" class="vendor-daily-cell" data-date="${dateStr}" data-cat="${cat}" ${isRo} style="width:100%; border:none; text-align:center; padding:6px; outline:none; background:transparent; ${styleBg}" value="${displayVal}"></td>`;
             });
+
+            grandTotal += rowTotal; // 💡 累加最右側的每日總金額到最終總計
 
             let displayRemark = '';
             if (selectedVendor === '全部') {
@@ -3820,14 +3944,33 @@ setInterval(() => {
             let isRoRem = selectedVendor === '全部' ? 'readonly tabindex="-1"' : '';
             let styleBgRem = selectedVendor === '全部' ? 'background-color:#f1f3f4; color:#5f6368;' : '';
 
-            tbody += `<td style="text-align:center; font-weight:bold; background:#fff9e6; color:#b06000; border: 1px solid var(--border-color);" class="daily-row-total">0</td>
+            let displayRowTotal = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
+            tbody += `<td style="text-align:center; font-weight:bold; background:#fff9e6; color:#b06000; border: 1px solid var(--border-color);" class="daily-row-total">${displayRowTotal}</td>
                 <td style="padding:0; border: 1px solid var(--border-color); ${styleBgRem}"><input type="text" class="vendor-remark-input" data-date="${dateStr}" ${isRoRem} style="width:100%; border:none; text-align:left; padding:6px; outline:none; background:transparent; ${styleBgRem}" value="${displayRemark}"></td>
             </tr>`;
             current.setDate(current.getDate() + 1);
         }
         
+        // 💡 新增：生成最下方的各科目總計列，並套用醒目的顏色
+        let tfootHtml = `<tr>
+            <td colspan="2" style="text-align:center; font-weight:bold; background:#FDE293; color:#b06000; border: 1px solid var(--border-color); padding: 8px;">各科目總計</td>`;
+        categories.forEach(cat => {
+            tfootHtml += `<td style="text-align:center; font-weight:bold; background:#FFF2CC; color:#b06000; border: 1px solid var(--border-color); padding: 8px;">${colTotals[cat] !== 0 ? colTotals[cat].toLocaleString('en-US') : '0'}</td>`;
+        });
+        tfootHtml += `<td style="text-align:center; font-weight:bold; background:#EA8600; color:#fff; border: 1px solid var(--border-color); padding: 8px; font-size: 1.1em;">${grandTotal !== 0 ? grandTotal.toLocaleString('en-US') : '0'}</td>
+            <td style="background:#FDE293; border: 1px solid var(--border-color);"></td>
+        </tr>`;
+
         let hd = document.getElementById('vendorDailyHead'); if(hd) hd.innerHTML = thead;
         let bd = document.getElementById('vendorDailyBody'); if(bd) bd.innerHTML = tbody;
+        
+        // 💡 將總計列完美塞回表格底部
+        let ft = document.getElementById('vendorDailyFoot'); 
+        if(ft) { 
+            ft.innerHTML = tfootHtml; 
+        } else if(bd) { 
+            bd.innerHTML += tfootHtml; // 如果舊系統沒有 tfoot 標籤，就強制接在最後一行
+        }
     });
 
     makeInvincible('renderCheckoutTab', function() {
@@ -3999,6 +4142,33 @@ setInterval(() => {
     };
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
+
+    // --- 🚀 關鍵木馬安全掛載 (解決最後一格沒存到與備註遺失) ---
+    var syncHookInterval = setInterval(() => {
+        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
+            let origSave = window.saveData;
+            makeInvincible('saveData', async function(...args) {
+                
+                // 1. 將外掛廠商備註「強力打針」進系統所有的變數裡，解決「昨天打的備註今天不見」的問題
+                let ms = {};
+                try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
+                ms.customVendorDB = window.customVendorCheckoutDB;
+                localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) {
+                        // 讓原系統以為 customVendorDB 是它親生的
+                        window[varName].customVendorDB = window.customVendorCheckoutDB;
+                    }
+                });
+
+                return await origSave.apply(this, args); 
+            });
+            window.saveData._isHooked = true;
+            clearInterval(syncHookInterval);
+        }
+    }, 500);
+
 })();
 </script>
 </body>
