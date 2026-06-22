@@ -2985,7 +2985,7 @@ setInterval(() => {
             }
         }
 
-        // 🌟 強制翻譯：手機縮寫還原為雲端標準名稱 (這是跨裝置同步的命脈)
+        // 🌟 強制翻譯：手機縮寫還原為雲端標準名稱
         if (key) {
             let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
             if (cleanKey.includes('出勤')) key = '出勤數';
@@ -3013,10 +3013,9 @@ setInterval(() => {
         if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
         
         ms.warehouses[wh].daily[date][key] = val;
-        ms.customVendorDB = window.customVendorCheckoutDB; // 木馬：順便掛載特殊專車備註
         localStorage.setItem('freightData_115', JSON.stringify(ms));
 
-        // 打針進原系統的「大腦」，防呆
+        // 初步打針進原系統的「大腦」
         ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
             if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
                 if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
@@ -3099,11 +3098,14 @@ setInterval(() => {
     document.addEventListener('change', handleAction, true);
     document.addEventListener('blur', handleAction, true);
 
-    // ⭐️ 閃退救命網
+    // ⭐️ 閃退救命網：解決關閉頁面時的資料遺失
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden' && isLocalDirty) {
-            if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-                document.activeElement.blur(); 
+            let activeEl = document.activeElement;
+            if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                // 強迫離開格子結算
+                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                activeEl.blur(); 
             }
             if (autoSaveTimer) clearTimeout(autoSaveTimer); 
             isLocalDirty = false;
@@ -3111,15 +3113,35 @@ setInterval(() => {
         }
     });
 
-    // --- 🚀 關鍵木馬安全掛載 (解決儲存衝突當機) ---
+    // --- 🚀 關鍵木馬安全掛載 (解決最後一格沒存到與備註遺失) ---
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             makeInvincible('saveData', async function(...args) {
+                
+                // 1. 強制結算正在輸入的格子，解決「最後一筆資料永遠上不去雲端」的懸案
+                let activeEl = document.activeElement;
+                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                    // 發送變更事件，逼迫原系統大腦立刻吞下資料
+                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    // 給原系統大腦 50 毫秒的反應與打包時間
+                    await new Promise(resolve => setTimeout(resolve, 50)); 
+                }
+
+                // 2. 將外掛廠商備註「強力打針」進系統所有的變數裡，解決「昨天打的備註今天不見」的問題
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
                 localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) {
+                        // 讓原系統以為 customVendorDB 是它親生的
+                        window[varName].customVendorDB = window.customVendorCheckoutDB;
+                    }
+                });
+
                 return await origSave.apply(this, args); 
             });
             window.saveData._isHooked = true;
@@ -4072,15 +4094,34 @@ setInterval(() => {
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
 
-    // 🚀 在存檔前最後一刻，掛載木馬包裹
+    // --- 🚀 關鍵木馬安全掛載 (解決最後一格沒存到與備註遺失) ---
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             makeInvincible('saveData', async function(...args) {
+                
+                // 1. 強制結算正在輸入的格子，解決「最後一筆資料永遠上不去雲端」的懸案
+                let activeEl = document.activeElement;
+                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                    // 發送變更事件，逼迫原系統大腦立刻吞下資料
+                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    // 給原系統大腦 50 毫秒的反應與打包時間
+                    await new Promise(resolve => setTimeout(resolve, 50)); 
+                }
+
+                // 2. 將外掛廠商備註「強力打針」進系統所有的變數裡，解決「昨天打的備註今天不見」的問題
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
                 localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) {
+                        // 讓原系統以為 customVendorDB 是它親生的
+                        window[varName].customVendorDB = window.customVendorCheckoutDB;
+                    }
+                });
 
                 return await origSave.apply(this, args); 
             });
