@@ -3045,7 +3045,7 @@ setInterval(() => {
         } catch(e) {}
     }, 2000);
 
-    var handleAction = (e) => {
+    window handleAction = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
@@ -3101,9 +3101,9 @@ setInterval(() => {
         }, delay);
     };
 
-    document.addEventListener('input', handleAction, true);
-    document.addEventListener('change', handleAction, true);
-    document.addEventListener('focusout', handleAction, true);
+    document.addEventListener('input', window.handleAction, true);
+    document.addEventListener('change', window.handleAction, true);
+    document.addEventListener('focusout', window.handleAction, true);
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
