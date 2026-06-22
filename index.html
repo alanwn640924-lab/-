@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極萬能同步引擎：強制打針 + 閃退救援 + 全頻翻譯 + 總計修復...");
+    console.log("🚀 啟動終極萬能同步引擎：強制打針 + 閃退救援 + 全頻翻譯 + 總計修復 + 無情瘦身...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     // 1. 初始化廠商資料庫
@@ -3045,7 +3045,7 @@ setInterval(() => {
         } catch(e) {}
     }, 2000);
 
-    window handleAction = (e) => {
+    window.handleAction = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
@@ -3096,7 +3096,7 @@ setInterval(() => {
         autoSaveTimer = setTimeout(() => {
             if (isLocalDirty && typeof window.saveData === 'function') {
                 isLocalDirty = false;
-                window.saveData(false, false);
+                window.saveData(true, true);
             }
         }, delay);
     };
@@ -3122,24 +3122,20 @@ setInterval(() => {
             if (isLocalDirty && typeof window.saveData === 'function') {
                 if (autoSaveTimer) clearTimeout(autoSaveTimer); 
                 isLocalDirty = false;
-                window.saveData(false, false); 
+                window.saveData(true, true); 
             }
         }
     });
 
-    // --- 🚀 關鍵木馬安全掛載 (解決最後一格沒存到與備註遺失) ---
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = async function(...args) {
-                // 💡 終極對策：強制系統吞下還在輸入的數字 (解決 9999 消失的問題)
                 let activeEl = document.activeElement;
                 if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                    // 發送變更事件給 Vue 系統，強迫它更新大腦
                     activeEl.dispatchEvent(new Event('input', { bubbles: true }));
                     activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                    // 給原系統 50 毫秒消化時間
                     await new Promise(resolve => setTimeout(resolve, 50));
                 }
 
@@ -3160,6 +3156,110 @@ setInterval(() => {
             clearInterval(syncHookInterval);
         }
     }, 500);
+
+    // ============================================================================
+    // 💡 核心四：動態尋找「雲端連線設定」，並將瘦身按鈕藏在儲存按鈕旁邊
+    // ============================================================================
+    setInterval(() => {
+        if (document.getElementById('btnCleanJunkModal')) return;
+
+        let buttons = document.querySelectorAll('button');
+        let targetBtn = null;
+        for (let btn of buttons) {
+            if (btn.textContent && btn.textContent.includes('儲存並重新連線')) {
+                targetBtn = btn;
+                break;
+            }
+        }
+
+        if (targetBtn && targetBtn.parentNode) {
+            let cleanBtn = document.createElement('button');
+            cleanBtn.id = 'btnCleanJunkModal';
+            cleanBtn.innerHTML = '🧹 雲端瘦身 (清垃圾)';
+            cleanBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 6px 12px; font-size: 14px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);';
+            
+            cleanBtn.onclick = function(e) {
+                e.preventDefault(); 
+                
+                if(!confirm('這將清除整個系統遺留的「全空白/全為0」的無效幽靈資料，為雲端減肥加速。\n絕對不會刪除您已輸入的任何有效數字！\n是否執行？')) return;
+                
+                let deletedDays = new Set();
+                
+                // 💡 無情過濾器：無視 Vue 的 __ob__，並將空物件、NaN、0 等同視為垃圾
+                const isGarbage = (record) => {
+                    if (!record || typeof record !== 'object') return false;
+                    for (let key in record) {
+                        // 忽略 Vue 的內建變數與可能的系統日期標籤
+                        if (['__ob__', 'date', '日期', 'id', 'wh', 'warehouse', '倉別'].includes(key)) continue;
+                        
+                        let val = record[key];
+                        if (Array.isArray(val) && val.length === 0) continue; // 空陣列
+                        if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue; // 空物件
+                        
+                        // 檢查是否為真實資料
+                        if (val !== '' && val !== 0 && val !== '0' && val !== null && val !== undefined) {
+                            if (typeof val === 'string' && val.trim() === '') continue; // 純空白字串
+                            if (typeof val === 'string' && val.trim() === '0') continue;
+                            if (typeof val === 'number' && isNaN(val)) continue; // 無效數字 NaN
+                            
+                            // 只要有一格是真實數據，就不是垃圾
+                            return false; 
+                        }
+                    }
+                    return true;
+                };
+
+                let db = window.customVendorCheckoutDB || {};
+                
+                // 1. 清理廠商備註資料庫
+                for (let wh in db) {
+                    for (let vendor in db[wh]) {
+                        for (let date in db[wh][vendor]) {
+                            if (isGarbage(db[wh][vendor][date])) { 
+                                delete db[wh][vendor][date]; 
+                                deletedDays.add(`vendor_${wh}_${date}`); 
+                            }
+                        }
+                    }
+                }
+                window.customVendorCheckoutDB = db;
+                localStorage.setItem('freight_vendor_db', JSON.stringify(db));
+
+                // 2. 清理主線大包裹
+                let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
+                let memoryTargets = [ms];
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) { 
+                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
+                        memoryTargets.push(window[varName]);
+                    }
+                });
+
+                memoryTargets.forEach(target => {
+                    if (target && target.warehouses) {
+                        for (let w in target.warehouses) {
+                            if (target.warehouses[w].daily) {
+                                for (let d in target.warehouses[w].daily) {
+                                    if (isGarbage(target.warehouses[w].daily[d])) {
+                                        delete target.warehouses[w].daily[d]; 
+                                        deletedDays.add(`main_${w}_${d}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+                let count = deletedDays.size;
+
+                if(window.saveData) window.saveData(true, true);
+                alert(`✅ 雲端大掃除成功！\n共無情地清除了 ${count} 個無效的幽靈日期包裹。\n請等待 2 秒後重新整理網頁，您的存檔速度將大幅提升！`);
+            };
+            
+            targetBtn.parentNode.appendChild(cleanBtn);
+        }
+    }, 1500);
 
     // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
@@ -4059,7 +4159,7 @@ setInterval(() => {
             vSel.addEventListener('change', () => { if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab(); }); 
             vSel.dataset.hasListener = "true"; 
         }
-        
+
         setTimeout(() => {
             let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
             let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
