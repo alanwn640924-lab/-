@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動脫胎換骨版：即打即存破解連續輸入遺失 + 移除所有干擾迴圈...");
+    console.log("🚀 啟動真理雙通道版：雙計時器破解連續輸入 + 滿血復活強制同步打針...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     var mainStateInit = {};
@@ -2942,7 +2942,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：精準定位與防呆翻譯機 (維持最穩定的電腦打針機制)
+    // 🚀 核心一：精準定位與防呆翻譯機 (維持電腦與手機最穩定的打針機制)
     // ============================================================================
     var getCoords = (target) => {
         let date = target.getAttribute('data-date');
@@ -3022,15 +3022,19 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心二：全新「即打即存」分流引擎 (破解連續輸入遺失的關鍵)
+    // 🚀 核心二：全新「雙通道存檔引擎」 (徹底破解連續輸入會取消存檔的 Bug)
     // ============================================================================
-    var autoSaveTimer = null;
+    var isLocalDirty = false;
+    var typeTimer = null; // 打字專用計時器
+    var jumpTimer = null; // 跳格專用極速計時器
 
     window.handleAction = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
 
+        isLocalDirty = true;
+        
         let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
         let whRaw = whSel ? whSel.value : '大肚';
         let wh = whRaw.replace('倉', '');
@@ -3069,19 +3073,25 @@ setInterval(() => {
             }
         }
 
-        // 🎯 全新分流存檔策略：打破倒數計時器的魔咒！
-        if (e.type === 'input') {
-            // 還在同一格打字時，給 1.5 秒延遲，避免一直上傳
-            if (autoSaveTimer) clearTimeout(autoSaveTimer);
-            autoSaveTimer = setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
+        // 🎯 雙通道計時器核心邏輯
+        if (e.type === 'focusout') {
+            // 當離開一格時，啟動極速存檔。這個存檔「不會」被下一格的打字給取消！
+            if (jumpTimer) clearTimeout(jumpTimer);
+            jumpTimer = setTimeout(() => {
+                if (isLocalDirty && typeof window.saveData === 'function') {
+                    isLocalDirty = false;
+                    window.saveData(true, true);
+                }
+            }, 300);
+        } else {
+            // 當還在同一格打字時，保持 1.5 秒延遲
+            if (typeTimer) clearTimeout(typeTimer);
+            typeTimer = setTimeout(() => {
+                if (isLocalDirty && typeof window.saveData === 'function') {
+                    isLocalDirty = false;
+                    window.saveData(true, true);
+                }
             }, 1500);
-        } else if (e.type === 'change' || e.type === 'focusout') {
-            // 只要切換格子 (blur) 或按確認，立刻強制存檔！絕不等待！
-            if (autoSaveTimer) clearTimeout(autoSaveTimer);
-            setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
-            }, 50); 
         }
     };
 
@@ -3090,7 +3100,7 @@ setInterval(() => {
     document.addEventListener('focusout', window.handleAction, true);
 
     // ============================================================================
-    // 🛡️ 極限收割防線：螢幕休眠或關閉網頁時，做最後一次搶救
+    // 🛡️ 螢幕休眠防線：關閉網頁或手機鎖屏時，做最後一次極速搶救
     // ============================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
@@ -3104,28 +3114,39 @@ setInterval(() => {
                 if (coords && coords.date && coords.key) {
                     forceInjectState(wh, coords.date, coords.key, activeEl.value);
                 }
-                activeEl.blur(); // 強迫拔游標
+                activeEl.blur(); 
             }
-            // 發射最後一次上傳
-            if (typeof window.saveData === 'function') window.saveData(true, true); 
+            
+            // 系統要休眠了，不管計時器了，立刻把記憶體資料砸上雲端！
+            if (isLocalDirty && typeof window.saveData === 'function') {
+                if (typeTimer) clearTimeout(typeTimer);
+                if (jumpTimer) clearTimeout(jumpTimer);
+                isLocalDirty = false;
+                window.saveData(true, true); 
+            }
         }
     });
 
     // ============================================================================
-    // 🔄 攔截存檔，僅處理廠商夾帶 (移除了會當機的無限迴圈程式碼)
+    // 🔄 攔截存檔，找回讓手機滿血同步的最強原生打針機制！
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = async function(...args) {
-                // ⚠️ 這裡已經把原本會引發手機當機的 dispatchEvent 移除了！
+                // ⚠️ 這兩行強制觸發 Event 是手機版能順利把資料餵給雲端的最大功臣，絕對不能拿掉！
+                let activeEl = document.activeElement;
+                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
                 
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
                 
-                // 隱形校正出貨/回收件數
                 if (ms.warehouses) {
                     for (let w in ms.warehouses) {
                         if (ms.warehouses[w].daily) {
