@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動回歸初心極穩版：退回最穩電腦同步核心 + 獨立補強手機防漏字與零垃圾濾網...");
+    console.log("🚀 啟動極簡守護版：最穩電腦同步 + 零觸控干擾 + 僅依賴關螢幕收割...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     // 1. 初始化廠商資料庫
@@ -2943,7 +2943,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：精準定位與防呆翻譯機 (維持最穩定的舊版打針機制)
+    // 🚀 核心一：精準定位與防呆翻譯機 (維持最穩定的電腦打針機制)
     // ============================================================================
     var getCoords = (target) => {
         let date = target.getAttribute('data-date');
@@ -3085,7 +3085,7 @@ setInterval(() => {
                 }
             }
         } else {
-            // 這就是確保電腦版穩定同步的最重要關鍵！
+            // 最穩定的電腦版強制打針機制
             let coords = getCoords(target);
             if (coords && coords.date && coords.key) {
                 forceInjectState(wh, coords.date, coords.key, target.value);
@@ -3111,13 +3111,6 @@ setInterval(() => {
             let origSave = window.saveData;
             
             window.saveData = async function(...args) {
-                let activeEl = document.activeElement;
-                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
@@ -3137,17 +3130,13 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 🛡️ 獨立補強：手機與電腦防漏字最終安全網 (只在此處介入，不干擾主邏輯)
+    // 🛡️ 唯一手機防呆：螢幕休眠或關閉網頁時的「極限收割」 (完全不干擾觸控打字)
     // ============================================================================
-    
-    // 補強 1：手機休眠、切換 APP 或關閉網頁時，最後一擊收割
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                // 💡 強迫發送 change 事件讓 Vue 吃到資料，然後拔除游標
-                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                
+                // 在螢幕變黑的瞬間，將還在閃爍的數字強迫寫入
                 let coords = getCoords(activeEl);
                 let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
                 let whRaw = whSel ? whSel.value : '大肚';
@@ -3158,6 +3147,7 @@ setInterval(() => {
                 }
                 activeEl.blur(); 
             }
+            // 不管倒數計時器了，直接強迫發射上雲端！
             if (isLocalDirty && typeof window.saveData === 'function') {
                 if (autoSaveTimer) clearTimeout(autoSaveTimer); 
                 isLocalDirty = false;
@@ -3165,15 +3155,6 @@ setInterval(() => {
             }
         }
     });
-
-    // 補強 2：手機觸控點擊空白處時，強迫拔除游標結算 (解決連續輸入漏字)
-    document.addEventListener('touchstart', (e) => {
-        let activeEl = document.activeElement;
-        if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName) && e.target !== activeEl) {
-            activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-            activeEl.blur(); 
-        }
-    }, { passive: true });
 
     // ============================================================================
     // 💡 核心三：動態尋找「雲端連線設定」，並將瘦身按鈕藏在儲存按鈕旁邊
