@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極雙重保障引擎：強制打針(保證同步) + 觸控強制結算(保證手機不漏字)...");
+    console.log("🚀 啟動終極回歸穩定版：以最穩的本機同步為基底 + 輕量級手機防漏字...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     // 1. 初始化廠商資料庫
@@ -2943,26 +2943,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 新增：【手機觸控與點擊防呆】(解決手機連續輸入被吃掉的問題)
-    // ============================================================================
-    const handleOutsideInteraction = (e) => {
-        let activeEl = document.activeElement;
-        if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-            // 如果點擊的地方「不是」另一個輸入框，就強制完成輸入並拔掉游標
-            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                activeEl.blur();
-            } else {
-                // 如果是點擊「下一個輸入框」，只觸發上一格的結算，不拔游標以免鍵盤縮回去
-                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-    };
-    document.addEventListener('mousedown', handleOutsideInteraction);
-    document.addEventListener('touchstart', handleOutsideInteraction, { passive: true });
-
-    // ============================================================================
-    // 🚀 核心一：精準定位與防呆翻譯機 (找回電腦端穩定同步的功臣)
+    // 🚀 核心一：精準定位與防呆翻譯機 (電腦端穩定同步的功臣)
     // ============================================================================
     var getCoords = (target) => {
         let date = target.getAttribute('data-date');
@@ -3042,7 +3023,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心二：自動存檔引擎與閃退防護
+    // 🚀 核心二：自動存檔引擎
     // ============================================================================
     var isLocalDirty = false;
     var autoSaveTimer = null;
@@ -3104,7 +3085,7 @@ setInterval(() => {
                 }
             }
         } else {
-            // 💡 保留舊版穩定的打針：這就是電腦端能穩穩上傳 GitHub 的關鍵！
+            // 💡 保留舊版最穩定的打針機制，確保電腦版資料確實進入 Vue 的記憶體
             let coords = getCoords(target);
             if (coords && coords.date && coords.key) {
                 forceInjectState(wh, coords.date, coords.key, target.value);
@@ -3125,22 +3106,23 @@ setInterval(() => {
     document.addEventListener('change', window.handleAction, true);
     document.addEventListener('focusout', window.handleAction, true);
 
-    // 手機休眠/關閉網頁/切換視窗時，最後一擊收割！
+    // ============================================================================
+    // 🛡️ 新增：輕量級手機防漏字機制 (完全不干擾電腦運作)
+    // ============================================================================
+    
+    // 1. 手機觸控點擊非輸入框時，溫和地拔除游標，觸發原生 focusout 結算
+    document.addEventListener('touchstart', (e) => {
+        let activeEl = document.activeElement;
+        if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName) && e.target !== activeEl) {
+            activeEl.blur(); 
+        }
+    }, { passive: true });
+
+    // 2. 手機休眠、切換 APP 或關閉網頁時，最後一擊收割
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                // 手機鎖屏時強制讓 Vue 結算
-                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                
-                // 並且搭配強制打針雙重保險
-                let coords = getCoords(activeEl);
-                let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-                let whRaw = whSel ? whSel.value : '大肚';
-                let wh = whRaw.replace('倉', '');
-                if (coords && coords.date && coords.key) {
-                    forceInjectState(wh, coords.date, coords.key, activeEl.value);
-                }
                 activeEl.blur(); 
             }
             if (isLocalDirty && typeof window.saveData === 'function') {
@@ -3151,27 +3133,36 @@ setInterval(() => {
         }
     });
 
+    // ============================================================================
+    // 🔄 攔截所有存檔，確保廠商資料夾帶與隱形欄位校正
+    // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = async function(...args) {
-                let activeEl = document.activeElement;
-                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                    activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                    await new Promise(resolve => setTimeout(resolve, 50));
-                }
-
                 let ms = {};
                 try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
                 ms.customVendorDB = window.customVendorCheckoutDB;
+                
+                // 同步「出貨」與「出貨件數」
+                if (ms.warehouses) {
+                    for (let w in ms.warehouses) {
+                        if (ms.warehouses[w].daily) {
+                            for (let d in ms.warehouses[w].daily) {
+                                let dayData = ms.warehouses[w].daily[d];
+                                if (dayData['出貨件數'] !== undefined && dayData['出貨'] === undefined) dayData['出貨'] = dayData['出貨件數'];
+                                else if (dayData['出貨'] !== undefined && dayData['出貨件數'] === undefined) dayData['出貨件數'] = dayData['出貨'];
+                                if (dayData['回收件數'] !== undefined && dayData['回收'] === undefined) dayData['回收'] = dayData['回收件數'];
+                                else if (dayData['回收'] !== undefined && dayData['回收件數'] === undefined) dayData['回收件數'] = dayData['回收'];
+                            }
+                        }
+                    }
+                }
                 localStorage.setItem('freightData_115', JSON.stringify(ms));
 
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) { 
-                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                    }
+                    if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
                 });
 
                 return await origSave.apply(this, args); 
@@ -3206,24 +3197,20 @@ setInterval(() => {
                 cleanBtn.onclick = function(e) {
                     e.preventDefault(); 
                     
-                    if(!confirm('這將清除整個系統遺留的「全空白/全為0」的無效幽靈資料，為雲端減肥加速。\n絕對不會刪除您已輸入的任何有效數字！\n是否執行？')) return;
+                    if(!confirm('這將清除系統遺留的「全空白/全為0」無效日期包裹。\n絕對不會刪除您已輸入的任何有效數字！是否執行？')) return;
                     
                     let deletedDays = new Set();
-                    
                     const isGarbage = (record) => {
                         if (!record || typeof record !== 'object') return false;
                         for (let key in record) {
                             if (['__ob__', 'date', '日期', 'id', 'wh', 'warehouse', '倉別'].includes(key)) continue;
-                            
                             let val = record[key];
                             if (Array.isArray(val) && val.length === 0) continue; 
                             if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue; 
-                            
                             if (val !== '' && val !== 0 && val !== '0' && val !== null && val !== undefined) {
                                 if (typeof val === 'string' && val.trim() === '') continue; 
                                 if (typeof val === 'string' && val.trim() === '0') continue;
                                 if (typeof val === 'number' && isNaN(val)) continue; 
-                                
                                 return false; 
                             }
                         }
@@ -3231,7 +3218,6 @@ setInterval(() => {
                     };
 
                     let db = window.customVendorCheckoutDB || {};
-                    
                     for (let wh in db) {
                         for (let vendor in db[wh]) {
                             for (let date in db[wh][vendor]) {
@@ -3274,7 +3260,7 @@ setInterval(() => {
                     let count = deletedDays.size;
 
                     if(window.saveData) window.saveData(true, true);
-                    alert(`✅ 雲端大掃除成功！\n共無情地清除了 ${count} 個無效的幽靈日期包裹。\n請等待 2 秒後重新整理網頁，您的存檔速度將大幅提升！`);
+                    alert(`✅ 雲端大掃除成功！\n共無情地清除了 ${count} 個無效的幽靈日期包裹。\n請等待 2 秒後重新整理網頁！`);
                 };
                 
                 targetBtn.parentNode.appendChild(cleanBtn);
@@ -3338,7 +3324,7 @@ setInterval(() => {
         }
     }, 1000);
 
-    // --- 1. 主線匯入引擎 (源頭阻絕垃圾版) ---
+    // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3367,8 +3353,7 @@ setInterval(() => {
                 if (dateStr) {
                     let costStr = String(row.AM).replace(/[,]/g, '');
                     let cost = parseFloat(costStr) || 0;
-                    
-                    if (cost === 0) continue; 
+                    if (cost === 0 && costStr === '') continue; 
                     
                     let key = targetWh + '_' + targetVendor + '_' + dateStr;
                     if (!clearedMainlineKeys.has(key)) {
@@ -3394,15 +3379,13 @@ setInterval(() => {
             }
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。\n(系統已自動過濾無效零值，並同步至雲端)`);
-            }, 500);
+            if (typeof window.saveData === 'function') window.saveData(true, true);
+            alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。`);
             e.target.value = '';
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 2. MIS 非主線匯入引擎 (源頭阻絕垃圾版) ---
+    // --- 2. MIS 非主線匯入引擎 ---
     makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3465,7 +3448,6 @@ setInterval(() => {
                     let cost = parseFloat(String(row[costCol] || '').replace(/[,]/g, '')) || 0;
                     
                     if (reason.includes('主線')) continue; 
-                    
                     if (cost === 0 && trips === 0) continue;
                     
                     let mainCat = '';
@@ -3523,10 +3505,8 @@ setInterval(() => {
             }
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 非主線MIS結帳明細智慧對帳成功！\n已成功分流並壓縮匯入 ${importedCount} 筆數據！\n(系統已自動過濾無效零值，並同步至雲端)`);
-            }, 500);
+            if (typeof window.saveData === 'function') window.saveData(true, true);
+            alert(`✅ 非主線MIS結帳明細智慧對帳成功！已成功分流並壓縮匯入 ${importedCount} 筆數據！`);
             e.target.value = '';
         }; r.readAsArrayBuffer(file);
     });
