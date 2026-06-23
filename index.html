@@ -2892,10 +2892,9 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極防呆純淨引擎：強制點擊結算 + 源頭阻絕垃圾 + 回歸原生上傳...");
+    console.log("🚀 啟動終極不漏字引擎：休眠強制收割 + 零垃圾濾網 + 雙向同步...");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // 1. 初始化廠商資料庫
     var mainStateInit = {};
     try { mainStateInit = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
     
@@ -2943,46 +2942,104 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心零：【全域強制收割機】(解決黃色框框未結算導致最後一筆資料消失)
+    // 🚀 核心零：【休眠與點擊攔截防呆】(解決手機連續輸入被吃掉的問題)
     // ============================================================================
-    const forceCommitActiveInput = () => {
+    const handleOutsideInteraction = (e) => {
         let activeEl = document.activeElement;
-        // 如果目前游標停留在輸入框上
         if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-            // 強迫發射變更訊號，逼迫 Vue 大腦吃下資料
-            activeEl.dispatchEvent(new Event('input', { bubbles: true }));
-            activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-            // 強制游標離開，消除黃色虛線框，完成輸入判定！
-            activeEl.blur(); 
+            // 如果點擊的地方「不是」另一個輸入框，就強制完成輸入並拔掉游標
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                activeEl.blur();
+            } else {
+                // 如果是點擊「下一個輸入框」，只觸發上一格的結算，不拔游標以免鍵盤縮回去
+                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         }
     };
+    document.addEventListener('mousedown', handleOutsideInteraction);
+    document.addEventListener('touchstart', handleOutsideInteraction, { passive: true });
 
-    // 攔截所有滑鼠點擊空白處或非輸入框的動作
-    document.addEventListener('mousedown', (e) => {
-        let activeEl = document.activeElement;
-        if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName) && e.target !== activeEl) {
-            forceCommitActiveInput();
+    // ============================================================================
+    // 🚀 核心一：底層隱形翻譯與自動存檔雷達
+    // ============================================================================
+    var isLocalDirty = false;
+    var autoSaveTimer = null;
+
+    // 恢復全域監聽：只要有打字，就倒數存檔！
+    window.handleAction = (e) => {
+        let target = e.target;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
+        if (target.closest('#vendorSummaryModal')) return;
+
+        isLocalDirty = true;
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let whRaw = whSel ? whSel.value : '大肚';
+        let wh = whRaw.replace('倉', '');
+
+        // 廠商專屬邏輯
+        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
+        if (isVendorInput) {
+            let dStr = target.getAttribute('data-date');
+            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
+            if (selectedVendor !== '全部' && dStr) {
+                if (target.classList.contains('vendor-daily-cell')) {
+                    let cat = target.getAttribute('data-cat');
+                    let valStr = target.value.replace(/,/g, '').trim();
+                    let val = parseFloat(valStr);
+                    setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+
+                    let tr = target.closest('tr');
+                    if (tr) {
+                        let rowTotal = 0;
+                        tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
+                            let cellVal = parseFloat(inp.value.replace(/,/g, ''));
+                            if (!isNaN(cellVal)) rowTotal += cellVal;
+                        });
+                        let totCell = tr.querySelector('.daily-row-total');
+                        if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
+                    }
+                } else if (target.classList.contains('vendor-remark-input')) {
+                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
+                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+                }
+            }
         }
-    });
 
-    // 攔截手機觸控點擊空白處的動作
-    document.addEventListener('touchstart', (e) => {
-        let activeEl = document.activeElement;
-        if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName) && e.target !== activeEl) {
-            forceCommitActiveInput();
-        }
-    }, { passive: true });
+        // 倒數自動存檔，不會再漏掉主線跟趟次了！
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        let delay = (e.type === 'input') ? 1500 : 500;
+        autoSaveTimer = setTimeout(() => {
+            if (isLocalDirty && typeof window.saveData === 'function') {
+                let activeEl = document.activeElement;
+                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                    activeEl.dispatchEvent(new Event('change', { bubbles: true })); // 上傳前強制把正在打的數字吞進去
+                }
+                isLocalDirty = false;
+                window.saveData(true, true);
+            }
+        }, delay);
+    };
 
-    // 網頁準備被關閉、縮小、或切換分頁時，無情收割最後一筆資料
+    document.addEventListener('input', window.handleAction, true);
+    document.addEventListener('change', window.handleAction, true);
+
+    // ☁️ 終極防線：當手機休眠、關閉網頁、切換 APP 時，無視所有定時器，瞬間強制上傳！
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
-            forceCommitActiveInput(); 
+            let activeEl = document.activeElement;
+            if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                activeEl.blur(); 
+            }
+            if (isLocalDirty && typeof window.saveData === 'function') {
+                if (autoSaveTimer) clearTimeout(autoSaveTimer); 
+                isLocalDirty = false;
+                window.saveData(true, true); 
+            }
         }
     });
 
-    // ============================================================================
-    // 🚀 核心一：底層隱形翻譯與包裹夾帶 (防呆同步出貨件數)
-    // ============================================================================
     const origSetItem = localStorage.setItem;
     localStorage.setItem = function(key, val) {
         if (key === 'freightData_115') {
@@ -2990,7 +3047,6 @@ setInterval(() => {
                 let ms = JSON.parse(val);
                 ms.customVendorDB = window.customVendorCheckoutDB; 
                 
-                // 💡 隱形校正：在存檔的最後一刻，雙向對齊「出貨」與「出貨件數」
                 if (ms.warehouses) {
                     for (let w in ms.warehouses) {
                         if (ms.warehouses[w].daily) {
@@ -3012,47 +3068,32 @@ setInterval(() => {
         origSetItem.apply(this, [key, val]);
     };
 
-    // ============================================================================
-    // 🚀 核心二：專屬廠商欄位存檔與連動
-    // ============================================================================
-    document.addEventListener('input', (e) => {
-        let target = e.target;
-        if (!target.classList.contains('vendor-daily-cell') && !target.classList.contains('vendor-remark-input')) return;
-        
-        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let whRaw = whSel ? whSel.value : '大肚';
-        let wh = whRaw.replace('倉', '');
-        let dStr = target.getAttribute('data-date');
-        let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-        
-        if (selectedVendor !== '全部' && dStr) {
-            if (target.classList.contains('vendor-daily-cell')) {
-                let cat = target.getAttribute('data-cat');
-                let val = parseFloat(target.value.replace(/,/g, '').trim());
-                setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
-
-                let tr = target.closest('tr');
-                if (tr) {
-                    let rowTotal = 0;
-                    tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
-                        let cellVal = parseFloat(inp.value.replace(/,/g, ''));
-                        if (!isNaN(cellVal)) rowTotal += cellVal;
-                    });
-                    let totCell = tr.querySelector('.daily-row-total');
-                    if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
+    // 攔截所有上傳動作，確保最後一刻有結算
+    var syncHookInterval = setInterval(() => {
+        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
+            let origSave = window.saveData;
+            window.saveData = async function(...args) {
+                let activeEl = document.activeElement;
+                if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
+                    activeEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    await new Promise(resolve => setTimeout(resolve, 50));
                 }
-            } else if (target.classList.contains('vendor-remark-input')) {
-                let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
-            }
-            
-            // 觸發原系統自動存檔，將廠商備註與總檔一起打包上傳
-            if (typeof window.saveData === 'function') setTimeout(() => window.saveData(false, false), 1000);
+                let ms = {};
+                try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
+                ms.customVendorDB = window.customVendorCheckoutDB;
+                localStorage.setItem('freightData_115', JSON.stringify(ms));
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
+                });
+                return await origSave.apply(this, args); 
+            };
+            window.saveData._isHooked = true;
+            clearInterval(syncHookInterval);
         }
-    }, true);
+    }, 500);
 
     // ============================================================================
-    // 💡 核心三：按鈕常駐巡邏雷達 (確保 GitHub 上按鈕絕對不會消失)
+    // 💡 核心三：按鈕常駐巡邏雷達
     // ============================================================================
     setInterval(() => {
         let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
@@ -3139,11 +3180,9 @@ setInterval(() => {
                     let costStr = String(row.AM).replace(/[,]/g, '');
                     let cost = parseFloat(costStr) || 0;
                     
-                    // 🛡️ 零垃圾濾網：如果這天這家廠商費用是 0，絕對不准在資料庫開新格子！
                     if (cost === 0) continue; 
                     
                     let key = targetWh + '_' + targetVendor + '_' + dateStr;
-                    // 只有在確定有非 0 資料要寫入時，才去初始化這天的欄位
                     if (!clearedMainlineKeys.has(key)) {
                         ['主線','主線_3_5T','主線_8T','主線_3_5T_車數','主線_8T_車數'].forEach(c => setStorageVal(targetWh, targetVendor, dateStr, c, ''));
                         clearedMainlineKeys.add(key);
@@ -3167,8 +3206,6 @@ setInterval(() => {
             }
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            
-            // ☁️ 匯入完成後，強制雲端大同步 (延遲 500ms 讓記憶體寫入完成)
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
                 alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。\n(系統已自動過濾無效零值，並同步至雲端)`);
@@ -3243,7 +3280,6 @@ setInterval(() => {
                     
                     if (reason.includes('主線')) continue; 
                     
-                    // 🛡️ 零垃圾濾網：如果這筆資料金額和趟次都是 0，直接跳過，不製造幽靈格子
                     if (cost === 0 && trips === 0) continue;
                     
                     let mainCat = '';
@@ -3258,7 +3294,6 @@ setInterval(() => {
                     else mainCat = '其他專車';
 
                     let key = selectedWh + '_' + targetVendor + '_' + dateStr;
-                    // 只有在確定有非 0 資料要寫入時，才去初始化這天的欄位
                     if (!clearedDates.has(key)) {
                         ['爆量','回收','特殊專車','罰款','離島','轉運','上收','其他'].forEach(c => {
                             setStorageVal(selectedWh, targetVendor, dateStr, c, '');
@@ -3302,8 +3337,6 @@ setInterval(() => {
             }
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            
-            // ☁️ 匯入完成後，強制雲端大同步 (延遲 500ms 讓記憶體寫入完成)
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
                 alert(`✅ 非主線MIS結帳明細智慧對帳成功！\n已成功分流並壓縮匯入 ${importedCount} 筆數據！\n(系統已自動過濾無效零值，並同步至雲端)`);
