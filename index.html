@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動刪字修復版：已補上 Vue.js 原廠空字串彈回 Bug 的終極補丁！");
+    console.log("🚀 啟動分靈體雙殺補丁版：徹底消滅件數統計區塊的無限復活 Bug！");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     var mainStateInit = {};
@@ -2942,7 +2942,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：定位器與備用狀態打針 (解決原廠刪字 Bug 的關鍵)
+    // 🚀 核心一：定位器 (精準找出是哪個分靈體)
     // ============================================================================
     var getCoords = (target) => {
         let date = target.getAttribute('data-date');
@@ -2989,6 +2989,7 @@ setInterval(() => {
             if (cleanKey.includes('出勤')) key = '出勤數';
             else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
             else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
+            else if (cleanKey.includes('預算')) key = '預算件數'; // 新增預算件數攔截
             else if (cleanKey.includes('簽到')) key = '簽到率';
             else if (cleanKey.includes('準點')) key = '準點率';
             else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
@@ -2999,6 +3000,10 @@ setInterval(() => {
         return { date, key };
     };
 
+    // ============================================================================
+    // ⚔️ 核心二：分靈體雙殺機制 (Horcrux Killer)
+    // 當使用者打字或刪除時，強迫雙胞胎欄位「同時變成一樣的值」，阻斷系統復活！
+    // ============================================================================
     var forceInjectState = (wh, date, key, val) => {
         let ms = {};
         try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
@@ -3007,8 +3012,15 @@ setInterval(() => {
         if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
         if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
         
-        // 強制寫入，不管是不是空字串，系統大腦都必須接受！
-        ms.warehouses[wh].daily[date][key] = val;
+        let applyDualKill = (targetObj) => {
+            targetObj[key] = val;
+            // ⚔️ 只要動到其中一個，另一個連坐處罰！保證空值能存進去！
+            if (key === '出貨件數' || key === '出貨') { targetObj['出貨'] = val; targetObj['出貨件數'] = val; }
+            if (key === '回收件數' || key === '回收') { targetObj['回收'] = val; targetObj['回收件數'] = val; }
+            if (key === '預算件數' || key === '預算') { targetObj['預算'] = val; targetObj['預算件數'] = val; }
+        };
+
+        applyDualKill(ms.warehouses[wh].daily[date]);
         ms.customVendorDB = window.customVendorCheckoutDB; 
         localStorage.setItem('freightData_115', JSON.stringify(ms));
 
@@ -3016,15 +3028,13 @@ setInterval(() => {
             if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
                 if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
                 if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
-                window[varName].warehouses[wh].daily[date][key] = val;
+                
+                applyDualKill(window[varName].warehouses[wh].daily[date]);
                 window[varName].customVendorDB = window.customVendorCheckoutDB;
             }
         });
     };
 
-    // ============================================================================
-    // 🚀 核心二：背景小精靈與打字監聽 (已加回強制覆寫補丁)
-    // ============================================================================
     var isLocalDirty = false;
     var autoSaveTimer = null;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
@@ -3081,8 +3091,7 @@ setInterval(() => {
                 }
             }
         } else {
-            // ✅ 補丁：當你在主線大表打字或刪除時，我們強行把值寫進系統大腦！
-            // 這樣原廠系統就不會因為「空字串」而彈回舊數字了！
+            // 🔪 觸發雙殺機制：當在主線大表打字或「刪除」時，直接把空字串塞爆所有別名！
             let coords = getCoords(target);
             if (coords && coords.date && coords.key) {
                 forceInjectState(wh, coords.date, coords.key, target.value);
@@ -3122,7 +3131,7 @@ setInterval(() => {
     });
 
     // ============================================================================
-    // 🔄 攔截存檔
+    // 🔄 攔截存檔 (雲端上傳前的最後一道淨化門)
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
@@ -3137,10 +3146,21 @@ setInterval(() => {
                                 if (window[varName].warehouses[w].daily) {
                                     for (let d in window[varName].warehouses[w].daily) {
                                         let dayData = window[varName].warehouses[w].daily[d];
-                                        if (dayData['出貨件數'] !== undefined && dayData['出貨'] === undefined) dayData['出貨'] = dayData['出貨件數'];
-                                        if (dayData['出貨'] !== undefined && dayData['出貨件數'] === undefined) dayData['出貨件數'] = dayData['出貨'];
-                                        if (dayData['回收件數'] !== undefined && dayData['回收'] === undefined) dayData['回收'] = dayData['回收件數'];
-                                        if (dayData['回收'] !== undefined && dayData['回收件數'] === undefined) dayData['回收件數'] = dayData['回收'];
+                                        
+                                        // ☠️ 淨化門：如果其中一個被清空了(空字串)，另一個必須跟著死，絕對不准復活！
+                                        if (dayData['出貨件數'] === '' || dayData['出貨'] === '') { dayData['出貨'] = ''; dayData['出貨件數'] = ''; }
+                                        else {
+                                            if (dayData['出貨件數'] !== undefined && dayData['出貨'] === undefined) dayData['出貨'] = dayData['出貨件數'];
+                                            if (dayData['出貨'] !== undefined && dayData['出貨件數'] === undefined) dayData['出貨件數'] = dayData['出貨'];
+                                        }
+
+                                        if (dayData['回收件數'] === '' || dayData['回收'] === '') { dayData['回收'] = ''; dayData['回收件數'] = ''; }
+                                        else {
+                                            if (dayData['回收件數'] !== undefined && dayData['回收'] === undefined) dayData['回收'] = dayData['回收件數'];
+                                            if (dayData['回收'] !== undefined && dayData['回收件數'] === undefined) dayData['回收件數'] = dayData['回收'];
+                                        }
+
+                                        if (dayData['預算件數'] === '' || dayData['預算'] === '') { dayData['預算'] = ''; dayData['預算件數'] = ''; }
                                     }
                                 }
                             }
@@ -3155,18 +3175,13 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💡 核心四：按鈕常駐與零垃圾濾網 (按鈕位置已恢復你熟悉的設定)
+    // 💡 核心四：左下角浮動防呆大按鈕 (一鍵殺殭屍)
     // ============================================================================
     setInterval(() => {
-        if (document.getElementById('btnCleanJunkModal')) return;
-
         let buttons = document.querySelectorAll('button');
         let targetBtn = null;
         for (let btn of buttons) {
-            if (btn.textContent && btn.textContent.includes('儲存並重新連線')) {
-                targetBtn = btn;
-                break;
-            }
+            if (btn.textContent && btn.textContent.includes('儲存並重新連線')) { targetBtn = btn; break; }
         }
 
         if (targetBtn && targetBtn.parentNode) {
@@ -3201,27 +3216,30 @@ setInterval(() => {
                 };
                 targetBtn.parentNode.appendChild(cleanBtn);
             }
-
-            // 🚨 強制雲端同步按鈕 (一鍵殺殭屍)
-            if (!document.getElementById('btnForceSyncModal')) {
-                let syncBtn = document.createElement('button');
-                syncBtn.id = 'btnForceSyncModal';
-                syncBtn.innerHTML = '🚨 強制雲端同步 (解卡死)';
-                syncBtn.style.cssText = 'background-color: #6f42c1; color: white; border: none; padding: 6px 12px; font-size: 14px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);';
-                
-                syncBtn.onclick = function(e) {
-                    e.preventDefault();
-                    if(!confirm('當畫面數字卡住刪不掉，或手機資料沒有更新時使用！\n這會清除本機的異常記憶，並強制從雲端重新下載最新進度。\n\n確定要強制同步嗎？')) return;
-                    
-                    // 無情殺死主線資料的 localStorage 殭屍
-                    localStorage.removeItem('freightData_115');
-                    
-                    alert('🧹 殭屍資料已清除！網頁即將重新整理並下載雲端最新進度。');
-                    window.location.reload();
-                };
-                targetBtn.parentNode.appendChild(syncBtn);
-            }
         }
+
+        // 🚨 浮動核彈按鈕 (永遠在左下角待命)
+        if (!document.getElementById('btnForceSyncModalFloating')) {
+            let syncBtn = document.createElement('button');
+            syncBtn.id = 'btnForceSyncModalFloating';
+            syncBtn.innerHTML = '🚨 殺殭屍 (強制雲端同步)';
+            syncBtn.style.cssText = 'position: fixed; bottom: 20px; left: 20px; background-color: #dc3545; color: white; border: 3px solid white; padding: 12px 24px; font-size: 16px; border-radius: 50px; font-weight: bold; cursor: pointer; z-index: 999999; box-shadow: 0 4px 10px rgba(0,0,0,0.4); transition: transform 0.2s;';
+            
+            syncBtn.onmouseover = () => syncBtn.style.transform = 'scale(1.05)';
+            syncBtn.onmouseout = () => syncBtn.style.transform = 'scale(1)';
+            
+            syncBtn.onclick = function(e) {
+                e.preventDefault();
+                if(!confirm('當畫面數字卡住刪不掉，或手機資料沒有更新時使用！\n這會無情清除本機的「殭屍記憶」，並強制從雲端重新下載。\n\n確定要發射核彈清除嗎？')) return;
+                
+                localStorage.removeItem('freightData_115'); // 炸毀主線暫存
+                
+                alert('🧹 殭屍資料已徹底火化！網頁即將重新整理。');
+                window.location.reload();
+            };
+            document.body.appendChild(syncBtn);
+        }
+
     }, 1500);
 
     // --- 下方的匯出引擎維持原樣 ---
