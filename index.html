@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動返璞歸真版：徹底放手主線大表，恢復原廠神經網路，僅作背景輔助！");
+    console.log("🚀 啟動返璞歸真版 + 一鍵殺殭屍按鈕！");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     var mainStateInit = {};
@@ -2942,7 +2942,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：背景小精靈 (每兩秒幫忙備份廠商資料，絕不干擾主線)
+    // 🚀 核心一：背景小精靈 (每兩秒幫忙備份廠商資料)
     // ============================================================================
     var isLocalDirty = false;
     var autoSaveTimer = null;
@@ -2964,7 +2964,7 @@ setInterval(() => {
     }, 2000);
 
     // ============================================================================
-    // 🚀 核心二：打字監聽 (✅ 徹底放手！只管廠商欄位，不管主線大表)
+    // 🚀 核心二：打字監聽 (徹底放手主線)
     // ============================================================================
     window.handleAction = (e) => {
         let target = e.target;
@@ -2973,10 +2973,8 @@ setInterval(() => {
 
         let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
 
-        // 如果是主線大表，我們什麼都不做，讓原廠系統自己處理！
         if (!isVendorInput) return;
 
-        // 以下只處理我們自建的廠商明細
         isLocalDirty = true; 
         let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
         let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
@@ -3021,13 +3019,13 @@ setInterval(() => {
     document.addEventListener('focusout', window.handleAction, true);
 
     // ============================================================================
-    // 🛡️ 唯一防漏字補丁：螢幕休眠時，最溫柔的極限搶救 (只拔游標，不暴力塞資料)
+    // 🛡️ 防漏字補丁
     // ============================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                activeEl.blur(); // ✅ 這會觸發原廠的 @change 神經網路，完美存檔
+                activeEl.blur(); 
             }
             if (isLocalDirty && typeof window.saveData === 'function') {
                 if (autoSaveTimer) clearTimeout(autoSaveTimer);
@@ -3038,19 +3036,16 @@ setInterval(() => {
     });
 
     // ============================================================================
-    // 🔄 攔截存檔 (✅ 只做最後一次的記憶體校正，不再干擾事件發送)
+    // 🔄 攔截存檔
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = function(...args) {
-                // 1. 把我們自建的廠商資料放進系統大腦，讓它一起帶上雲端
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
                     if (window[varName]) { 
                         window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                        
-                        // 2. 在上傳前的一瞬間，把出貨件數欄位對齊，不破壞神經網路
                         if (window[varName].warehouses) {
                             for (let w in window[varName].warehouses) {
                                 if (window[varName].warehouses[w].daily) {
@@ -3066,8 +3061,6 @@ setInterval(() => {
                         }
                     }
                 });
-
-                // 3. 原汁原味呼叫系統存檔
                 return origSave.apply(this, args); 
             };
             window.saveData._isHooked = true;
@@ -3076,11 +3069,9 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💡 核心四：按鈕常駐與零垃圾濾網
+    // 💡 核心四：按鈕常駐與零垃圾濾網 (新增殺殭屍按鈕)
     // ============================================================================
     setInterval(() => {
-        if (document.getElementById('btnCleanJunkModal')) return;
-
         let buttons = document.querySelectorAll('button');
         let targetBtn = null;
         for (let btn of buttons) {
@@ -3091,83 +3082,63 @@ setInterval(() => {
         }
 
         if (targetBtn && targetBtn.parentNode) {
-            if (!targetBtn.parentNode.querySelector('#btnCleanJunkModal')) {
+            // 1. 雲端瘦身按鈕
+            if (!document.getElementById('btnCleanJunkModal')) {
                 let cleanBtn = document.createElement('button');
                 cleanBtn.id = 'btnCleanJunkModal';
-                cleanBtn.innerHTML = '🧹 雲端瘦身 (清垃圾)';
+                cleanBtn.innerHTML = '🧹 雲端瘦身';
                 cleanBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 6px 12px; font-size: 14px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);';
                 
                 cleanBtn.onclick = function(e) {
                     e.preventDefault(); 
-                    if(!confirm('這將清除系統遺留的「全空白/全為0」無效日期包裹。\n絕對不會刪除您已輸入的任何有效數字！是否執行？')) return;
-                    
-                    let deletedDays = new Set();
-                    const isGarbage = (record) => {
-                        if (!record || typeof record !== 'object') return false;
-                        for (let key in record) {
-                            if (['__ob__', 'date', '日期', 'id', 'wh', 'warehouse', '倉別'].includes(key)) continue;
-                            let val = record[key];
-                            if (Array.isArray(val) && val.length === 0) continue; 
-                            if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue; 
-                            if (val !== '' && val !== 0 && val !== '0' && val !== null && val !== undefined) {
-                                if (typeof val === 'string' && val.trim() === '') continue; 
-                                if (typeof val === 'string' && val.trim() === '0') continue;
-                                if (typeof val === 'number' && isNaN(val)) continue; 
-                                return false; 
-                            }
-                        }
-                        return true;
-                    };
-
+                    if(!confirm('這將清除系統遺留的無效日期包裹。是否執行？')) return;
                     let db = window.customVendorCheckoutDB || {};
                     for (let wh in db) {
                         for (let vendor in db[wh]) {
                             for (let date in db[wh][vendor]) {
-                                if (isGarbage(db[wh][vendor][date])) { 
-                                    delete db[wh][vendor][date]; 
-                                    deletedDays.add(`v_${wh}_${date}`); 
+                                let record = db[wh][vendor][date];
+                                let isG = true;
+                                for(let k in record){
+                                    if(['__ob__','date','日期','id','wh','warehouse','倉別'].includes(k)) continue;
+                                    let v = record[k];
+                                    if(v !== '' && v !== 0 && v !== '0' && v !== null && v !== undefined && !(typeof v === 'number' && isNaN(v))) { isG = false; break; }
                                 }
+                                if(isG) delete db[wh][vendor][date];
                             }
                         }
                     }
                     window.customVendorCheckoutDB = db;
                     localStorage.setItem('freight_vendor_db', JSON.stringify(db));
-
-                    let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
-                    ms.customVendorDB = db;
-                    let memoryTargets = [ms];
-                    ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                        if (window[varName]) { 
-                            window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                            memoryTargets.push(window[varName]);
-                        }
-                    });
-
-                    memoryTargets.forEach(target => {
-                        if (target && target.warehouses) {
-                            for (let w in target.warehouses) {
-                                if (target.warehouses[w].daily) {
-                                    for (let d in target.warehouses[w].daily) {
-                                        if (isGarbage(target.warehouses[w].daily[d])) {
-                                            delete target.warehouses[w].daily[d]; 
-                                            deletedDays.add(`m_${w}_${d}`);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-                    let count = deletedDays.size;
                     if(window.saveData) window.saveData(true, true);
-                    alert(`✅ 雲端大掃除成功！\n共無情地清除了 ${count} 個無效的幽靈日期包裹。\n請等待 2 秒後重新整理網頁！`);
+                    alert(`✅ 雲端大掃除成功！`);
                 };
                 targetBtn.parentNode.appendChild(cleanBtn);
+            }
+
+            // 2. 🚨 強制雲端同步按鈕 (一鍵殺殭屍)
+            if (!document.getElementById('btnForceSyncModal')) {
+                let syncBtn = document.createElement('button');
+                syncBtn.id = 'btnForceSyncModal';
+                syncBtn.innerHTML = '🚨 強制雲端同步 (解卡死)';
+                syncBtn.style.cssText = 'background-color: #6f42c1; color: white; border: none; padding: 6px 12px; font-size: 14px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-left: 10px; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);';
+                
+                syncBtn.onclick = function(e) {
+                    e.preventDefault();
+                    if(!confirm('當畫面數字卡住刪不掉，或手機資料沒有更新時使用！\n這會清除本機的異常記憶，並強制從雲端重新下載最新進度。\n\n確定要強制同步嗎？')) return;
+                    
+                    // 無情殺死主線資料的 localStorage 殭屍
+                    localStorage.removeItem('freightData_115');
+                    
+                    alert('🧹 殭屍資料已清除！網頁即將重新整理並下載雲端最新進度。');
+                    // 重新整理網頁，強迫 Vue.js 從 Firebase 重新拿資料
+                    window.location.reload();
+                };
+                targetBtn.parentNode.appendChild(syncBtn);
             }
         }
     }, 1500);
 
+    // --- 下方的匯出引擎維持原樣 ---
     setInterval(() => {
         let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
         let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
@@ -3221,7 +3192,7 @@ setInterval(() => {
         }
     }, 1000);
 
-    // --- 1. 主線匯入引擎 (保留零垃圾濾網) ---
+    // --- 1. 主線匯入引擎 ---
     makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3250,7 +3221,6 @@ setInterval(() => {
                 if (dateStr) {
                     let costStr = String(row.AM).replace(/[,]/g, '');
                     let cost = parseFloat(costStr) || 0;
-                    
                     if (cost === 0) continue; 
                     
                     let key = targetWh + '_' + targetVendor + '_' + dateStr;
@@ -3279,13 +3249,13 @@ setInterval(() => {
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。\n(系統已自動過濾無效零值，並同步至雲端)`);
+                alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。`);
             }, 500);
             e.target.value = '';
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 2. MIS 非主線匯入引擎 (保留零垃圾濾網) ---
+    // --- 2. MIS 非主線匯入引擎 ---
     makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3324,7 +3294,7 @@ setInterval(() => {
             let costCol = getIdx(['費用小計', '總計', '金額']);
 
             if (!dateCol || !reasonCol || !costCol) {
-                alert('⚠️ 找不到必要的欄位(進貨日/派車原因/費用小計)，請確認 Excel 檔案！'); return;
+                alert('⚠️ 找不到必要的欄位(進貨日/派車原因/費用小計)！'); return;
             }
 
             let importedCount = 0; let clearedDates = new Set(); 
@@ -3407,7 +3377,7 @@ setInterval(() => {
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 非主線MIS結帳明細智慧對帳成功！已成功分流並壓縮匯入 ${importedCount} 筆數據！`);
+                alert(`✅ 非主線MIS匯入成功！共處理 ${importedCount} 筆數據！`);
             }, 500);
             e.target.value = '';
         }; r.readAsArrayBuffer(file);
@@ -3417,10 +3387,8 @@ setInterval(() => {
     makeInvincible('exportVendorDailyToExcel', function() {
         let vendorSel = document.getElementById('vendorSelect');
         let vendorName = vendorSel ? vendorSel.value : '創新';
-        
         let whSel = document.getElementById('checkoutWhSelect');
         let whName = whSel ? whSel.value.replace('倉', '') : '大肚';
-        
         let startInput = document.getElementById('checkoutStartDate').value; 
         let endInput = document.getElementById('checkoutEndDate').value; 
         let dateRange = (startInput && endInput) ? `${startInput.substring(5).replace('-','')}_${endInput.substring(5).replace('-','')}` : '';
@@ -3452,25 +3420,19 @@ setInterval(() => {
         }
 
         tableEl.querySelectorAll('td, th').forEach(cell => {
-            if (!cell.innerText || cell.innerText.trim() === '') {
-                cell.innerText = '\u00A0';
-            }
+            if (!cell.innerText || cell.innerText.trim() === '') cell.innerText = '\u00A0';
         });
 
         let ws = XLSX.utils.table_to_sheet(tableEl, {raw: true});
         let range = XLSX.utils.decode_range(ws['!ref']);
-
         let maxRemarkLen = 20; 
 
         for (let R = range.s.r; R <= range.e.r; ++R) {
-            
             let remarkCellRef = XLSX.utils.encode_cell({r:R, c:12});
             if (ws[remarkCellRef] && ws[remarkCellRef].v) {
                 let str = String(ws[remarkCellRef].v);
                 let len = 0;
-                for(let i=0; i<str.length; i++) {
-                    len += str.charCodeAt(i) > 255 ? 2.2 : 1.2; 
-                }
+                for(let i=0; i<str.length; i++) len += str.charCodeAt(i) > 255 ? 2.2 : 1.2; 
                 if (len > maxRemarkLen) maxRemarkLen = len;
             }
 
@@ -3504,49 +3466,32 @@ setInterval(() => {
                     for (let i = 0; i < htmlRow.cells.length; i++) {
                         let td = htmlRow.cells[i];
                         let span = td.colSpan || 1;
-                        if (C >= colOffset && C < colOffset + span) {
-                            originCell = td; 
-                            break;
-                        }
+                        if (C >= colOffset && C < colOffset + span) { originCell = td; break; }
                         colOffset += span;
                     }
                 }
 
                 if (originCell) {
                     if (originCell.getAttribute('data-header') === 'true') {
-                        cellStyle.font.bold = true; 
-                        cellStyle.font.sz = 18; 
-                        cellStyle.border = {}; 
+                        cellStyle.font.bold = true; cellStyle.font.sz = 18; cellStyle.border = {}; 
                     } else if (R === 1) { 
-                        cellStyle.font.bold = true;
-                        cellStyle.fill = { fgColor: { rgb: "DDEBF7" } };
+                        cellStyle.font.bold = true; cellStyle.fill = { fgColor: { rgb: "DDEBF7" } };
                         if (C === 11) cellStyle.fill = { fgColor: { rgb: "FFF2CC" } }; 
                     } else if (R === range.e.r) { 
-                        cellStyle.font.bold = true;
-                        cellStyle.fill = { fgColor: { rgb: "FDE293" } };
-                        if (C === 11) {
-                            cellStyle.fill = { fgColor: { rgb: "EA8600" } };
-                            cellStyle.font.color = { rgb: "FFFFFF" };
-                        }
+                        cellStyle.font.bold = true; cellStyle.fill = { fgColor: { rgb: "FDE293" } };
+                        if (C === 11) { cellStyle.fill = { fgColor: { rgb: "EA8600" } }; cellStyle.font.color = { rgb: "FFFFFF" }; }
                     }
-                    
                     if (C === 12 && R > 1 && R < range.e.r) {
-                        cellStyle.alignment.horizontal = "left"; 
-                        cellStyle.alignment.wrapText = false; 
+                        cellStyle.alignment.horizontal = "left"; cellStyle.alignment.wrapText = false; 
                     }
                 }
-
                 cell.s = cellStyle;
             }
         }
 
         maxRemarkLen = Math.min(Math.max(maxRemarkLen + 5, 20), 200);
-
         ws['!cols'] = [
-            { wch: 12 }, { wch: 8 }, 
-            { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, 
-            { wch: 14 }, 
-            { wch: Math.ceil(maxRemarkLen) }  
+            { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: Math.ceil(maxRemarkLen) }  
         ];
 
         let wb = XLSX.utils.book_new();
@@ -3573,15 +3518,9 @@ setInterval(() => {
             if (td) {
                 let val = inp.value;
                 td.innerText = (val === '' || val === null) ? '\u00A0' : val;
-                
-                if(inp.style.color === 'rgb(211, 47, 47)' || inp.style.color === '#d32f2f' || inp.style.color === 'red') {
-                    td.setAttribute('data-color', 'D32F2F');
-                } else if(inp.style.color === 'rgb(0, 86, 179)' || inp.style.color === '#0056b3') {
-                    td.setAttribute('data-color', '0056B3');
-                }
-                if(inp.id && inp.id.startsWith('final-')) {
-                    td.setAttribute('data-total-num', 'true');
-                }
+                if(inp.style.color === 'rgb(211, 47, 47)' || inp.style.color === '#d32f2f' || inp.style.color === 'red') td.setAttribute('data-color', 'D32F2F');
+                else if(inp.style.color === 'rgb(0, 86, 179)' || inp.style.color === '#0056b3') td.setAttribute('data-color', '0056B3');
+                if(inp.id && inp.id.startsWith('final-')) td.setAttribute('data-total-num', 'true');
             }
         });
 
@@ -3602,11 +3541,8 @@ setInterval(() => {
 
                 if (typeof cell.v === 'string') {
                     let cleanStr = cell.v.replace(/,/g, '').trim();
-                    if (cleanStr === '') {
-                        cell.v = ''; 
-                    } else if (!isNaN(cleanStr) && cleanStr !== '-') {
-                        cell.v = Number(cleanStr); cell.t = 'n';
-                    }
+                    if (cleanStr === '') cell.v = ''; 
+                    else if (!isNaN(cleanStr) && cleanStr !== '-') { cell.v = Number(cleanStr); cell.t = 'n'; }
                 }
 
                 let borderStyle = { style: "thin", color: { rgb: "000000" } };
@@ -3619,17 +3555,13 @@ setInterval(() => {
 
                 let text = String(cell.v).trim();
                 let htmlRow = cloneTable.rows[R];
-                
                 let originCell = null;
                 if (htmlRow) {
                     let colOffset = 0;
                     for (let i = 0; i < htmlRow.cells.length; i++) {
                         let td = htmlRow.cells[i];
                         let span = td.colSpan || 1;
-                        if (C >= colOffset && C < colOffset + span) {
-                            originCell = td; 
-                            break;
-                        }
+                        if (C >= colOffset && C < colOffset + span) { originCell = td; break; }
                         colOffset += span;
                     }
                 }
@@ -3645,35 +3577,24 @@ setInterval(() => {
                     if (originCell.getAttribute('data-header') === 'true') {
                         cellStyle.font.bold = true; cellStyle.font.sz = 18; cellStyle.border = {}; cellStyle.alignment.horizontal = "center";
                     }
-                    if (originCell.getAttribute('data-total-num') === 'true') {
-                        cellStyle.font.bold = true; cellStyle.font.sz = 14; 
-                    }
-                    if (originCell.getAttribute('data-color')) {
-                        cellStyle.font.color = { rgb: originCell.getAttribute('data-color') };
-                    }
-                    if (originCell.getAttribute('data-no-border') === 'true') {
-                        cellStyle.border = {};
-                    }
+                    if (originCell.getAttribute('data-total-num') === 'true') { cellStyle.font.bold = true; cellStyle.font.sz = 14; }
+                    if (originCell.getAttribute('data-color')) cellStyle.font.color = { rgb: originCell.getAttribute('data-color') };
+                    if (originCell.getAttribute('data-no-border') === 'true') cellStyle.border = {};
 
                     let originText = originCell.innerText || '';
                     if (['合計運費：', '當月運費(未稅)：', '稅額：', '當月運費(含稅)：'].some(k => originText.includes(k))) {
-                        cellStyle.font.bold = true; cellStyle.font.sz = 12; 
-                        cellStyle.fill = { fgColor: { rgb: "F8F9FA" } };
+                        cellStyle.font.bold = true; cellStyle.font.sz = 12; cellStyle.fill = { fgColor: { rgb: "F8F9FA" } };
                         if (originText.includes('當月運費(含稅)：')) { cellStyle.fill = { fgColor: { rgb: "E8F0FE" } }; cellStyle.font.color = { rgb: "0056B3" }; }
                     }
                 }
-
                 cell.s = cellStyle;
             }
         }
 
         ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 18 }, { wch: 18 }]; 
-        
         if(!ws['!pageSetup']) ws['!pageSetup'] = {};
-        ws['!pageSetup'].paperSize = 9; 
-        ws['!pageSetup'].orientation = 'portrait';
-        ws['!pageSetup'].fitToWidth = 1; 
-        ws['!pageSetup'].fitToHeight = 0;
+        ws['!pageSetup'].paperSize = 9; ws['!pageSetup'].orientation = 'portrait';
+        ws['!pageSetup'].fitToWidth = 1; ws['!pageSetup'].fitToHeight = 0;
 
         let wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "結帳大表");
