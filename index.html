@@ -3039,9 +3039,8 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心二：全域打字監聽 (✅ 修正：分離快速打字與離開格子的發車邏輯)
+    // 🚀 核心二：全域打字監聽 (已拔除舊的發車器，交給總閘門統一管理)
     // ============================================================================
-    var autoSaveTimer = null;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
     setInterval(() => {
@@ -3096,28 +3095,15 @@ setInterval(() => {
                 }
             }
         } else {
-            // ✅ 致命錯誤修復：只針對頂部有「分靈體Bug」的三個欄位強制注入，下半部完全放手讓原廠系統處理！
             let coords = getCoords(target);
             if (coords && coords.date && coords.key) {
-                let twinKeys = ['出貨件數', '出貨', '回收件數', '回收', '預算件數', '預算'];
-                if (twinKeys.includes(coords.key)) {
-                    forceInjectState(wh, coords.date, coords.key, target.value);
-                }
+                forceInjectState(wh, coords.date, coords.key, target.value);
             }
         }
 
-        // 🚚 發車邏輯大升級：
-        if (e.type === 'focusout' || e.type === 'change') {
-            // 當滑鼠離開格子時，派出一台不被取消的獨立小貨車，100毫秒後立刻上傳！
-            setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
-            }, 100);
-        } else if (e.type === 'input') {
-            // 正在連續打字時，防手震 1.5 秒
-            if (autoSaveTimer) clearTimeout(autoSaveTimer);
-            autoSaveTimer = setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
-            }, 1500);
+        // 呼叫原廠存檔，觸發下方的「紅綠燈閘門」
+        if (typeof window.saveData === 'function') {
+            window.saveData(true, true);
         }
     };
 
@@ -3126,75 +3112,57 @@ setInterval(() => {
     document.addEventListener('focusout', window.handleAction, true);
 
     // ============================================================================
-// 🔄 攔截存檔
-// ============================================================================
-var syncHookInterval = setInterval(() => {
-    if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
-        let origSave = window.saveData;
-        
-        window.saveData = function(...args) {
-            ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                if (window[varName]) { 
-                    window[varName].customVendorDB = window.customVendorCheckoutDB; 
-
-                    // ✅ 在發車前，幫原廠把上半部的「分靈體」清理乾淨，確保傳上雲端的是正確的資料
-                    if (window[varName].warehouses) {
-                        for (let w in window[varName].warehouses) {
-                            if (window[varName].warehouses[w].daily) {
-                                for (let d in window[varName].warehouses[w].daily) {
-                                    let dayData = window[varName].warehouses[w].daily[d];
-                                    if (!dayData) continue;
-                                    
-                                    let cVal = dayData['出貨件數'];
-                                    if (cVal === '' || cVal === null || cVal === undefined) { delete dayData['出貨']; delete dayData['出貨件數']; }
-                                    else { dayData['出貨'] = cVal; }
-
-                                    let rVal = dayData['回收件數'];
-                                    if (rVal === '' || rVal === null || rVal === undefined) { delete dayData['回收']; delete dayData['回收件數']; }
-                                    else { dayData['回收'] = rVal; }
-
-                                    let bVal = dayData['預算件數'];
-                                    if (bVal === '' || bVal === null || bVal === undefined) { delete dayData['預算']; delete dayData['預算件數']; }
-                                    else { dayData['預算'] = bVal; }
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            return origSave.apply(this, args); 
-        };
-        window.saveData._isHooked = true;
-        clearInterval(syncHookInterval);
-    }
-}, 500);
-
-// ============================================================================
-// 💡 核心四：精緻版迷你殺殭屍按鈕 (安插於右上角連線中區域)
-// ============================================================================
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            let activeEl = document.activeElement;
-            if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                activeEl.blur(); // 這會觸發上面的 focusout 獨立小貨車
-            }
-        }
-    });
-
-    // ============================================================================
-    // 🔄 攔截存檔
+    // 🔄 攔截存檔 (🚦 終極防撞車閘門機制)
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
+            // 🚦 建立全域唯一的「紅綠燈」計時器
+            let globalTollboothTimer = null;
+            
             window.saveData = function(...args) {
+                // 1. 先把本地的大腦整理好、淨化分靈體
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
                     if (window[varName]) { 
                         window[varName].customVendorDB = window.customVendorCheckoutDB; 
+
+                        if (window[varName].warehouses) {
+                            for (let w in window[varName].warehouses) {
+                                if (window[varName].warehouses[w].daily) {
+                                    for (let d in window[varName].warehouses[w].daily) {
+                                        let dayData = window[varName].warehouses[w].daily[d];
+                                        if (!dayData) continue;
+                                        
+                                        let cVal = dayData['出貨件數'];
+                                        if (cVal === '' || cVal === null || cVal === undefined) { delete dayData['出貨']; delete dayData['出貨件數']; }
+                                        else { dayData['出貨'] = cVal; }
+
+                                        let rVal = dayData['回收件數'];
+                                        if (rVal === '' || rVal === null || rVal === undefined) { delete dayData['回收']; delete dayData['回收件數']; }
+                                        else { dayData['回收'] = rVal; }
+
+                                        let bVal = dayData['預算件數'];
+                                        if (bVal === '' || bVal === null || bVal === undefined) { delete dayData['預算']; delete dayData['預算件數']; }
+                                        else { dayData['預算'] = bVal; }
+                                    }
+                                }
+                            }
+                        }
                     }
                 });
-                return origSave.apply(this, args); 
+
+                // 2. 🚦 真正的防塞車閘門（攔截原廠的所有發車請求）
+                // 不管你一次貼上幾百格、呼叫了多少次 saveData，都先取消上一次的發車倒數！
+                if (globalTollboothTimer) {
+                    clearTimeout(globalTollboothTimer);
+                }
+                
+                // 等待 1.2 秒的寧靜期，確認你已經完全貼上完畢、手離開鍵盤了，再正式放行一輛大卡車上雲端！
+                globalTollboothTimer = setTimeout(() => {
+                    console.log("🚚 閘門放行：資料打包完畢，大卡車正式發車上雲端！");
+                    origSave.apply(this, args); 
+                }, 1200);
             };
             window.saveData._isHooked = true;
             clearInterval(syncHookInterval);
