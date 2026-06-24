@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極版：版面已復原，已修復刪字反彈 Bug，殺殭屍按鈕安全安插！");
+    console.log("🚀 啟動極簡撤軍版：全面退出主線登錄干預，將主導權完全還給原廠！");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     var mainStateInit = {};
@@ -2942,99 +2942,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：定位器與備用狀態打針 (解決原廠刪字彈回的關鍵)
-    // ============================================================================
-    var getCoords = (target) => {
-        let date = target.getAttribute('data-date');
-        if (!date) {
-            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
-            if (container) {
-                let dEl = container.querySelector('[data-date]');
-                if (dEl) date = dEl.getAttribute('data-date');
-            }
-        }
-
-        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
-        if (!key) {
-            let td = target.closest('td');
-            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
-            if (!key && td) {
-                let tr = target.closest('tr');
-                let table = target.closest('table');
-                if (tr && table) {
-                    let idx = Array.from(tr.children).indexOf(td);
-                    let thead = table.querySelector('thead');
-                    if (thead) {
-                        let ths = thead.querySelectorAll('th');
-                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
-                    }
-                }
-            }
-        }
-        if (!key) {
-            let prev = target.previousElementSibling;
-            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
-                key = prev.innerText;
-            } else {
-                let parent = target.closest('div, li, label, .form-group');
-                if (parent) {
-                    let lbl = parent.querySelector('label, span, strong');
-                    if (lbl && lbl !== target) key = lbl.innerText;
-                }
-            }
-        }
-
-        if (key) {
-            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
-            if (cleanKey.includes('出勤')) key = '出勤數';
-            else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
-            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
-            else if (cleanKey.includes('預算')) key = '預算件數';
-            else if (cleanKey.includes('簽到')) key = '簽到率';
-            else if (cleanKey.includes('準點')) key = '準點率';
-            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
-            else key = cleanKey;
-        }
-
-        if (!key || key === '日期' || key === '星期' || key === '') return null;
-        return { date, key };
-    };
-
-    var forceInjectState = (wh, date, key, val) => {
-        let ms = {};
-        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
-        if (!ms.warehouses) ms.warehouses = {};
-        if (!ms.warehouses[wh]) ms.warehouses[wh] = { daily: {} };
-        if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
-        if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
-        
-        // 🛡️ 溫和清空法：絕對不能用 delete，要塞空字串，才不會弄斷 Vue 的神經網路！
-        let targetVal = (val === undefined || val === null) ? '' : val;
-
-        let applyDualKill = (targetObj) => {
-            targetObj[key] = targetVal;
-            // 雙胞胎欄位連坐處罰，同步變成空字串
-            if (key === '出貨件數' || key === '出貨') { targetObj['出貨'] = targetVal; targetObj['出貨件數'] = targetVal; }
-            if (key === '回收件數' || key === '回收') { targetObj['回收'] = targetVal; targetObj['回收件數'] = targetVal; }
-            if (key === '預算件數' || key === '預算') { targetObj['預算'] = targetVal; targetObj['預算件數'] = targetVal; }
-        };
-
-        applyDualKill(ms.warehouses[wh].daily[date]);
-        ms.customVendorDB = window.customVendorCheckoutDB; 
-        localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-        ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-            if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
-                if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
-                if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
-                
-                applyDualKill(window[varName].warehouses[wh].daily[date]);
-            }
-        });
-    };
-
-    // ============================================================================
-    // 🚀 核心二：打字監聽 (已補上強制連坐覆寫，解決刪字 Bug)
+    // 🚀 核心一：背景小精靈 (僅負責備份我們自己的廠商資料)
     // ============================================================================
     var isLocalDirty = false;
     var autoSaveTimer = null;
@@ -3055,121 +2963,72 @@ setInterval(() => {
         } catch(e) {}
     }, 2000);
 
+    // ============================================================================
+    // 🚀 核心二：打字監聽 (✅ 徹底不碰主線！只管下方廠商明細)
+    // ============================================================================
     window.handleAction = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
 
-        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let whRaw = whSel ? whSel.value : '大肚';
-        let wh = whRaw.replace('倉', '');
-
         let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
 
-        if (isVendorInput) {
-            let dStr = target.getAttribute('data-date');
-            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-            if (selectedVendor !== '全部' && dStr) {
-                if (target.classList.contains('vendor-daily-cell')) {
-                    let cat = target.getAttribute('data-cat');
-                    let valStr = target.value.replace(/,/g, '').trim();
-                    let val = parseFloat(valStr);
-                    setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+        // 🛑 全面撤軍：如果不是下方的廠商輸入框，我們什麼都不做，直接離開！讓原廠處理！
+        if (!isVendorInput) return;
 
-                    let tr = target.closest('tr');
-                    if (tr) {
-                        let rowTotal = 0;
-                        tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
-                            let cellVal = parseFloat(inp.value.replace(/,/g, ''));
-                            if (!isNaN(cellVal)) rowTotal += cellVal;
-                        });
-                        let totCell = tr.querySelector('.daily-row-total');
-                        if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
-                    }
-                } else if (target.classList.contains('vendor-remark-input')) {
-                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+        isLocalDirty = true; 
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
+        let dStr = target.getAttribute('data-date');
+        let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
+
+        if (selectedVendor !== '全部' && dStr) {
+            if (target.classList.contains('vendor-daily-cell')) {
+                let cat = target.getAttribute('data-cat');
+                let valStr = target.value.replace(/,/g, '').trim();
+                let val = parseFloat(valStr);
+                setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+
+                let tr = target.closest('tr');
+                if (tr) {
+                    let rowTotal = 0;
+                    tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
+                        let cellVal = parseFloat(inp.value.replace(/,/g, ''));
+                        if (!isNaN(cellVal)) rowTotal += cellVal;
+                    });
+                    let totCell = tr.querySelector('.daily-row-total');
+                    if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
                 }
-            }
-        } else {
-            // ✅ 主線大表打字或「刪除」時，直接觸發雙殺機制，把雙胞胎欄位同步清空！
-            let coords = getCoords(target);
-            if (coords && coords.date && coords.key) {
-                forceInjectState(wh, coords.date, coords.key, target.value);
+            } else if (target.classList.contains('vendor-remark-input')) {
+                let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
+                setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
             }
         }
 
-        isLocalDirty = true;
         if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        let delay = (e.type === 'input') ? 1500 : 50;
         autoSaveTimer = setTimeout(() => {
             if (isLocalDirty && typeof window.saveData === 'function') {
                 isLocalDirty = false;
                 window.saveData(true, true);
             }
-        }, delay);
+        }, 1500);
     };
 
     document.addEventListener('input', window.handleAction, true);
     document.addEventListener('change', window.handleAction, true);
-    document.addEventListener('focusout', window.handleAction, true);
 
     // ============================================================================
-    // 🛡️ 防漏字補丁
-    // ============================================================================
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            let activeEl = document.activeElement;
-            if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                activeEl.blur(); 
-            }
-            if (isLocalDirty && typeof window.saveData === 'function') {
-                if (autoSaveTimer) clearTimeout(autoSaveTimer);
-                isLocalDirty = false;
-                window.saveData(true, true); 
-            }
-        }
-    });
-
-    // ============================================================================
-    // 🔄 攔截存檔 (雲端上傳前的最後一道淨化門)
+    // 🔄 攔截存檔 (✅ 僅偷偷把廠商資料帶上車，絕對不修改任何主線數字)
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = function(...args) {
+                // 我們只做一件事：把 customVendorDB 塞進大腦，其他什麼都不動
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
                     if (window[varName]) { 
                         window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                        if (window[varName].warehouses) {
-                            for (let w in window[varName].warehouses) {
-                                if (window[varName].warehouses[w].daily) {
-                                    for (let d in window[varName].warehouses[w].daily) {
-                                        let dayData = window[varName].warehouses[w].daily[d];
-                                        
-                                        // ☠️ 淨化門：如果其中一個被清空了(空字串)，另一個必須跟著清空，絕對不准用舊數字復活！
-                                        if (dayData['出貨件數'] === '' || dayData['出貨'] === '' || dayData['出貨件數'] === undefined) { 
-                                            dayData['出貨'] = ''; dayData['出貨件數'] = ''; 
-                                        } else {
-                                            dayData['出貨'] = dayData['出貨件數'];
-                                        }
-
-                                        if (dayData['回收件數'] === '' || dayData['回收'] === '' || dayData['回收件數'] === undefined) { 
-                                            dayData['回收'] = ''; dayData['回收件數'] = ''; 
-                                        } else {
-                                            dayData['回收'] = dayData['回收件數'];
-                                        }
-
-                                        if (dayData['預算件數'] === '' || dayData['預算'] === '' || dayData['預算件數'] === undefined) { 
-                                            dayData['預算'] = ''; dayData['預算件數'] = ''; 
-                                        } else {
-                                            dayData['預算'] = dayData['預算件數'];
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 });
                 return origSave.apply(this, args); 
@@ -3180,10 +3039,9 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💡 核心四：精緻版迷你殺殭屍按鈕 (無損版面安全安插法)
+    // 💡 核心四：精緻版迷你殺殭屍按鈕 (安插於右上角連線中區域)
     // ============================================================================
     setInterval(() => {
-        // 尋找「已連線」標籤
         let allEls = document.querySelectorAll('span, div, a, button, label');
         let connectionTag = null;
         for (let el of allEls) {
@@ -3194,8 +3052,6 @@ setInterval(() => {
         }
 
         if (connectionTag && connectionTag.parentNode) {
-            // ✅ 我們直接把按鈕放在「已連線」文字的「後面」，完全不改父容器的 flex 或 CSS！
-            
             // 1. 🚨 精緻版殺殭屍按鈕
             if (!document.getElementById('btnForceSyncModal')) {
                 let syncBtn = document.createElement('button');
@@ -3209,11 +3065,10 @@ setInterval(() => {
                 syncBtn.onclick = function(e) {
                     e.preventDefault();
                     if(!confirm('這會清除異常的「殭屍記憶」，並強制重新下載最新進度。\n確定要強制同步嗎？')) return;
-                    localStorage.removeItem('freightData_115'); // 炸毀主線暫存
+                    localStorage.removeItem('freightData_115'); 
                     alert('🧹 殭屍資料已清除！網頁即將重新整理。');
                     window.location.reload();
                 };
-                // 安全插入
                 connectionTag.insertAdjacentElement('afterend', syncBtn);
             }
 
@@ -3259,11 +3114,6 @@ setInterval(() => {
                 }
             }
         }
-        
-        // 保險機制：把舊的左下角浮動按鈕移除
-        let floatBtn = document.getElementById('btnForceSyncModalFloating');
-        if (floatBtn) floatBtn.remove();
-        
     }, 1500);
 
     // --- 下方的匯出引擎維持原樣 ---
