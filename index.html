@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動返璞歸真版 + 一鍵殺殭屍按鈕！");
+    console.log("🚀 啟動刪字修復版：已補上 Vue.js 原廠空字串彈回 Bug 的終極補丁！");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     var mainStateInit = {};
@@ -2942,7 +2942,88 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：背景小精靈 (每兩秒幫忙備份廠商資料)
+    // 🚀 核心一：定位器與備用狀態打針 (解決原廠刪字 Bug 的關鍵)
+    // ============================================================================
+    var getCoords = (target) => {
+        let date = target.getAttribute('data-date');
+        if (!date) {
+            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
+            if (container) {
+                let dEl = container.querySelector('[data-date]');
+                if (dEl) date = dEl.getAttribute('data-date');
+            }
+        }
+
+        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
+        if (!key) {
+            let td = target.closest('td');
+            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
+            if (!key && td) {
+                let tr = target.closest('tr');
+                let table = target.closest('table');
+                if (tr && table) {
+                    let idx = Array.from(tr.children).indexOf(td);
+                    let thead = table.querySelector('thead');
+                    if (thead) {
+                        let ths = thead.querySelectorAll('th');
+                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
+                    }
+                }
+            }
+        }
+        if (!key) {
+            let prev = target.previousElementSibling;
+            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
+                key = prev.innerText;
+            } else {
+                let parent = target.closest('div, li, label, .form-group');
+                if (parent) {
+                    let lbl = parent.querySelector('label, span, strong');
+                    if (lbl && lbl !== target) key = lbl.innerText;
+                }
+            }
+        }
+
+        if (key) {
+            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
+            if (cleanKey.includes('出勤')) key = '出勤數';
+            else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
+            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
+            else if (cleanKey.includes('簽到')) key = '簽到率';
+            else if (cleanKey.includes('準點')) key = '準點率';
+            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
+            else key = cleanKey;
+        }
+
+        if (!key || key === '日期' || key === '星期' || key === '') return null;
+        return { date, key };
+    };
+
+    var forceInjectState = (wh, date, key, val) => {
+        let ms = {};
+        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
+        if (!ms.warehouses) ms.warehouses = {};
+        if (!ms.warehouses[wh]) ms.warehouses[wh] = { daily: {} };
+        if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
+        if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
+        
+        // 強制寫入，不管是不是空字串，系統大腦都必須接受！
+        ms.warehouses[wh].daily[date][key] = val;
+        ms.customVendorDB = window.customVendorCheckoutDB; 
+        localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+        ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+            if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
+                if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
+                if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
+                window[varName].warehouses[wh].daily[date][key] = val;
+                window[varName].customVendorDB = window.customVendorCheckoutDB;
+            }
+        });
+    };
+
+    // ============================================================================
+    // 🚀 核心二：背景小精靈與打字監聽 (已加回強制覆寫補丁)
     // ============================================================================
     var isLocalDirty = false;
     var autoSaveTimer = null;
@@ -2963,47 +3044,52 @@ setInterval(() => {
         } catch(e) {}
     }, 2000);
 
-    // ============================================================================
-    // 🚀 核心二：打字監聽 (徹底放手主線)
-    // ============================================================================
     window.handleAction = (e) => {
         let target = e.target;
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
 
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let whRaw = whSel ? whSel.value : '大肚';
+        let wh = whRaw.replace('倉', '');
+
         let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
 
-        if (!isVendorInput) return;
+        if (isVendorInput) {
+            let dStr = target.getAttribute('data-date');
+            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
+            if (selectedVendor !== '全部' && dStr) {
+                if (target.classList.contains('vendor-daily-cell')) {
+                    let cat = target.getAttribute('data-cat');
+                    let valStr = target.value.replace(/,/g, '').trim();
+                    let val = parseFloat(valStr);
+                    setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
 
-        isLocalDirty = true; 
-        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
-        let dStr = target.getAttribute('data-date');
-        let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-
-        if (selectedVendor !== '全部' && dStr) {
-            if (target.classList.contains('vendor-daily-cell')) {
-                let cat = target.getAttribute('data-cat');
-                let valStr = target.value.replace(/,/g, '').trim();
-                let val = parseFloat(valStr);
-                setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
-
-                let tr = target.closest('tr');
-                if (tr) {
-                    let rowTotal = 0;
-                    tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
-                        let cellVal = parseFloat(inp.value.replace(/,/g, ''));
-                        if (!isNaN(cellVal)) rowTotal += cellVal;
-                    });
-                    let totCell = tr.querySelector('.daily-row-total');
-                    if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
+                    let tr = target.closest('tr');
+                    if (tr) {
+                        let rowTotal = 0;
+                        tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
+                            let cellVal = parseFloat(inp.value.replace(/,/g, ''));
+                            if (!isNaN(cellVal)) rowTotal += cellVal;
+                        });
+                        let totCell = tr.querySelector('.daily-row-total');
+                        if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
+                    }
+                } else if (target.classList.contains('vendor-remark-input')) {
+                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
+                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
                 }
-            } else if (target.classList.contains('vendor-remark-input')) {
-                let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+            }
+        } else {
+            // ✅ 補丁：當你在主線大表打字或刪除時，我們強行把值寫進系統大腦！
+            // 這樣原廠系統就不會因為「空字串」而彈回舊數字了！
+            let coords = getCoords(target);
+            if (coords && coords.date && coords.key) {
+                forceInjectState(wh, coords.date, coords.key, target.value);
             }
         }
 
+        isLocalDirty = true;
         if (autoSaveTimer) clearTimeout(autoSaveTimer);
         let delay = (e.type === 'input') ? 1500 : 50;
         autoSaveTimer = setTimeout(() => {
@@ -3069,9 +3155,11 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💡 核心四：按鈕常駐與零垃圾濾網 (新增殺殭屍按鈕)
+    // 💡 核心四：按鈕常駐與零垃圾濾網 (按鈕位置已恢復你熟悉的設定)
     // ============================================================================
     setInterval(() => {
+        if (document.getElementById('btnCleanJunkModal')) return;
+
         let buttons = document.querySelectorAll('button');
         let targetBtn = null;
         for (let btn of buttons) {
@@ -3082,8 +3170,7 @@ setInterval(() => {
         }
 
         if (targetBtn && targetBtn.parentNode) {
-            // 1. 雲端瘦身按鈕
-            if (!document.getElementById('btnCleanJunkModal')) {
+            if (!targetBtn.parentNode.querySelector('#btnCleanJunkModal')) {
                 let cleanBtn = document.createElement('button');
                 cleanBtn.id = 'btnCleanJunkModal';
                 cleanBtn.innerHTML = '🧹 雲端瘦身';
@@ -3091,7 +3178,7 @@ setInterval(() => {
                 
                 cleanBtn.onclick = function(e) {
                     e.preventDefault(); 
-                    if(!confirm('這將清除系統遺留的無效日期包裹。是否執行？')) return;
+                    if(!confirm('這將清除系統遺留的「全空白/全為0」無效日期包裹。是否執行？')) return;
                     let db = window.customVendorCheckoutDB || {};
                     for (let wh in db) {
                         for (let vendor in db[wh]) {
@@ -3115,7 +3202,7 @@ setInterval(() => {
                 targetBtn.parentNode.appendChild(cleanBtn);
             }
 
-            // 2. 🚨 強制雲端同步按鈕 (一鍵殺殭屍)
+            // 🚨 強制雲端同步按鈕 (一鍵殺殭屍)
             if (!document.getElementById('btnForceSyncModal')) {
                 let syncBtn = document.createElement('button');
                 syncBtn.id = 'btnForceSyncModal';
@@ -3130,7 +3217,6 @@ setInterval(() => {
                     localStorage.removeItem('freightData_115');
                     
                     alert('🧹 殭屍資料已清除！網頁即將重新整理並下載雲端最新進度。');
-                    // 重新整理網頁，強迫 Vue.js 從 Firebase 重新拿資料
                     window.location.reload();
                 };
                 targetBtn.parentNode.appendChild(syncBtn);
