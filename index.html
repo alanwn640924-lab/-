@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動神經重連終極版：恢復主線資料綁定，並採用安全 delete 徹底解決跑版、透明與同步斷線問題！");
+    console.log("🚀 啟動神經重連終極版 (保證發車版)：修正連續快速輸入導致的存檔延遲問題！");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
     var mainStateInit = {};
@@ -3010,7 +3010,7 @@ setInterval(() => {
         
         let rawVal = (val === undefined || val === null) ? '' : String(val).trim();
         
-        // ⚔️ 完美雙殺淨化邏輯：如果是空字串，絕對不塞入系統，而是用 delete 徹底超渡它，公式才不會當機！
+        // ⚔️ 完美雙殺淨化邏輯：如果是空字串，用 delete 徹底超渡它
         let applyDualKill = (targetObj) => {
             if (rawVal === '') {
                 delete targetObj[key];
@@ -3029,7 +3029,6 @@ setInterval(() => {
         ms.customVendorDB = window.customVendorCheckoutDB; 
         localStorage.setItem('freightData_115', JSON.stringify(ms));
 
-        // 重新接上傳輸神經
         ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
             if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
                 if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
@@ -3040,9 +3039,8 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心二：全域打字監聽 (已恢復主線攔截，確保資料上雲端)
+    // 🚀 核心二：全域打字監聽 (✅ 修正：分離快速打字與離開格子的發車邏輯)
     // ============================================================================
-    var isLocalDirty = false;
     var autoSaveTimer = null;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
@@ -3098,22 +3096,29 @@ setInterval(() => {
                 }
             }
         } else {
-            // ✅ 把神經接回來！在主線打字或刪除時，資料才能正確存入記憶體並觸發雲端同步！
+            // ✅ 致命錯誤修復：只針對頂部有「分靈體Bug」的三個欄位強制注入，下半部完全放手讓原廠系統處理！
             let coords = getCoords(target);
             if (coords && coords.date && coords.key) {
-                forceInjectState(wh, coords.date, coords.key, target.value);
+                let twinKeys = ['出貨件數', '出貨', '回收件數', '回收', '預算件數', '預算'];
+                if (twinKeys.includes(coords.key)) {
+                    forceInjectState(wh, coords.date, coords.key, target.value);
+                }
             }
         }
 
-        isLocalDirty = true;
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        let delay = (e.type === 'input') ? 1500 : 50;
-        autoSaveTimer = setTimeout(() => {
-            if (isLocalDirty && typeof window.saveData === 'function') {
-                isLocalDirty = false;
-                window.saveData(true, true);
-            }
-        }, delay);
+        // 🚚 發車邏輯大升級：
+        if (e.type === 'focusout' || e.type === 'change') {
+            // 當滑鼠離開格子時，派出一台不被取消的獨立小貨車，100毫秒後立刻上傳！
+            setTimeout(() => {
+                if (typeof window.saveData === 'function') window.saveData(true, true);
+            }, 100);
+        } else if (e.type === 'input') {
+            // 正在連續打字時，防手震 1.5 秒
+            if (autoSaveTimer) clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(() => {
+                if (typeof window.saveData === 'function') window.saveData(true, true);
+            }, 1500);
+        }
     };
 
     document.addEventListener('input', window.handleAction, true);
@@ -3121,18 +3126,57 @@ setInterval(() => {
     document.addEventListener('focusout', window.handleAction, true);
 
     // ============================================================================
-    // 🛡️ 防漏字補丁
-    // ============================================================================
+// 🔄 攔截存檔
+// ============================================================================
+var syncHookInterval = setInterval(() => {
+    if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
+        let origSave = window.saveData;
+        
+        window.saveData = function(...args) {
+            ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                if (window[varName]) { 
+                    window[varName].customVendorDB = window.customVendorCheckoutDB; 
+
+                    // ✅ 在發車前，幫原廠把上半部的「分靈體」清理乾淨，確保傳上雲端的是正確的資料
+                    if (window[varName].warehouses) {
+                        for (let w in window[varName].warehouses) {
+                            if (window[varName].warehouses[w].daily) {
+                                for (let d in window[varName].warehouses[w].daily) {
+                                    let dayData = window[varName].warehouses[w].daily[d];
+                                    if (!dayData) continue;
+                                    
+                                    let cVal = dayData['出貨件數'];
+                                    if (cVal === '' || cVal === null || cVal === undefined) { delete dayData['出貨']; delete dayData['出貨件數']; }
+                                    else { dayData['出貨'] = cVal; }
+
+                                    let rVal = dayData['回收件數'];
+                                    if (rVal === '' || rVal === null || rVal === undefined) { delete dayData['回收']; delete dayData['回收件數']; }
+                                    else { dayData['回收'] = rVal; }
+
+                                    let bVal = dayData['預算件數'];
+                                    if (bVal === '' || bVal === null || bVal === undefined) { delete dayData['預算']; delete dayData['預算件數']; }
+                                    else { dayData['預算'] = bVal; }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            return origSave.apply(this, args); 
+        };
+        window.saveData._isHooked = true;
+        clearInterval(syncHookInterval);
+    }
+}, 500);
+
+// ============================================================================
+// 💡 核心四：精緻版迷你殺殭屍按鈕 (安插於右上角連線中區域)
+// ============================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                activeEl.blur(); 
-            }
-            if (isLocalDirty && typeof window.saveData === 'function') {
-                if (autoSaveTimer) clearTimeout(autoSaveTimer);
-                isLocalDirty = false;
-                window.saveData(true, true); 
+                activeEl.blur(); // 這會觸發上面的 focusout 獨立小貨車
             }
         }
     });
