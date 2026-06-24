@@ -2892,10 +2892,9 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動終極純淨同步引擎：回歸原生上傳 + 隱形欄位校正 + 雷達常駐...");
+    console.log("🚀 啟動返璞歸真版：徹底放手主線大表，恢復原廠神經網路，僅作背景輔助！");
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
-    // 1. 初始化廠商資料庫
     var mainStateInit = {};
     try { mainStateInit = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
     
@@ -2943,54 +2942,52 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚀 核心一：底層隱形翻譯與包裹夾帶 (絕不破壞原生 Vue 反應機制)
+    // 🚀 核心一：背景小精靈 (每兩秒幫忙備份廠商資料，絕不干擾主線)
     // ============================================================================
-    const origSetItem = localStorage.setItem;
-    localStorage.setItem = function(key, val) {
-        if (key === 'freightData_115') {
-            try {
-                let ms = JSON.parse(val);
-                ms.customVendorDB = window.customVendorCheckoutDB; // 夾帶廠商備註
-                
-                // 💡 隱形校正：在存檔的最後一刻，同步「手機出貨」與「電腦出貨件數」
-                if (ms.warehouses) {
-                    for (let w in ms.warehouses) {
-                        if (ms.warehouses[w].daily) {
-                            for (let d in ms.warehouses[w].daily) {
-                                let dayData = ms.warehouses[w].daily[d];
-                                
-                                if (dayData['出貨件數'] !== undefined && dayData['出貨'] === undefined) dayData['出貨'] = dayData['出貨件數'];
-                                else if (dayData['出貨'] !== undefined && dayData['出貨件數'] === undefined) dayData['出貨件數'] = dayData['出貨'];
-                                
-                                if (dayData['回收件數'] !== undefined && dayData['回收'] === undefined) dayData['回收'] = dayData['回收件數'];
-                                else if (dayData['回收'] !== undefined && dayData['回收件數'] === undefined) dayData['回收件數'] = dayData['回收'];
-                            }
-                        }
-                    }
+    var isLocalDirty = false;
+    var autoSaveTimer = null;
+    var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
+
+    setInterval(() => {
+        try {
+            let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
+            if (ms.customVendorDB) {
+                let cloudStr = JSON.stringify(ms.customVendorDB);
+                if (cloudStr !== lastCloudVendorStr && cloudStr !== '{}') {
+                    window.customVendorCheckoutDB = ms.customVendorDB;
+                    localStorage.setItem('freight_vendor_db', cloudStr);
+                    lastCloudVendorStr = cloudStr;
+                    if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
                 }
-                val = JSON.stringify(ms);
-            } catch(e) {}
-        }
-        origSetItem.apply(this, [key, val]);
-    };
+            }
+        } catch(e) {}
+    }, 2000);
 
     // ============================================================================
-    // 🚀 核心二：專屬廠商欄位處理與閃退防護
+    // 🚀 核心二：打字監聽 (✅ 徹底放手！只管廠商欄位，不管主線大表)
     // ============================================================================
-    document.addEventListener('input', (e) => {
+    window.handleAction = (e) => {
         let target = e.target;
-        if (!target.classList.contains('vendor-daily-cell') && !target.classList.contains('vendor-remark-input')) return;
-        
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
+        if (target.closest('#vendorSummaryModal')) return;
+
+        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
+
+        // 如果是主線大表，我們什麼都不做，讓原廠系統自己處理！
+        if (!isVendorInput) return;
+
+        // 以下只處理我們自建的廠商明細
+        isLocalDirty = true; 
         let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let whRaw = whSel ? whSel.value : '大肚';
-        let wh = whRaw.replace('倉', '');
+        let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
         let dStr = target.getAttribute('data-date');
         let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-        
+
         if (selectedVendor !== '全部' && dStr) {
             if (target.classList.contains('vendor-daily-cell')) {
                 let cat = target.getAttribute('data-cat');
-                let val = parseFloat(target.value.replace(/,/g, '').trim());
+                let valStr = target.value.replace(/,/g, '').trim();
+                let val = parseFloat(valStr);
                 setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
 
                 let tr = target.closest('tr');
@@ -3007,28 +3004,80 @@ setInterval(() => {
                 let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
                 setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
             }
-            // 觸發原系統存檔，把廠商備註一起包上雲端
-            if (typeof window.saveData === 'function') setTimeout(() => window.saveData(false, false), 1000);
         }
-    }, true);
 
-    // ⭐️ 閃退救命網：解決「最後一格直接關網頁」資料不見的痛點
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        let delay = (e.type === 'input') ? 1500 : 50;
+        autoSaveTimer = setTimeout(() => {
+            if (isLocalDirty && typeof window.saveData === 'function') {
+                isLocalDirty = false;
+                window.saveData(true, true);
+            }
+        }, delay);
+    };
+
+    document.addEventListener('input', window.handleAction, true);
+    document.addEventListener('change', window.handleAction, true);
+    document.addEventListener('focusout', window.handleAction, true);
+
+    // ============================================================================
+    // 🛡️ 唯一防漏字補丁：螢幕休眠時，最溫柔的極限搶救 (只拔游標，不暴力塞資料)
+    // ============================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') {
             let activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA'].includes(activeEl.tagName)) {
-                // 強迫觸發原生 change 事件，讓系統大腦吞下最後一個數字並存檔
-                activeEl.dispatchEvent(new Event('change', { bubbles: true }));
-                activeEl.blur(); 
+                activeEl.blur(); // ✅ 這會觸發原廠的 @change 神經網路，完美存檔
+            }
+            if (isLocalDirty && typeof window.saveData === 'function') {
+                if (autoSaveTimer) clearTimeout(autoSaveTimer);
+                isLocalDirty = false;
+                window.saveData(true, true); 
             }
         }
     });
 
     // ============================================================================
-    // 💡 核心三：按鈕常駐巡邏雷達 (確保 GitHub 上按鈕絕對不會消失)
+    // 🔄 攔截存檔 (✅ 只做最後一次的記憶體校正，不再干擾事件發送)
     // ============================================================================
-    
-    // 1. 巡邏雷達：雲端連線設定裡的「瘦身按鈕」
+    var syncHookInterval = setInterval(() => {
+        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
+            let origSave = window.saveData;
+            
+            window.saveData = function(...args) {
+                // 1. 把我們自建的廠商資料放進系統大腦，讓它一起帶上雲端
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) { 
+                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
+                        
+                        // 2. 在上傳前的一瞬間，把出貨件數欄位對齊，不破壞神經網路
+                        if (window[varName].warehouses) {
+                            for (let w in window[varName].warehouses) {
+                                if (window[varName].warehouses[w].daily) {
+                                    for (let d in window[varName].warehouses[w].daily) {
+                                        let dayData = window[varName].warehouses[w].daily[d];
+                                        if (dayData['出貨件數'] !== undefined && dayData['出貨'] === undefined) dayData['出貨'] = dayData['出貨件數'];
+                                        if (dayData['出貨'] !== undefined && dayData['出貨件數'] === undefined) dayData['出貨件數'] = dayData['出貨'];
+                                        if (dayData['回收件數'] !== undefined && dayData['回收'] === undefined) dayData['回收'] = dayData['回收件數'];
+                                        if (dayData['回收'] !== undefined && dayData['回收件數'] === undefined) dayData['回收件數'] = dayData['回收'];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // 3. 原汁原味呼叫系統存檔
+                return origSave.apply(this, args); 
+            };
+            window.saveData._isHooked = true;
+            clearInterval(syncHookInterval);
+        }
+    }, 500);
+
+    // ============================================================================
+    // 💡 核心四：按鈕常駐與零垃圾濾網
+    // ============================================================================
     setInterval(() => {
         if (document.getElementById('btnCleanJunkModal')) return;
 
@@ -3050,7 +3099,7 @@ setInterval(() => {
                 
                 cleanBtn.onclick = function(e) {
                     e.preventDefault(); 
-                    if(!confirm('這將清除系統遺留的「全空白/全為0」無效日期包裹。\n(若該日已有預算資料則會保留)\n絕對不會刪除您已輸入的任何數字！是否執行？')) return;
+                    if(!confirm('這將清除系統遺留的「全空白/全為0」無效日期包裹。\n絕對不會刪除您已輸入的任何有效數字！是否執行？')) return;
                     
                     let deletedDays = new Set();
                     const isGarbage = (record) => {
@@ -3058,13 +3107,13 @@ setInterval(() => {
                         for (let key in record) {
                             if (['__ob__', 'date', '日期', 'id', 'wh', 'warehouse', '倉別'].includes(key)) continue;
                             let val = record[key];
-                            if (Array.isArray(val) && val.length === 0) continue;
-                            if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue;
+                            if (Array.isArray(val) && val.length === 0) continue; 
+                            if (typeof val === 'object' && val !== null && Object.keys(val).length === 0) continue; 
                             if (val !== '' && val !== 0 && val !== '0' && val !== null && val !== undefined) {
-                                if (typeof val === 'string' && val.trim() === '') continue;
+                                if (typeof val === 'string' && val.trim() === '') continue; 
                                 if (typeof val === 'string' && val.trim() === '0') continue;
-                                if (typeof val === 'number' && isNaN(val)) continue;
-                                return false; // 找到任何有效資料，包含預算，就不刪除
+                                if (typeof val === 'number' && isNaN(val)) continue; 
+                                return false; 
                             }
                         }
                         return true;
@@ -3088,7 +3137,10 @@ setInterval(() => {
                     ms.customVendorDB = db;
                     let memoryTargets = [ms];
                     ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                        if (window[varName]) { memoryTargets.push(window[varName]); }
+                        if (window[varName]) { 
+                            window[varName].customVendorDB = window.customVendorCheckoutDB; 
+                            memoryTargets.push(window[varName]);
+                        }
                     });
 
                     memoryTargets.forEach(target => {
@@ -3109,14 +3161,13 @@ setInterval(() => {
 
                     let count = deletedDays.size;
                     if(window.saveData) window.saveData(true, true);
-                    alert(`✅ 雲端大掃除成功！\n共清除了 ${count} 個無效的日期包裹。\n請等待 2 秒後重新整理網頁！`);
+                    alert(`✅ 雲端大掃除成功！\n共無情地清除了 ${count} 個無效的幽靈日期包裹。\n請等待 2 秒後重新整理網頁！`);
                 };
                 targetBtn.parentNode.appendChild(cleanBtn);
             }
         }
-    }, 1000);
+    }, 1500);
 
-    // 2. 巡邏雷達：廠商結帳區的「匯出每日明細」按鈕
     setInterval(() => {
         let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
         let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
@@ -3170,7 +3221,7 @@ setInterval(() => {
         }
     }, 1000);
 
-    // --- 1. 主線匯入引擎 ---
+    // --- 1. 主線匯入引擎 (保留零垃圾濾網) ---
     makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3199,7 +3250,8 @@ setInterval(() => {
                 if (dateStr) {
                     let costStr = String(row.AM).replace(/[,]/g, '');
                     let cost = parseFloat(costStr) || 0;
-                    if (cost === 0 && costStr === '') continue; 
+                    
+                    if (cost === 0) continue; 
                     
                     let key = targetWh + '_' + targetVendor + '_' + dateStr;
                     if (!clearedMainlineKeys.has(key)) {
@@ -3225,13 +3277,15 @@ setInterval(() => {
             }
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            if (typeof window.saveData === 'function') window.saveData(true, true);
-            alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。`);
+            setTimeout(() => {
+                if (typeof window.saveData === 'function') window.saveData(true, true);
+                alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。\n(系統已自動過濾無效零值，並同步至雲端)`);
+            }, 500);
             e.target.value = '';
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 2. MIS 非主線匯入引擎 ---
+    // --- 2. MIS 非主線匯入引擎 (保留零垃圾濾網) ---
     makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3294,7 +3348,7 @@ setInterval(() => {
                     let cost = parseFloat(String(row[costCol] || '').replace(/[,]/g, '')) || 0;
                     
                     if (reason.includes('主線')) continue; 
-                    if (cost === 0 && trips === 0) continue;
+                    if (cost === 0 && trips === 0) continue; 
                     
                     let mainCat = '';
                     if (reason.includes('上收') || reason.includes('B2C') || reason.includes('C2C')) mainCat = '上收';
@@ -3351,8 +3405,10 @@ setInterval(() => {
             }
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            if (typeof window.saveData === 'function') window.saveData(true, true);
-            alert(`✅ 非主線MIS結帳明細智慧對帳成功！已成功分流並壓縮匯入 ${importedCount} 筆數據！`);
+            setTimeout(() => {
+                if (typeof window.saveData === 'function') window.saveData(true, true);
+                alert(`✅ 非主線MIS結帳明細智慧對帳成功！已成功分流並壓縮匯入 ${importedCount} 筆數據！`);
+            }, 500);
             e.target.value = '';
         }; r.readAsArrayBuffer(file);
     });
@@ -3878,176 +3934,6 @@ setInterval(() => {
             });
             calcTotal(); 
         }
-    });
-
-    makeInvincible('calcVendorDailyTable', function() { /* 保留空殼 */ });
-
-    makeInvincible('renderVendorDailyTable', function(startDate, endDate) {
-        let categories = ['主線', '爆量', '回收', '其他', '特殊專車', '罰款', '離島', '轉運', '上收'];
-        let thead = `<tr>
-            <th class="sticky-top" style="background:#DDEBF7; color:#000; text-align:center; min-width: 60px;">日期</th>
-            <th class="sticky-top" style="background:#DDEBF7; color:#000; text-align:center; min-width: 50px;">星期</th>
-            ${categories.map(k => `<th class="sticky-top" style="background:#DDEBF7; color:#000; text-align:center; min-width: 80px;">${k}</th>`).join('')}
-            <th class="sticky-top" style="background:#FFF2CC; color:#000; text-align:center; min-width: 100px;">每日總計</th>
-            <th class="sticky-top" style="background:#DDEBF7; color:#000; text-align:center; min-width: 220px;">備註</th>
-        </tr>`;
-        
-        let tbody = '';
-        let current = new Date(startDate);
-        let selectedWh = document.getElementById('checkoutWhSelect') ? document.getElementById('checkoutWhSelect').value.replace('倉', '') : '大肚';
-        let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-
-        let colTotals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '特殊專車': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 };
-        let grandTotal = 0;
-
-        while (current <= endDate && !isNaN(current.getTime())) {
-            let m = current.getMonth() + 1, d = current.getDate(), dow = LOCAL_DOW[current.getDay()];
-            let dateStr = `${current.getFullYear()}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            tbody += `<tr>
-                <td style="text-align:center; font-weight:bold; color:#333; border: 1px solid var(--border-color); background:#f8f9fa;">${m}/${d}</td>
-                <td style="text-align:center; color:#555; border: 1px solid var(--border-color); background:#f8f9fa;">${dow}</td>`;
-            
-            let rowTotal = 0;
-
-            categories.forEach(cat => {
-                let displayVal = ''; let isRo = ''; let styleBg = '';
-                if (selectedVendor === '全部') {
-                    let sum = 0, hasData = false;
-                    ['創新', '峻富', '華碩'].forEach(vName => { 
-                        let vCost = getStorageVal(selectedWh, vName, dateStr, cat); 
-                        if (vCost !== '') { sum += Number(vCost); hasData = true; } 
-                    });
-                    displayVal = hasData ? (sum !== 0 ? sum.toLocaleString('en-US') : '0') : '';
-                    rowTotal += sum; 
-                    colTotals[cat] += sum; 
-                    isRo = 'readonly tabindex="-1"'; styleBg = 'background-color:#f1f3f4; color:#5f6368; font-weight:bold;';
-                } else {
-                    let vCost = getStorageVal(selectedWh, selectedVendor, dateStr, cat);
-                    displayVal = (vCost !== '') ? Number(vCost).toLocaleString('en-US') : '';
-                    if (vCost !== '') {
-                        let costNum = Number(vCost);
-                        rowTotal += costNum; 
-                        colTotals[cat] += costNum; 
-                    }
-                }
-                tbody += `<td style="padding:0; border: 1px solid var(--border-color); ${styleBg}"><input type="text" class="vendor-daily-cell" data-date="${dateStr}" data-cat="${cat}" ${isRo} style="width:100%; border:none; text-align:center; padding:6px; outline:none; background:transparent; ${styleBg}" value="${displayVal}"></td>`;
-            });
-
-            grandTotal += rowTotal; 
-
-            let displayRemark = '';
-            if (selectedVendor === '全部') {
-                let tripNotes = [];
-                categories.forEach(c => { let tSum = 0; ['創新', '峻富', '華碩'].forEach(v => { tSum += Number(getStorageVal(selectedWh, v, dateStr, c + '_trips') || 0); }); if (tSum > 0) tripNotes.push(`${c}:${tSum}趟`); });
-                let manualRemarks = [];
-                ['創新', '峻富', '華碩'].forEach(v => { let r = getStorageVal(selectedWh, v, dateStr, 'remark'); if (r) manualRemarks.push(`${v}:${r}`); });
-                displayRemark = (tripNotes.length > 0 ? `[${tripNotes.join(',')}] ` : '') + manualRemarks.join('; ');
-            } else {
-                let tripNotes = [];
-                categories.forEach(c => { let t = Number(getStorageVal(selectedWh, selectedVendor, dateStr, c + '_trips') || 0); if (t > 0) tripNotes.push(`${c}:${t}趟`); });
-                let remarkVal = getStorageVal(selectedWh, selectedVendor, dateStr, 'remark');
-                displayRemark = (tripNotes.length > 0 ? `[${tripNotes.join(',')}] ` : '') + remarkVal;
-            }
-
-            let isRoRem = selectedVendor === '全部' ? 'readonly tabindex="-1"' : '';
-            let styleBgRem = selectedVendor === '全部' ? 'background-color:#f1f3f4; color:#5f6368;' : '';
-
-            let displayRowTotal = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
-            tbody += `<td style="text-align:center; font-weight:bold; background:#fff9e6; color:#b06000; border: 1px solid var(--border-color);" class="daily-row-total">${displayRowTotal}</td>
-                <td style="padding:0; border: 1px solid var(--border-color); ${styleBgRem}"><input type="text" class="vendor-remark-input" data-date="${dateStr}" ${isRoRem} style="width:100%; border:none; text-align:left; padding:6px; outline:none; background:transparent; ${styleBgRem}" value="${displayRemark}"></td>
-            </tr>`;
-            current.setDate(current.getDate() + 1);
-        }
-        
-        let tfootHtml = `<tr>
-            <td colspan="2" style="text-align:center; font-weight:bold; background:#FDE293; color:#b06000; border: 1px solid var(--border-color); padding: 8px;">各科目總計</td>`;
-        categories.forEach(cat => {
-            tfootHtml += `<td style="text-align:center; font-weight:bold; background:#FFF2CC; color:#b06000; border: 1px solid var(--border-color); padding: 8px;">${colTotals[cat] !== 0 ? colTotals[cat].toLocaleString('en-US') : '0'}</td>`;
-        });
-        tfootHtml += `<td style="text-align:center; font-weight:bold; background:#EA8600; color:#fff; border: 1px solid var(--border-color); padding: 8px; font-size: 1.1em;">${grandTotal !== 0 ? grandTotal.toLocaleString('en-US') : '0'}</td>
-            <td style="background:#FDE293; border: 1px solid var(--border-color);"></td>
-        </tr>`;
-
-        let hd = document.getElementById('vendorDailyHead'); if(hd) hd.innerHTML = thead;
-        let bd = document.getElementById('vendorDailyBody'); if(bd) bd.innerHTML = tbody;
-        
-        let ft = document.getElementById('vendorDailyFoot'); 
-        if(ft) { 
-            ft.innerHTML = tfootHtml; 
-        } else if(bd) { 
-            bd.innerHTML += tfootHtml; 
-        }
-    });
-
-    makeInvincible('renderCheckoutTab', function() {
-        let startInputEl = document.getElementById('checkoutStartDate');
-        let endInputEl = document.getElementById('checkoutEndDate');
-        if (!startInputEl || !endInputEl) return;
-        
-        let startInput = startInputEl.value;
-        let endInput = endInputEl.value;
-        
-        if (!startInput || !endInput) {
-            let d = new Date();
-            let m = d.getMonth() + 1;
-            let y = d.getFullYear();
-            let prevM = m === 1 ? 12 : m - 1;
-            let prevY = m === 1 ? y - 1 : y;
-            startInputEl.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`;
-            endInputEl.value = `${y}-${String(m).padStart(2,'0')}-25`;
-            startInput = startInputEl.value;
-            endInput = endInputEl.value;
-        }
-
-        let start = new Date(startInput), end = new Date(endInput);
-        let totals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
-        let current = new Date(start);
-        
-        let mainState = {};
-        try { mainState = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
-        let whSel = document.getElementById('checkoutWhSelect');
-        let wh = whSel ? whSel.value.replace('倉', '') : (window.currentWarehouse || '大肚');
-        let dailyDataObj = mainState.warehouses?.[wh]?.daily || {};
-
-        while (current <= end) {
-            let m = current.getMonth() + 1, d = current.getDate();
-            let dateStr = `${current.getFullYear()}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-            let dailyData = dailyDataObj[dateStr];
-            
-            if (dailyData) {
-                totals['主線'] += Number(dailyData['主線費用'] || 0); 
-                totals['爆量'] += Number(dailyData['爆量費用'] || 0) + Number(dailyData['爆量自揹費用'] || 0); 
-                totals['回收'] += Number(dailyData['回收費用'] || 0) + Number(dailyData['回頭收費用'] || 0); 
-                totals['其他'] += Number(dailyData['其他專車費用'] || 0) + Number(dailyData['特殊點專車費用'] || 0) + Number(dailyData['新開店費用'] || 0); 
-                totals['罰款'] += Number(dailyData['違規罰款'] || 0); 
-                totals['離島'] += Number(dailyData['離島費用'] || 0); 
-                totals['轉運'] += Number(dailyData['轉運費用'] || 0); 
-                totals['上收'] += Number(dailyData['B2C專車費用'] || 0) + Number(dailyData['B2C回頭費用'] || 0) + Number(dailyData['C2C專車費用'] || 0) + Number(dailyData['C2C回頭費用'] || 0);
-            } 
-            current.setDate(current.getDate() + 1);
-        }
-        
-        Object.keys(totals).forEach(k => { grandTotal += totals[k]; });
-        let formatCost = (v) => isNaN(v) ? '0' : Number(v).toLocaleString('en-US', {maximumFractionDigits:0});
-
-        let sysThead = `<tr>
-            <th class="sticky-top" style="background:#2F5597; color:white; text-align:center; min-width: 130px; border-bottom: 2px solid #1a3c70;">各科目運費</th>
-            ${Object.keys(totals).map(k => `<th class="sticky-top" style="background:#2F5597; color:white; text-align:center; min-width: 90px; border-bottom: 2px solid #1a3c70;">${k}</th>`).join('')}
-            <th class="sticky-top" style="background:#ea8600; color:white; text-align:center; min-width: 140px; border-bottom: 2px solid #b06000;">總運費</th>
-        </tr>`;
-
-        let sysTbody = `<tr>
-            <td style="text-align:center; font-weight:bold; background:#e8f0fe; color:#0056b3; font-size:16px;">系統資料合計</td>
-            ${Object.keys(totals).map(k => `<td style="text-align:center; font-size:15px; font-weight:bold; color:${totals[k]<0?'#dc3545':'#333'};">${formatCost(totals[k])}</td>`).join('')}
-            <td style="text-align:center; background:#fff3cd; color:${grandTotal<0?'#dc3545':'#d32f2f'}; font-size:18px; font-weight:bold;">${formatCost(grandTotal)}</td>
-        </tr>`;
-        
-        let headEl = document.getElementById('checkoutSystemHead');
-        let bodyEl = document.getElementById('checkoutSystemBody');
-        if(headEl) headEl.innerHTML = sysThead;
-        if(bodyEl) bodyEl.innerHTML = sysTbody;
-
-        window.renderVendorDailyTable(start, end, totals);
     });
 
     var initAll = () => {
