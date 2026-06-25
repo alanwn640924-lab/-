@@ -2892,10 +2892,10 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動智能馬達裝甲版：全面強制接管資料同步，並啟用防塞車與防透明機制！");
+    console.log("🚀 啟動 11504 完美校準版：修復原廠表格重構 (DOM Rebuild) 導致的掉字 Bug！");
     
     // ============================================================================
-    // 👑 終極獨裁者指令 (地毯式搜索並強制清空所有人手機裡的舊私人金鑰)
+    // 👑 決策 A：終極獨裁者指令 (地毯式搜索並強制清空所有人手機裡的舊私人金鑰)
     // ============================================================================
     try {
         let keysToNuke = [];
@@ -2955,106 +2955,39 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // ⚙️ 智能馬達核心：精準抓取座標與強制寫入大腦
+    // 🛡️ 救命解藥：攔截原廠存檔，加裝 1.5 秒防護罩閘門
     // ============================================================================
-    var getCoords = (target) => {
-        let date = target.getAttribute('data-date');
-        if (!date) {
-            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
-            if (container) {
-                let dEl = container.querySelector('[data-date]');
-                if (dEl) date = dEl.getAttribute('data-date');
-            }
-        }
-
-        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
-        if (!key) {
-            let td = target.closest('td');
-            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
-            if (!key && td) {
-                let tr = target.closest('tr');
-                let table = target.closest('table');
-                if (tr && table) {
-                    let idx = Array.from(tr.children).indexOf(td);
-                    let thead = table.querySelector('thead');
-                    if (thead) {
-                        let ths = thead.querySelectorAll('th');
-                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
-                    }
+    var syncHookInterval = setInterval(() => {
+        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
+            let origSave = window.saveData;
+            let globalTollboothTimer = null;
+            
+            window.saveData = function(...args) {
+                // 如果是手動強制存檔 (顯示訊息)，直接放行
+                if (args[0] === true) {
+                    return origSave.apply(this, args);
                 }
-            }
-        }
-        if (!key) {
-            let prev = target.previousElementSibling;
-            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
-                key = prev.innerText;
-            } else {
-                let parent = target.closest('div, li, label, .form-group');
-                if (parent) {
-                    let lbl = parent.querySelector('label, span, strong');
-                    if (lbl && lbl !== target) key = lbl.innerText;
+
+                // 🚦 防護罩啟動：只要還在打字，就取消上一次的存檔倒數，保護表格不被重畫！
+                if (globalTollboothTimer) {
+                    clearTimeout(globalTollboothTimer);
                 }
-            }
+                
+                // 等手離開鍵盤 1.5 秒後，才正式打包所有資料一次送上雲端
+                globalTollboothTimer = setTimeout(() => {
+                    console.log("🚚 閘門放行：資料打包完畢，大卡車正式發車上雲端！");
+                    origSave.apply(this, args); 
+                }, 1500);
+            };
+            window.saveData._isHooked = true;
+            clearInterval(syncHookInterval);
         }
-
-        if (key) {
-            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
-            // 統一欄位名稱，確保原廠大腦聽得懂
-            if (cleanKey.includes('出勤')) key = '出勤數';
-            else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
-            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
-            else if (cleanKey.includes('預算')) key = '預算件數';
-            else if (cleanKey.includes('簽到')) key = '簽到率';
-            else if (cleanKey.includes('準點')) key = '準點率';
-            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
-            else key = cleanKey;
-        }
-
-        if (!key || key === '日期' || key === '星期' || key === '') return null;
-        return { date, key };
-    };
-
-    var forceInjectState = (wh, date, key, val) => {
-        let ms = {};
-        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
-        if (!ms.warehouses) ms.warehouses = {};
-        if (!ms.warehouses[wh]) ms.warehouses[wh] = { daily: {} };
-        if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
-        if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
-        
-        let rawVal = (val === undefined || val === null) ? '' : String(val).trim();
-        
-        // ⚔️ 雙殺淨化邏輯：空字串直接 delete，防止 0.0% 或透明格子
-        let applyDualKill = (targetObj) => {
-            if (rawVal === '') {
-                delete targetObj[key];
-                if (key === '出貨件數' || key === '出貨') { delete targetObj['出貨']; delete targetObj['出貨件數']; }
-                if (key === '回收件數' || key === '回收') { delete targetObj['回收']; delete targetObj['回收件數']; }
-                if (key === '預算件數' || key === '預算') { delete targetObj['預算']; delete targetObj['預算件數']; }
-            } else {
-                targetObj[key] = rawVal;
-                if (key === '出貨件數' || key === '出貨') { targetObj['出貨'] = rawVal; targetObj['出貨件數'] = rawVal; }
-                if (key === '回收件數' || key === '回收') { targetObj['回收'] = rawVal; targetObj['回收件數'] = rawVal; }
-                if (key === '預算件數' || key === '預算') { targetObj['預算'] = rawVal; targetObj['預算件數'] = rawVal; }
-            }
-        };
-
-        applyDualKill(ms.warehouses[wh].daily[date]);
-        ms.customVendorDB = window.customVendorCheckoutDB; 
-        localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-        ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-            if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
-                if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
-                if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
-                applyDualKill(window[varName].warehouses[wh].daily[date]);
-            }
-        });
-    };
+    }, 500);
 
     // ============================================================================
-    // 🚀 核心二：全域打字攔截 (包含防塞車機制)
+    // ⚙️ 只保留下方廠商明細的監聽器 (主線格子 100% 交還給原廠 11504 完美處理)
     // ============================================================================
+    var autoSaveTimer = null;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
     setInterval(() => {
@@ -3077,86 +3010,47 @@ setInterval(() => {
         if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
         if (target.closest('#vendorSummaryModal')) return;
 
-        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let whRaw = whSel ? whSel.value : '大肚';
-        let wh = whRaw.replace('倉', '');
-
         let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
+        // 🛑 主線格子不干涉！一律退出讓原廠的 handleInput 自己安全處理
+        if (!isVendorInput) return; 
 
-        if (isVendorInput) {
-            // 處理下方廠商對帳區
-            let dStr = target.getAttribute('data-date');
-            let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
-            if (selectedVendor !== '全部' && dStr) {
-                if (target.classList.contains('vendor-daily-cell')) {
-                    let cat = target.getAttribute('data-cat');
-                    let valStr = target.value.replace(/,/g, '').trim();
-                    let val = parseFloat(valStr);
-                    setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
+        let dStr = target.getAttribute('data-date');
+        let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
 
-                    let tr = target.closest('tr');
-                    if (tr) {
-                        let rowTotal = 0;
-                        tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
-                            let cellVal = parseFloat(inp.value.replace(/,/g, ''));
-                            if (!isNaN(cellVal)) rowTotal += cellVal;
-                        });
-                        let totCell = tr.querySelector('.daily-row-total');
-                        if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
-                    }
-                } else if (target.classList.contains('vendor-remark-input')) {
-                    let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+        if (selectedVendor !== '全部' && dStr) {
+            if (target.classList.contains('vendor-daily-cell')) {
+                let cat = target.getAttribute('data-cat');
+                let valStr = target.value.replace(/,/g, '').trim();
+                let val = parseFloat(valStr);
+                setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+
+                let tr = target.closest('tr');
+                if (tr) {
+                    let rowTotal = 0;
+                    tr.querySelectorAll('.vendor-daily-cell').forEach(inp => {
+                        let cellVal = parseFloat(inp.value.replace(/,/g, ''));
+                        if (!isNaN(cellVal)) rowTotal += cellVal;
+                    });
+                    let totCell = tr.querySelector('.daily-row-total');
+                    if (totCell) totCell.innerText = rowTotal !== 0 ? rowTotal.toLocaleString('en-US') : '0';
                 }
-            }
-        } else {
-            // 處理主線區 (強制抓取並寫入大腦)
-            let coords = getCoords(target);
-            if (coords && coords.date && coords.key) {
-                forceInjectState(wh, coords.date, coords.key, target.value);
+            } else if (target.classList.contains('vendor-remark-input')) {
+                let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
+                setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
             }
         }
 
-        // 觸發下方的防撞車紅綠燈存檔
-        if (typeof window.saveData === 'function') {
-            window.saveData(true, true);
-        }
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(() => {
+            if (typeof window.saveData === 'function') window.saveData(false);
+        }, 1500);
     };
 
     document.addEventListener('input', window.handleAction, true);
     document.addEventListener('change', window.handleAction, true);
     document.addEventListener('focusout', window.handleAction, true);
-
-    // ============================================================================
-    // 🚦 核心三：攔截存檔與防塞車紅綠燈
-    // ============================================================================
-    var syncHookInterval = setInterval(() => {
-        if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
-            let origSave = window.saveData;
-            let globalTollboothTimer = null;
-            
-            window.saveData = function(...args) {
-                // 1. 同步下方廠商資料到主物件
-                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) { 
-                        window[varName].customVendorDB = window.customVendorCheckoutDB; 
-                    }
-                });
-
-                // 2. 🚦 紅綠燈機制：等 1.2 秒沒動作才真正上傳，防止 10 台貨車撞車
-                if (globalTollboothTimer) {
-                    clearTimeout(globalTollboothTimer);
-                }
-                
-                globalTollboothTimer = setTimeout(() => {
-                    console.log("🚚 閘門放行：資料打包完畢，大卡車正式發車上雲端！");
-                    origSave.apply(this, args); 
-                }, 1200);
-            };
-            window.saveData._isHooked = true;
-            clearInterval(syncHookInterval);
-        }
-    }, 500);
 
     // ============================================================================
     // 💡 核心四：精緻版迷你殺殭屍按鈕
