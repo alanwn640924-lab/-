@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🛡️ 啟動【大滿貫終極版】：嚴格表頭對位、空白補零、超級貼上攔截器 (修復 ReferenceError 版)！");
+    console.log("🛡️ 啟動【大滿貫無敵版】：還原 11504 完美對位、超級貼上攔截器、徹底解決大量掉字！");
     
     // ============================================================================
     // 🧹 清理殘留：確保沒有私人金鑰干擾，全體統一使用官方大金庫
@@ -2909,7 +2909,6 @@ setInterval(() => {
             localStorage.removeItem(k);
         });
     } catch(err) {}
-    // ============================================================================
 
     // 1. 初始化我們專屬的下方廠商 DB
     if (!window.customVendorCheckoutDB) {
@@ -2917,14 +2916,12 @@ setInterval(() => {
         catch(e) { window.customVendorCheckoutDB = {}; }
     }
 
-    // ✅ 雙重綁定宣告：徹底解決 ReferenceError 找不到變數的問題
-    var getStorageVal = (wh, vendor, date, cat) => {
+    window.getStorageVal = (wh, vendor, date, cat) => {
         if (!window.customVendorCheckoutDB[wh] || !window.customVendorCheckoutDB[wh][vendor] || !window.customVendorCheckoutDB[wh][vendor][date]) return '';
         return window.customVendorCheckoutDB[wh][vendor][date][cat] ?? '';
     };
-    window.getStorageVal = getStorageVal;
 
-    var setStorageVal = (wh, vendor, date, cat, val) => {
+    window.setStorageVal = (wh, vendor, date, cat, val) => {
         if (!window.customVendorCheckoutDB[wh]) window.customVendorCheckoutDB[wh] = {};
         if (!window.customVendorCheckoutDB[wh][vendor]) window.customVendorCheckoutDB[wh][vendor] = {};
         if (!window.customVendorCheckoutDB[wh][vendor][date]) window.customVendorCheckoutDB[wh][vendor][date] = {};
@@ -2936,31 +2933,68 @@ setInterval(() => {
         }
         localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
     };
-    window.setStorageVal = setStorageVal;
 
-    var parseExcelDateUnified = (cell) => {
-        if(!cell) return null; let s = String(cell).trim();
-        if(/^4[456]\d{3}(?:\.\d+)?$/.test(s)) { let d = new Date((parseFloat(s) - 25569) * 86400 * 1000); d.setTime(d.getTime() + 12 * 60 * 60 * 1000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; }
-        s = s.replace(/\([一二三四五六日]\)/g, '').replace(/（[一二三四五六日]）/g, '').trim().replace(/[\/\.]/g, '-');
-        let m = s.match(/^(\d{3,4})-(\d{1,2})-(\d{1,2})/); 
-        if(m) { let y = parseInt(m[1], 10); if (y < 200) y += 1911; return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`; }
-        return null;
-    };
-    window.parseExcelDateUnified = parseExcelDateUnified;
-
-    var makeInvincible = (funcName, newFunc) => {
+    window.makeInvincible = (funcName, newFunc) => {
         Object.defineProperty(window, funcName, {
             get: () => newFunc,
             set: (val) => { console.warn(`🛡️ 系統成功阻擋舊版程式覆寫：${funcName}`); },
             configurable: true
         });
     };
-    window.makeInvincible = makeInvincible;
 
     // ============================================================================
-    // 🛡️ 核心救星：【安全神經重連】 (精準將資料注入 Vue 大腦)
+    // 👑 完美還原 11504 舊版邏輯：防錯位解析器 (extractDate & findItem)
     // ============================================================================
-    var getCoords = (target) => {
+    window.extractDate = function(str, mth) { 
+        let s = String(str||'').trim().replace(/[\/\.]/g, '-'); 
+        if(s.length < 3) return null;
+        let m1 = s.match(/(?:20\d{2}|11[0-9])-(\d{1,2})-(\d{1,2})/); 
+        let m2 = s.match(/^(\d{1,2})-(\d{1,2})$/); 
+        let m3 = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/); 
+        let m4 = s.match(/^(\d{1,2})-(\d{1,2})-(?:20\d{2}|\d{2})$/);
+        let check = m => m && parseInt(m[1])===mth ? `2026-${String(mth).padStart(2,'0')}-${String(m[m===m1||m===m4?2:2]).padStart(2,'0')}` : null;
+        let rx = check(m1)||check(m2)||check(m3)||check(m4); 
+        if(rx) return rx;
+        if(/^4[456]\d{3}(?:\.\d+)?$/.test(s)) { 
+            let d = new Date(Math.round((parseFloat(s)-25569)*86400*1000)); 
+            if(d.getUTCMonth()+1===mth) return `2026-${String(mth).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; 
+        } 
+        return null;
+    };
+
+    window.findItem = function(s, items) { 
+        s = (s||'').replace(/[ \(\)（）\n\r]/g,''); if(!s) return null; 
+        let ex = items.find(i=>i===s); if(ex) return ex; 
+        if(/日配|預算|達成|目標|去年|差異/.test(s) && !s.includes('件數')) return null; 
+        let isC = /費用|運費|金額|成本/.test(s), isI = /件數/.test(s);
+        if(/B2C|上收/.test(s) && !s.includes('C2C')) return isC?(s.includes('回頭')?'B2C回頭費用':'B2C專車費用'):(isI?'B2C件數':(s.includes('回頭')?'B2C回頭趟次':'B2C專車趟次'));
+        if(s.includes('C2C')) return isC?(s.includes('回頭')?'C2C回頭費用':'C2C專車費用'):(isI?'C2C件數':(s.includes('回頭')?'C2C回頭趟次':'C2C專車趟次'));
+        
+        // 夜配與全台共配精準攔截
+        if(s.includes('夜配') && s.includes('簽到')) return '夜配簽到率';
+        if(s.includes('夜配') && s.includes('準點')) return '夜配準點率';
+        if(s.includes('全台') && s.includes('簽到')) return '全台共配簽到率';
+        if(s.includes('全台') && s.includes('準點')) return '全台共配準點率';
+        if(s.includes('特殊') && s.includes('準點')) return '特殊專車準點率'; 
+        if(s.includes('特殊') && s.includes('簽到')) return '特殊專車簽到率';
+        if(s.includes('件數達成')) return '件數達成率';
+
+        if(s.includes('主線')) return isC?'主線費用':'主線條數'; 
+        if(/爆量自[揹背]/.test(s)) return isC?'爆量自揹費用':'爆量自揹'; 
+        if(/爆量|加派/.test(s)) return isC?'爆量費用':'爆量趟次';
+        if(/回頭收|店回/.test(s)) return isC?'回頭收費用':'回頭收趟次'; 
+        if(/回收/.test(s)) return isC?'回收費用':'回收趟次'; 
+        if(s.includes('特殊')) return isC?'特殊點專車費用':'特殊點專車';
+        if(s.includes('新開店')) return isC?'新開店費用':'新開店'; 
+        if(s.includes('其他')) return isC?'其他專車費用':'其他專車'; 
+        if(/違規|罰款/.test(s)) return '違規罰款'; 
+        return null;
+    };
+
+    // ============================================================================
+    // 🛡️ 核心救星：【安全神經重連】 (解決 Vue 響應式掉字)
+    // ============================================================================
+    window.getCoords = (target) => {
         let date = target.getAttribute('data-date');
         if (!date) {
             let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
@@ -3015,9 +3049,8 @@ setInterval(() => {
         if (!key || key === '日期' || key === '星期' || key === '') return null;
         return { date, key };
     };
-    window.getCoords = getCoords;
 
-    var forceInjectState = (wh, date, key, val) => {
+    window.forceInjectState = (wh, date, key, val) => {
         let ms = {};
         try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
         if (!ms.warehouses) ms.warehouses = {};
@@ -3027,41 +3060,43 @@ setInterval(() => {
         
         let rawVal = (val === undefined || val === null) ? '' : String(val).trim();
         
-        let applyDualKill = (targetObj) => {
+        let applyKill = (targetObj) => {
+            if (!targetObj) return targetObj;
+            let newObj = Object.assign({}, targetObj); // Clone 觸發 Vue 響應式
             if (rawVal === '') {
-                delete targetObj[key];
-                if (key === '出貨件數' || key === '出貨') { delete targetObj['出貨']; delete targetObj['出貨件數']; }
-                if (key === '回收件數' || key === '回收') { delete targetObj['回收']; delete targetObj['回收件數']; }
-                if (key === '預算件數' || key === '預算') { delete targetObj['預算']; delete targetObj['預算件數']; }
+                delete newObj[key];
+                if (key === '出貨件數' || key === '出貨') { delete newObj['出貨']; delete newObj['出貨件數']; }
+                if (key === '回收件數' || key === '回收') { delete newObj['回收']; delete newObj['回收件數']; }
+                if (key === '預算件數' || key === '預算') { delete newObj['預算']; delete newObj['預算件數']; }
             } else {
-                targetObj[key] = rawVal;
-                if (key === '出貨件數' || key === '出貨') { targetObj['出貨'] = rawVal; targetObj['出貨件數'] = rawVal; }
-                if (key === '回收件數' || key === '回收') { targetObj['回收'] = rawVal; targetObj['回收件數'] = rawVal; }
-                if (key === '預算件數' || key === '預算') { targetObj['預算'] = rawVal; targetObj['預算件數'] = rawVal; }
+                newObj[key] = rawVal;
+                if (key === '出貨件數' || key === '出貨') { newObj['出貨'] = rawVal; newObj['出貨件數'] = rawVal; }
+                if (key === '回收件數' || key === '回收') { newObj['回收'] = rawVal; newObj['回收件數'] = rawVal; }
+                if (key === '預算件數' || key === '預算') { newObj['預算'] = rawVal; newObj['預算件數'] = rawVal; }
             }
+            return newObj;
         };
 
-        applyDualKill(ms.warehouses[wh].daily[date]);
+        ms.warehouses[wh].daily[date] = applyKill(ms.warehouses[wh].daily[date]);
         ms.customVendorDB = window.customVendorCheckoutDB; 
         localStorage.setItem('freightData_115', JSON.stringify(ms));
 
+        // 強制替換物件，確保 Vue 絕對能接收到更新！
         ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
             if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
                 if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
                 if (!window[varName].warehouses[wh].daily[date]) window[varName].warehouses[wh].daily[date] = {};
-                applyDualKill(window[varName].warehouses[wh].daily[date]);
+                window[varName].warehouses[wh].daily[date] = applyKill(window[varName].warehouses[wh].daily[date]);
             }
         });
     };
-    window.forceInjectState = forceInjectState;
 
     // ============================================================================
-    // 🚦 絕對防禦機制：2.5 秒延遲，確保貼上與匯入資料不被重畫切斷
+    // 🚦 絕對防禦機制：攔截存檔，避免表單在中途被重畫洗掉
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
-            let globalSaveTimer = null;
             
             window.saveData = function(...args) {
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
@@ -3069,17 +3104,15 @@ setInterval(() => {
                 });
 
                 if (args[0] === true || args[1] === true) {
-                    if (globalSaveTimer) clearTimeout(globalSaveTimer);
+                    if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
                     return origSave.apply(this, args);
                 }
 
-                // 🚨 重點防禦：將延遲拉長至 2.5 秒，確保大型區塊貼上能完全執行完畢
-                if (globalSaveTimer) clearTimeout(globalSaveTimer);
-                
-                globalSaveTimer = setTimeout(() => {
-                    console.log("🛡️ 防護罩解開：所有動作皆已完成，整批資料發車上雲端！");
+                if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
+                window.autoSaveTimer = setTimeout(() => {
+                    console.log("🛡️ 防護罩解開：資料發車上雲端！");
                     origSave.apply(this, args); 
-                }, 2500); 
+                }, 1500); 
             };
             window.saveData._isHooked = true;
             clearInterval(syncHookInterval);
@@ -3087,7 +3120,7 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💥 全新發明：超級貼上攔截器 (解決大筆貼上掉字的問題)
+    // 💥 全新發明：超級貼上攔截器 (解決大筆貼上太慢被蓋掉的問題)
     // ============================================================================
     document.addEventListener('paste', function(e) {
         let target = e.target;
@@ -3096,11 +3129,12 @@ setInterval(() => {
         let clipboardData = e.clipboardData || window.clipboardData;
         let pastedText = clipboardData.getData('text');
         
-        // 如果沒有換行或 tab，代表是一般的單格貼上，讓系統正常處理
+        // 只有包含換行或 Tab 的大量區塊貼上，我們才攔截
         if (!pastedText || (!pastedText.includes('\t') && !pastedText.includes('\n'))) return;
         
-        // 攔截多格貼上！不讓瀏覽器一格一格貼去觸發當機
+        // 🛑 第一時間阻殺原廠緩慢的貼上功能！
         e.preventDefault();
+        e.stopImmediatePropagation();
         
         let rows = pastedText.split(/\r?\n/).map(row => row.split('\t'));
         let tr = target.closest('tr');
@@ -3116,7 +3150,7 @@ setInterval(() => {
 
         let updates = [];
         for (let i = 0; i < rows.length; i++) {
-            if (rows[i].length === 1 && rows[i][0] === '') continue; // 略過空白行
+            if (rows[i].length === 1 && rows[i][0] === '') continue; 
             let targetTr = tbody.children[startRowIdx + i];
             if (!targetTr) continue;
             
@@ -3127,7 +3161,7 @@ setInterval(() => {
                 let inp = targetTd.querySelector('input');
                 if (inp && !inp.disabled && !inp.readOnly) {
                     let valStr = rows[i][j].trim().replace(/,/g, '');
-                    let coords = getCoords(inp);
+                    let coords = window.getCoords(inp);
                     if (coords && coords.date && coords.key) {
                         updates.push({ date: coords.date, key: coords.key, val: valStr, input: inp });
                     }
@@ -3149,20 +3183,22 @@ setInterval(() => {
             } else {
                 u.input.value = '';
             }
-            forceInjectState(wh, u.date, u.key, finalVal);
+            window.forceInjectState(wh, u.date, u.key, finalVal);
         });
+        
+        // 強制 Vue 更新畫面
+        if (typeof window.renderAll === 'function') window.renderAll();
         
         // 貼完後，呼叫存檔一次打包上傳
         if (typeof window.saveData === 'function') {
             if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-            window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 500);
+            window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 800);
         }
-    });
+    }, true); // 使用 capturing phase，確保在原廠之前攔截
 
     // ============================================================================
     // 🚀 一般打字監聽 
     // ============================================================================
-    var autoSaveTimer = null;
     var isLocalDirty = false;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
@@ -3198,7 +3234,7 @@ setInterval(() => {
                     let cat = target.getAttribute('data-cat');
                     let valStr = target.value.replace(/,/g, '').trim();
                     let val = parseFloat(valStr);
-                    setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
+                    window.setStorageVal(wh, selectedVendor, dStr, cat, isNaN(val) ? '' : val);
 
                     let tr = target.closest('tr');
                     if (tr) {
@@ -3212,35 +3248,31 @@ setInterval(() => {
                     }
                 } else if (target.classList.contains('vendor-remark-input')) {
                     let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
-                    setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
+                    window.setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
                 }
             }
         } else {
-            let coords = getCoords(target);
+            let coords = window.getCoords(target);
             if (coords && coords.date && coords.key) {
-                forceInjectState(wh, coords.date, coords.key, target.value);
+                window.forceInjectState(wh, coords.date, coords.key, target.value);
             }
         }
 
         isLocalDirty = true;
-        
-        // 🚦 觸發 2.5 秒防護罩的存檔功能
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        let delay = (e.type === 'input' || e.type === 'paste') ? 2500 : 50;
-        
-        autoSaveTimer = setTimeout(() => {
+        if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
+        window.autoSaveTimer = setTimeout(() => {
             if (isLocalDirty && typeof window.saveData === 'function') {
                 isLocalDirty = false;
                 window.saveData(false); 
             }
-        }, delay);
+        }, 1500);
     };
 
     document.addEventListener('input', window.handleAction, true);
     document.addEventListener('change', window.handleAction, true);
 
     // ============================================================================
-    // 💡 核心四：精緻版迷你殺殭屍按鈕
+    // 💡 精緻版迷你殺殭屍按鈕
     // ============================================================================
     setInterval(() => {
         let allEls = document.querySelectorAll('span, div, a, button, label');
@@ -3272,9 +3304,9 @@ setInterval(() => {
     }, 1500);
 
     // ============================================================================
-    // 💡 【全新大滿貫匯入引擎】：精準表頭對位、夜配指標修復、空白強制補 0
+    // 💡 【全新大滿貫匯入引擎】：完美復刻 11504 對位法、夜配指標修復、空白強制補 0
     // ============================================================================
-    makeInvincible('handleDailyExcelImport', function(e) {
+    window.makeInvincible('handleDailyExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
         
@@ -3302,50 +3334,28 @@ setInterval(() => {
                 let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: false, defval: ''});
                 if (js.length < 2) return;
 
-                // ✅ 1. 【嚴格表頭對位】：只掃描前 5 行找日期，絕對不碰底下的趟次數字！
+                // ✅ 1. 【完美復刻 11504 對位】：嚴格找出真正的「日期表頭」
                 let dateCols = {};
-                let bestRow = -1;
-                let maxDates = 0;
+                let headerRowIdx = -1;
+                let maxFound = 0;
                 
-                for(let i=0; i<Math.min(5, js.length); i++) {
-                    let dateCount = 0;
+                for (let i = 0; i < Math.min(10, js.length); i++) {
                     let row = js[i];
-                    if(!row) continue;
-                    for(let j=1; j<row.length; j++) {
-                        let s = String(row[j] || '').trim().replace(/[\/\.]/g, '-');
-                        if (s.match(/20\d{2}-\d{1,2}-\d{1,2}/) || s.match(/^\d{1,2}-\d{1,2}$/) || s.match(/^\d{1,2}$/) || s.match(/^\d{1,2}\s*\(/)) {
-                            dateCount++;
-                        }
+                    if (!row) continue;
+                    let found = 0;
+                    let tempDates = {};
+                    for (let c = 1; c < row.length; c++) {
+                        let d = window.extractDate(row[c], currentMonth);
+                        if (d) { found++; tempDates[c] = d; }
                     }
-                    if (dateCount > maxDates) { maxDates = dateCount; bestRow = i; }
+                    if (found > maxFound) {
+                        maxFound = found;
+                        headerRowIdx = i;
+                        dateCols = tempDates;
+                    }
                 }
                 
-                if (bestRow !== -1) {
-                    let hr = js[bestRow];
-                    for(let c=1; c<hr.length; c++) {
-                        let s = String(hr[c] || '').trim().replace(/[\/\.]/g, '-');
-                        let dMatch = s.match(/20\d{2}-\d{1,2}-(\d{1,2})/) || s.match(/^\d{1,2}-(\d{1,2})$/) || s.match(/^(\d{1,2})\s*\(/) || s.match(/^(\d{1,2})$/);
-                        if (dMatch) {
-                            let d = parseInt(dMatch[1] || dMatch[2] || dMatch[0]);
-                            if (d >= 1 && d <= 31) dateCols[c] = `2026-${String(currentMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                        }
-                    }
-                }
-
-                // ✅ 2. 【嚴格字眼比對】：強制攔截換行的夜配指標
-                let matchItem = (name) => {
-                    let n = name.replace(/[\s\n\r]/g, ''); 
-                    if(n.includes('夜配') && n.includes('簽到')) return '夜配簽到率';
-                    if(n.includes('夜配') && n.includes('準點')) return '夜配準點率';
-                    if(n.includes('全台') && n.includes('簽到')) return '全台共配簽到率';
-                    if(n.includes('全台') && n.includes('準點')) return '全台共配準點率';
-                    if(n.includes('特殊') && n.includes('簽到')) return '特殊專車簽到率';
-                    if(n.includes('特殊') && n.includes('準點')) return '特殊專車準點率';
-                    if(n.includes('件數達成')) return '件數達成率';
-                    if(n.includes('爆量自')) return n.includes('費用') ? '爆量自揹費用' : '爆量自揹';
-
-                    return targetItems.find(t => n.includes(t) || t.includes(n));
-                };
+                if (headerRowIdx === -1) return; // 找不到表頭則跳過
 
                 ['appData', 'state', 'mainState', 'vueData', 'ms_backup'].forEach(varName => {
                     let st = (varName === 'ms_backup') ? ms : window[varName];
@@ -3364,11 +3374,12 @@ setInterval(() => {
                     };
 
                     let passCnt = 0;
-                    for (let r = 1; r < js.length; r++) {
+                    for (let r = headerRowIdx + 1; r < js.length; r++) { // 從表頭下一行開始掃描
                         let row = js[r];
                         if (!row || !row[0]) continue;
                         
-                        let matched = matchItem(String(row[0]));
+                        // ✅ 使用 11504 防漏抓字眼邏輯
+                        let matched = window.findItem(String(row[0]), targetItems);
                         if (!matched) continue;
 
                         let isRate = matched.includes('率');
@@ -3411,7 +3422,7 @@ setInterval(() => {
             
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。\n(已執行：空白自動補 0、嚴格日期對位、修復夜配指標)。`);
+                alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。\n(已執行：還原 11504 對位法、修復夜配指標、空白自動補 0)。`);
             }, 1500);
             e.target.value = '';
         }; 
@@ -3473,7 +3484,7 @@ setInterval(() => {
     }, 1000);
 
     // 主線匯入引擎
-    makeInvincible('handleMainlineExcelImport', function(e) {
+    window.makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
         if (typeof XLSX === 'undefined') return alert('⚠️ 網頁套件未就緒！');
@@ -3497,7 +3508,7 @@ setInterval(() => {
                 let targetWh = whNames.find(w => rWh.includes(w)); if (!targetWh) continue;
                 let targetVendor = ['創新', '峻富', '華碩'].find(v => rVendor.includes(v)); if (!targetVendor) continue;
 
-                let dateStr = parseExcelDateUnified(row.D);
+                let dateStr = window.extractDate(row.D, parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1)));
                 if (dateStr) {
                     let costStr = String(row.AM).replace(/[,]/g, '');
                     let cost = parseFloat(costStr) || 0;
@@ -3505,22 +3516,22 @@ setInterval(() => {
                     
                     let key = targetWh + '_' + targetVendor + '_' + dateStr;
                     if (!clearedMainlineKeys.has(key)) {
-                        ['主線','主線_3_5T','主線_8T','主線_3_5T_車數','主線_8T_車數'].forEach(c => setStorageVal(targetWh, targetVendor, dateStr, c, ''));
+                        ['主線','主線_3_5T','主線_8T','主線_3_5T_車數','主線_8T_車數'].forEach(c => window.setStorageVal(targetWh, targetVendor, dateStr, c, ''));
                         clearedMainlineKeys.add(key);
                     }
                     
-                    let currMain = Number(getStorageVal(targetWh, targetVendor, dateStr, '主線')) || 0;
-                    setStorageVal(targetWh, targetVendor, dateStr, '主線', currMain + cost);
+                    let currMain = Number(window.getStorageVal(targetWh, targetVendor, dateStr, '主線')) || 0;
+                    window.setStorageVal(targetWh, targetVendor, dateStr, '主線', currMain + cost);
                     
                     let is8T = carType.includes('8') || carType.includes('八');
                     let subCat = is8T ? '主線_8T' : '主線_3_5T';
                     let subCatCount = is8T ? '主線_8T_車數' : '主線_3_5T_車數';
                     
-                    let currSub = Number(getStorageVal(targetWh, targetVendor, dateStr, subCat)) || 0;
-                    setStorageVal(targetWh, targetVendor, dateStr, subCat, currSub + cost);
+                    let currSub = Number(window.getStorageVal(targetWh, targetVendor, dateStr, subCat)) || 0;
+                    window.setStorageVal(targetWh, targetVendor, dateStr, subCat, currSub + cost);
                     
-                    let currCount = Number(getStorageVal(targetWh, targetVendor, dateStr, subCatCount)) || 0;
-                    setStorageVal(targetWh, targetVendor, dateStr, subCatCount, currCount + 1);
+                    let currCount = Number(window.getStorageVal(targetWh, targetVendor, dateStr, subCatCount)) || 0;
+                    window.setStorageVal(targetWh, targetVendor, dateStr, subCatCount, currCount + 1);
 
                     importedCount++;
                 }
@@ -3536,7 +3547,7 @@ setInterval(() => {
     });
 
     // MIS 非主線匯入引擎
-    makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
+    window.makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
         let selectedWh = document.getElementById('checkoutWhSelect') ? document.getElementById('checkoutWhSelect').value.replace('倉', '') : '大肚';
@@ -3578,6 +3589,7 @@ setInterval(() => {
             }
 
             let importedCount = 0; let clearedDates = new Set(); 
+            let currentMonth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
 
             for (let i = headerRowIdx + 1; i < js.length; i++) {
                 let row = js[i]; if (!row[dateCol]) continue;
@@ -3589,7 +3601,7 @@ setInterval(() => {
                 let targetVendor = ['創新', '峻富', '華碩'].find(v => rVendor.includes(v));
                 if (!targetVendor) continue;
 
-                let dateStr = parseExcelDateUnified(row[dateCol]);
+                let dateStr = window.extractDate(row[dateCol], currentMonth);
                 if (dateStr) {
                     let reason = String(row[reasonCol] || '').trim(); 
                     let typeStr = typeCol ? String(row[typeCol] || '').trim() : '';
@@ -3614,14 +3626,14 @@ setInterval(() => {
                     let key = selectedWh + '_' + targetVendor + '_' + dateStr;
                     if (!clearedDates.has(key)) {
                         ['爆量','回收','特殊專車','罰款','離島','轉運','上收','其他'].forEach(c => {
-                            setStorageVal(selectedWh, targetVendor, dateStr, c, '');
-                            setStorageVal(selectedWh, targetVendor, dateStr, c+'_trips', '');
+                            window.setStorageVal(selectedWh, targetVendor, dateStr, c, '');
+                            window.setStorageVal(selectedWh, targetVendor, dateStr, c+'_trips', '');
                         });
-                        setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', []); 
+                        window.setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', []); 
                         clearedDates.add(key);
                     }
 
-                    let misDetails = getStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS');
+                    let misDetails = window.getStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS');
                     if (!Array.isArray(misDetails)) misDetails = [];
                     
                     let existing = misDetails.find(d => d.mainCat === mainCat && d.typeStr === typeStr && d.price === price);
@@ -3631,7 +3643,7 @@ setInterval(() => {
                     } else {
                         misDetails.push({ mainCat, typeStr, price, trips, cost });
                     }
-                    setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', misDetails);
+                    window.setStorageVal(selectedWh, targetVendor, dateStr, 'MIS_DETAILS', misDetails);
 
                     let legacyCat = '';
                     if (mainCat === '里程類') legacyCat = '爆量';
@@ -3642,12 +3654,12 @@ setInterval(() => {
                     else legacyCat = mainCat;
 
                     if (legacyCat) {
-                        let currentVal = Number(getStorageVal(selectedWh, targetVendor, dateStr, legacyCat)) || 0;
-                        setStorageVal(selectedWh, targetVendor, dateStr, legacyCat, currentVal + cost);
+                        let currentVal = Number(window.getStorageVal(selectedWh, targetVendor, dateStr, legacyCat)) || 0;
+                        window.setStorageVal(selectedWh, targetVendor, dateStr, legacyCat, currentVal + cost);
                         if (trips > 0) {
                             let tripKey = legacyCat + '_trips';
-                            let currentTrips = Number(getStorageVal(selectedWh, targetVendor, dateStr, tripKey)) || 0;
-                            setStorageVal(selectedWh, targetVendor, dateStr, tripKey, currentTrips + trips);
+                            let currentTrips = Number(window.getStorageVal(selectedWh, targetVendor, dateStr, tripKey)) || 0;
+                            window.setStorageVal(selectedWh, targetVendor, dateStr, tripKey, currentTrips + trips);
                         }
                     }
                     importedCount++;
@@ -3664,7 +3676,7 @@ setInterval(() => {
     });
 
     // 每日明細下載引擎
-    makeInvincible('exportVendorDailyToExcel', function() {
+    window.makeInvincible('exportVendorDailyToExcel', function() {
         let vendorSel = document.getElementById('vendorSelect');
         let vendorName = vendorSel ? vendorSel.value : '創新';
         let whSel = document.getElementById('checkoutWhSelect');
@@ -3780,7 +3792,7 @@ setInterval(() => {
     });
 
     // 結帳大表匯出引擎
-    makeInvincible('exportSummaryToExcel', function() {
+    window.makeInvincible('exportSummaryToExcel', function() {
         let table = document.querySelector('#vendorSummaryModal .csv-table');
         if(!table) return; 
         
@@ -3882,7 +3894,7 @@ setInterval(() => {
     });
 
     // 結帳總表 UI 生成引擎
-    makeInvincible('openVendorSummaryModal', function() {
+    window.makeInvincible('openVendorSummaryModal', function() {
         let whSel = document.getElementById('checkoutWhSelect');
         let vendorSel = document.getElementById('vendorSelect');
         let whName = whSel ? whSel.value.replace('倉', '') : '大肚';
@@ -3949,17 +3961,17 @@ setInterval(() => {
             daysCount++; let m = current.getMonth()+1, d = current.getDate();
             let dStr = current.getFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
             
-            sum35_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
-            sum8_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
+            sum35_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
+            sum8_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
             
             if (m === targetMonth) {
-                let d35 = Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
-                let d8 = Number(getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
+                let d35 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
+                let d8 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
                 if (d35 > max35_cars) max35_cars = d35;
                 if (d8 > max8_cars) max8_cars = d8;
             }
 
-            let misDetails = getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
+            let misDetails = window.getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
             if (Array.isArray(misDetails)) {
                 misDetails.forEach(dt => {
                     let cat = dt.mainCat, p = dt.price || 0, type = dt.typeStr || '';
