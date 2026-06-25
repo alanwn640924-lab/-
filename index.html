@@ -2892,13 +2892,25 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🚀 啟動歸還原廠主導權版：包含【決策 A】強制清空金鑰，回歸原廠大金庫！");
+    console.log("🚀 啟動歸還原廠主導權版：包含【決策 A】地毯式搜索並強制清空金鑰！");
     
     // ============================================================================
-    // 👑 決策 A：獨裁者指令 (強制清空所有人手機裡的舊金鑰，統一回歸原廠大金庫)
+    // 👑 決策 A：終極獨裁者指令 (地毯式搜索並強制清空所有人手機裡的舊金鑰)
     // ============================================================================
-    localStorage.removeItem('firebase_config'); 
-    localStorage.removeItem('firebase_settings'); 
+    try {
+        let keysToNuke = [];
+        for(let i=0; i<localStorage.length; i++) {
+            let keyName = localStorage.key(i);
+            // 只要名字裡有 firebase 或是 config，就列入爆破名單 (避開我們自己的主資料)
+            if (keyName && (keyName.toLowerCase().includes('firebase') || keyName.toLowerCase().includes('config'))) {
+                keysToNuke.push(keyName);
+            }
+        }
+        keysToNuke.forEach(k => {
+            localStorage.removeItem(k);
+            console.log("💣 已強制炸毀舊金鑰設定：", k);
+        });
+    } catch(err) {}
     // ============================================================================
 
     var LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
