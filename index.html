@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🛡️ 啟動【大滿貫無敵版】：還原 11504 完美對位、超級貼上攔截器、徹底解決大量掉字！");
+    console.log("🛡️ 啟動【大滿貫無敵版】：新增離島匯入紐(紫色版)、岡山專屬廠商(御馬/詮程)智能動態切換！");
     
     // ============================================================================
     // 🧹 清理殘留：確保沒有私人金鑰干擾，全體統一使用官方大金庫
@@ -3062,7 +3062,7 @@ setInterval(() => {
         
         let applyKill = (targetObj) => {
             if (!targetObj) return targetObj;
-            let newObj = Object.assign({}, targetObj); // Clone 觸發 Vue 響應式
+            let newObj = Object.assign({}, targetObj); 
             if (rawVal === '') {
                 delete newObj[key];
                 if (key === '出貨件數' || key === '出貨') { delete newObj['出貨']; delete newObj['出貨件數']; }
@@ -3081,7 +3081,6 @@ setInterval(() => {
         ms.customVendorDB = window.customVendorCheckoutDB; 
         localStorage.setItem('freightData_115', JSON.stringify(ms));
 
-        // 強制替換物件，確保 Vue 絕對能接收到更新！
         ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
             if (window[varName] && window[varName].warehouses && window[varName].warehouses[wh]) {
                 if (!window[varName].warehouses[wh].daily) window[varName].warehouses[wh].daily = {};
@@ -3129,10 +3128,8 @@ setInterval(() => {
         let clipboardData = e.clipboardData || window.clipboardData;
         let pastedText = clipboardData.getData('text');
         
-        // 只有包含換行或 Tab 的大量區塊貼上，我們才攔截
         if (!pastedText || (!pastedText.includes('\t') && !pastedText.includes('\n'))) return;
         
-        // 🛑 第一時間阻殺原廠緩慢的貼上功能！
         e.preventDefault();
         e.stopImmediatePropagation();
         
@@ -3169,13 +3166,11 @@ setInterval(() => {
             }
         }
         
-        // 一次性極速寫入大腦，杜絕中斷
         updates.forEach(u => {
             let isRate = u.key.includes('率');
             let isCostOrCount = !isRate && !u.key.includes('備註');
             let finalVal = u.val;
             
-            // 貼上遇到空白，強制補 0
             if (finalVal === '' && isCostOrCount) finalVal = '0';
             
             if (finalVal !== '') {
@@ -3186,15 +3181,13 @@ setInterval(() => {
             window.forceInjectState(wh, u.date, u.key, finalVal);
         });
         
-        // 強制 Vue 更新畫面
         if (typeof window.renderAll === 'function') window.renderAll();
         
-        // 貼完後，呼叫存檔一次打包上傳
         if (typeof window.saveData === 'function') {
             if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
             window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 800);
         }
-    }, true); // 使用 capturing phase，確保在原廠之前攔截
+    }, true); 
 
     // ============================================================================
     // 🚀 一般打字監聽 
@@ -3304,7 +3297,7 @@ setInterval(() => {
     }, 1500);
 
     // ============================================================================
-    // 💡 【全新大滿貫匯入引擎】：完美復刻 11504 對位法、夜配指標修復、空白強制補 0
+    // 💡 大滿貫匯入引擎：支援全廠商 (含御馬/詮程)
     // ============================================================================
     window.makeInvincible('handleDailyExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3334,7 +3327,6 @@ setInterval(() => {
                 let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: false, defval: ''});
                 if (js.length < 2) return;
 
-                // ✅ 1. 【完美復刻 11504 對位】：嚴格找出真正的「日期表頭」
                 let dateCols = {};
                 let headerRowIdx = -1;
                 let maxFound = 0;
@@ -3355,7 +3347,7 @@ setInterval(() => {
                     }
                 }
                 
-                if (headerRowIdx === -1) return; // 找不到表頭則跳過
+                if (headerRowIdx === -1) return; 
 
                 ['appData', 'state', 'mainState', 'vueData', 'ms_backup'].forEach(varName => {
                     let st = (varName === 'ms_backup') ? ms : window[varName];
@@ -3374,11 +3366,10 @@ setInterval(() => {
                     };
 
                     let passCnt = 0;
-                    for (let r = headerRowIdx + 1; r < js.length; r++) { // 從表頭下一行開始掃描
+                    for (let r = headerRowIdx + 1; r < js.length; r++) { 
                         let row = js[r];
                         if (!row || !row[0]) continue;
                         
-                        // ✅ 使用 11504 防漏抓字眼邏輯
                         let matched = window.findItem(String(row[0]), targetItems);
                         if (!matched) continue;
 
@@ -3389,7 +3380,6 @@ setInterval(() => {
                             let dStr = dateCols[c];
                             let valStr = String(row[c] === undefined || row[c] === null ? '' : row[c]).trim();
 
-                            // ✅ 3. 【空白強制補 0】
                             if (valStr === '' && isCostOrCount) {
                                 valStr = '0';
                             }
@@ -3422,14 +3412,16 @@ setInterval(() => {
             
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。\n(已執行：還原 11504 對位法、修復夜配指標、空白自動補 0)。`);
+                alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。`);
             }, 1500);
             e.target.value = '';
         }; 
         r.readAsArrayBuffer(file);
     });
 
-    // --- 下方程式碼維持原樣 (主線匯入、MIS 匯入、匯出明細、匯出大表等) ---
+    // ============================================================================
+    // 🎨 UI 按鈕安插與動態選單切換
+    // ============================================================================
     setInterval(() => {
         let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
         let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
@@ -3441,23 +3433,36 @@ setInterval(() => {
                 style.id = 'custom-btn-styles';
                 style.innerHTML = `
                     .custom-export-btn { background-color: #e67e22 !important; border-color: #e67e22 !important; color: white !important; }
-                    #btnExportDaily, button[onclick*="handleMainlineExcelImport"], button[onclick*="handleVendorCheckoutExcelImportNew"], button[onclick*="openVendorSummaryModal"] {
+                    .custom-island-btn { background-color: #8e44ad !important; border-color: #8e44ad !important; color: white !important; }
+                    #btnExportDaily, #btnImportIsland, button[onclick*="handleMainlineExcelImport"], button[onclick*="handleVendorCheckoutExcelImportNew"], button[onclick*="openVendorSummaryModal"] {
                         transform: none !important; box-shadow: none !important; transition: none !important; display: inline-flex !important; justify-content: center !important; align-items: center !important;
                     }
                 `;
                 document.head.appendChild(style);
             }
 
+            // 新增 4. 每日明細 (原 3.)
             let newBtn = document.createElement('button');
             newBtn.id = 'btnExportDaily';
             newBtn.className = b3.className + ' custom-export-btn'; 
-            newBtn.innerHTML = '📊 3. 匯出每日明細';
+            newBtn.innerHTML = '📊 4. 匯出每日明細';
             newBtn.onclick = window.exportVendorDailyToExcel;
+
+            // ✨ 新增 3. 離島運費匯入 (使用優雅紫色 #8e44ad)
+            let islandBtn = document.createElement('button');
+            islandBtn.id = 'btnImportIsland';
+            islandBtn.className = b3.className + ' custom-island-btn';
+            islandBtn.innerHTML = '🏝️ 3. 離島運費匯入';
+            islandBtn.onclick = () => alert('🏝️ 離島運費匯入功能建置中...後續將確認匯入格式');
             
-            b3.innerHTML = b3.innerHTML.replace('3.', '4.');
+            // 原本的總表變成 5.
+            b3.innerHTML = b3.innerHTML.replace(/\d\./, '5.');
+            
+            // 順序：主線(1) -> MIS(2) -> 離島(3) -> 明細(4) -> 總表(5)
+            b3.parentNode.insertBefore(islandBtn, b3);
             b3.parentNode.insertBefore(newBtn, b3);
 
-            [b1, b2, newBtn, b3].forEach(btn => {
+            [b1, b2, islandBtn, newBtn, b3].forEach(btn => {
                 if (btn) {
                     btn.style.width = '180px'; btn.style.marginRight = '8px'; btn.style.display = 'inline-flex';
                     btn.style.justifyContent = 'center'; btn.style.alignItems = 'center'; btn.style.textAlign = 'center';
@@ -3483,7 +3488,9 @@ setInterval(() => {
         }
     }, 1000);
 
-    // 主線匯入引擎
+    // ============================================================================
+    // 💡 【智能連動廠商選單】＆ 擴充匯入邏輯 (含 御馬、詮程)
+    // ============================================================================
     window.makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3506,7 +3513,8 @@ setInterval(() => {
                 let carType = String(row.AG).trim();
 
                 let targetWh = whNames.find(w => rWh.includes(w)); if (!targetWh) continue;
-                let targetVendor = ['創新', '峻富', '華碩'].find(v => rVendor.includes(v)); if (!targetVendor) continue;
+                // ✅ 擴充支援 5 家廠商
+                let targetVendor = ['創新', '峻富', '華碩', '御馬', '詮程'].find(v => rVendor.includes(v)); if (!targetVendor) continue;
 
                 let dateStr = window.extractDate(row.D, parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1)));
                 if (dateStr) {
@@ -3546,7 +3554,6 @@ setInterval(() => {
         }; r.readAsArrayBuffer(file);
     });
 
-    // MIS 非主線匯入引擎
     window.makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3598,7 +3605,8 @@ setInterval(() => {
                 let rVendor = String(row[vendorCol] || '').trim();
                 if (whCol && !rWh.includes(selectedWh)) continue;
                 
-                let targetVendor = ['創新', '峻富', '華碩'].find(v => rVendor.includes(v));
+                // ✅ 擴充支援 5 家廠商
+                let targetVendor = ['創新', '峻富', '華碩', '御馬', '詮程'].find(v => rVendor.includes(v));
                 if (!targetVendor) continue;
 
                 let dateStr = window.extractDate(row[dateCol], currentMonth);
@@ -3961,17 +3969,17 @@ setInterval(() => {
             daysCount++; let m = current.getMonth()+1, d = current.getDate();
             let dStr = current.getFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
             
-            sum35_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
-            sum8_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
+            sum35_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
+            sum8_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
             
             if (m === targetMonth) {
-                let d35 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
-                let d8 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
+                let d35 = Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
+                let d8 = Number(getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
                 if (d35 > max35_cars) max35_cars = d35;
                 if (d8 > max8_cars) max8_cars = d8;
             }
 
-            let misDetails = window.getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
+            let misDetails = getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
             if (Array.isArray(misDetails)) {
                 misDetails.forEach(dt => {
                     let cat = dt.mainCat, p = dt.price || 0, type = dt.typeStr || '';
@@ -4151,11 +4159,40 @@ setInterval(() => {
 
     var initAll = () => {
         let vSel = document.getElementById('vendorSelect');
-        if (vSel && !vSel.querySelector('option[value="全部"]')) {
-            let opt = document.createElement('option');
-            opt.value = '全部'; opt.innerText = '全部 (全廠商加總唯讀)';
-            vSel.insertBefore(opt, vSel.firstChild); vSel.value = '全部'; 
+        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+        
+        // 💡 智能廠商列表切換引擎
+        const updateVendorList = () => {
+            if (!vSel || !whSel) return;
+            let currentWh = whSel.value || '';
+            let currentVendor = vSel.value;
+
+            // 判斷倉別決定下拉名單
+            let vendors = currentWh.includes('岡山') ? ['創新', '峻富', '御馬', '詮程'] : ['創新', '峻富', '華碩'];
+
+            // 重新組裝選項
+            vSel.innerHTML = '<option value="全部">全部 (全廠商加總唯讀)</option>';
+            vendors.forEach(v => {
+                let opt = document.createElement('option');
+                opt.value = v; opt.innerText = v;
+                vSel.appendChild(opt);
+            });
+
+            // 恢復選擇，若選錯則退回創新
+            if (vendors.includes(currentVendor) || currentVendor === '全部') {
+                vSel.value = currentVendor;
+            } else {
+                vSel.value = '創新'; 
+                if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
+            }
+        };
+
+        // 綁定倉別切換監聽
+        if (whSel && !whSel.dataset.dynamicVendorHook) {
+            whSel.addEventListener('change', updateVendorList);
+            whSel.dataset.dynamicVendorHook = "true";
         }
+        updateVendorList(); // 初始化執行
 
         document.querySelectorAll("strong").forEach(el => {
             if (el.innerText && el.innerText.trim() === "📊 各科目運費") {
