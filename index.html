@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🛡️ 啟動【大滿貫終極版】：匯入補零、夜配指標修復、底層 1.5 秒絕對防禦！");
+    console.log("🛡️ 啟動【大滿貫終極版】：嚴格表頭對位、空白補零、夜配指標修復、2.5 秒絕對防禦！");
     
     // ============================================================================
     // 🧹 清理殘留：確保沒有私人金鑰干擾，全體統一使用官方大金庫
@@ -2935,15 +2935,6 @@ setInterval(() => {
         localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
     };
 
-    window.parseExcelDateUnified = (cell) => {
-        if(!cell) return null; let s = String(cell).trim();
-        if(/^4[456]\d{3}(?:\.\d+)?$/.test(s)) { let d = new Date((parseFloat(s) - 25569) * 86400 * 1000); d.setTime(d.getTime() + 12 * 60 * 60 * 1000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; }
-        s = s.replace(/\([一二三四五六日]\)/g, '').replace(/（[一二三四五六日]）/g, '').trim().replace(/[\/\.]/g, '-');
-        let m = s.match(/^(\d{3,4})-(\d{1,2})-(\d{1,2})/); 
-        if(m) { let y = parseInt(m[1], 10); if (y < 200) y += 1911; return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`; }
-        return null;
-    };
-
     window.makeInvincible = (funcName, newFunc) => {
         Object.defineProperty(window, funcName, {
             get: () => newFunc,
@@ -2953,7 +2944,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🛡️ 核心救星：【安全神經重連】 (精準將資料注入 Vue 大腦，保證上雲端)
+    // 🛡️ 核心救星：【安全神經重連】 (精準將資料注入 Vue 大腦)
     // ============================================================================
     window.getCoords = (target) => {
         let date = target.getAttribute('data-date');
@@ -3049,7 +3040,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚦 絕對防禦機制：攔截所有存檔，確保貼上與匯入資料不被重畫切斷
+    // 🚦 絕對防禦機制：2.5 秒延遲，確保貼上與匯入資料不被重畫切斷
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
@@ -3057,25 +3048,22 @@ setInterval(() => {
             let globalSaveTimer = null;
             
             window.saveData = function(...args) {
-                // 1. 同步下方廠商資料
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
                     if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
                 });
 
-                // 2. 如果是顯示彈跳訊息的手動儲存，直接放行
                 if (args[0] === true || args[1] === true) {
                     if (globalSaveTimer) clearTimeout(globalSaveTimer);
                     return origSave.apply(this, args);
                 }
 
-                // 3. 🚨 重點防禦：阻擋 Vue 的瘋狂連續存檔！
-                // 只要收到新的存檔請求（例如貼上時或大量匯入時連續觸發），就重新倒數 1.5 秒
+                // 🚨 重點防禦：將延遲拉長至 2.5 秒，確保大型區塊貼上能完全執行完畢
                 if (globalSaveTimer) clearTimeout(globalSaveTimer);
                 
                 globalSaveTimer = setTimeout(() => {
                     console.log("🛡️ 防護罩解開：所有動作皆已完成，整批資料發車上雲端！");
                     origSave.apply(this, args); 
-                }, 1500); 
+                }, 2500); 
             };
             window.saveData._isHooked = true;
             clearInterval(syncHookInterval);
@@ -3083,8 +3071,10 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 🚀 打字監聽 (配合防護罩)
+    // 🚀 打字與貼上監聽 (配合防護罩)
     // ============================================================================
+    var autoSaveTimer = null;
+    var isLocalDirty = false;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
 
     setInterval(() => {
@@ -3143,13 +3133,23 @@ setInterval(() => {
             }
         }
 
-        // 觸發被我們加上 1.5 秒防護罩的存檔功能
-        if (typeof window.saveData === 'function') window.saveData(false);
+        isLocalDirty = true;
+        
+        // 🚦 觸發 2.5 秒防護罩的存檔功能
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        let delay = (e.type === 'input' || e.type === 'paste') ? 2500 : 50;
+        
+        autoSaveTimer = setTimeout(() => {
+            if (isLocalDirty && typeof window.saveData === 'function') {
+                isLocalDirty = false;
+                window.saveData(false); // 觸發帶防護罩的存檔
+            }
+        }, delay);
     };
 
     document.addEventListener('input', window.handleAction, true);
     document.addEventListener('change', window.handleAction, true);
-    document.addEventListener('focusout', window.handleAction, true);
+    document.addEventListener('paste', window.handleAction, true);
 
     // ============================================================================
     // 💡 核心四：精緻版迷你殺殭屍按鈕
@@ -3171,9 +3171,6 @@ setInterval(() => {
                 syncBtn.innerHTML = '🚨殺殭屍';
                 syncBtn.title = '強制清除暫存並重新同步';
                 syncBtn.style.cssText = 'background-color: #6f42c1; color: white; border: none; padding: 4px 10px; font-size: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-left: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: 0.2s; display: inline-block; vertical-align: middle;';
-                syncBtn.onmouseover = () => syncBtn.style.transform = 'scale(1.05)';
-                syncBtn.onmouseout = () => syncBtn.style.transform = 'scale(1)';
-                
                 syncBtn.onclick = function(e) {
                     e.preventDefault();
                     if(!confirm('這會清除異常的「殭屍記憶」，並強制重新下載最新進度。\n確定要強制同步嗎？')) return;
@@ -3183,51 +3180,148 @@ setInterval(() => {
                 };
                 connectionTag.insertAdjacentElement('afterend', syncBtn);
             }
-
-            if (!document.getElementById('btnCleanJunkModal')) {
-                let cleanBtn = document.createElement('button');
-                cleanBtn.id = 'btnCleanJunkModal';
-                cleanBtn.innerHTML = '🧹雲端瘦身';
-                cleanBtn.title = '清理系統多餘空值';
-                cleanBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 4px 10px; font-size: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-left: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: 0.2s; display: inline-block; vertical-align: middle;';
-                cleanBtn.onmouseover = () => cleanBtn.style.transform = 'scale(1.05)';
-                cleanBtn.onmouseout = () => cleanBtn.style.transform = 'scale(1)';
-                
-                cleanBtn.onclick = function(e) {
-                    e.preventDefault(); 
-                    if(!confirm('這將清除系統遺留的無效日期包裹。是否執行？')) return;
-                    let db = window.customVendorCheckoutDB || {};
-                    for (let wh in db) {
-                        for (let vendor in db[wh]) {
-                            for (let date in db[wh][vendor]) {
-                                let record = db[wh][vendor][date];
-                                let isG = true;
-                                for(let k in record){
-                                    if(['__ob__','date','日期','id','wh','warehouse','倉別'].includes(k)) continue;
-                                    let v = record[k];
-                                    if(v !== '' && v !== 0 && v !== '0' && v !== null && v !== undefined && !(typeof v === 'number' && isNaN(v))) { isG = false; break; }
-                                }
-                                if(isG) delete db[wh][vendor][date];
-                            }
-                        }
-                    }
-                    window.customVendorCheckoutDB = db;
-                    localStorage.setItem('freight_vendor_db', JSON.stringify(db));
-                    if(window.saveData) window.saveData(true, true);
-                    alert(`✅ 雲端大掃除成功！`);
-                };
-                
-                let syncBtn = document.getElementById('btnForceSyncModal');
-                if (syncBtn) {
-                    syncBtn.insertAdjacentElement('afterend', cleanBtn);
-                } else {
-                    connectionTag.insertAdjacentElement('afterend', cleanBtn);
-                }
-            }
         }
     }, 1500);
 
-    // --- 下方的匯出引擎維持原樣 ---
+    // ============================================================================
+    // 💡 【全新大滿貫匯入引擎】：精準表頭對位、夜配指標修復、空白強制補 0
+    // ============================================================================
+    window.makeInvincible('handleDailyExcelImport', function(e) {
+        if (!e.target.files || e.target.files.length === 0) return;
+        let file = e.target.files[0];
+        
+        let r = new FileReader();
+        r.onload = ev => {
+            let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+            
+            // 完整目標欄位清單
+            let targetItems = [
+                "預算件數", "出貨件數", "件數達成率", "裝載率", "回收件數",
+                "主線條數", "爆量趟次", "爆量自揹", "回收趟次", "回頭收趟次", "其他專車", "特殊點專車", "新開店", "離島", "轉運",
+                "主線費用", "爆量費用", "爆量自揹費用", "回收費用", "回頭收費用", "其他專車費用", "特殊點專車費用", "新開店費用", "違規罰款",
+                "上收申請案件數", "B2C件數", "C2C件數", "B2C專車趟次", "B2C回頭趟次", "C2C專車趟次", "C2C回頭趟次", "B2C專車費用", "B2C回頭費用", "C2C專車費用", "C2C回頭費用",
+                "特殊專車準點率", "特殊專車簽到率", "全台共配準點率", "全台共配簽到率", "夜配準點率", "夜配簽到率"
+            ];
+            
+            let cnt = 0;
+            let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+            let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
+            let currentMonth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
+            
+            let ms = {};
+            try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
+
+            wb.SheetNames.forEach(sn => { 
+                let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: false, defval: ''});
+                if (js.length < 2) return;
+
+                // ✅ 1. 【嚴格表頭對位】：只掃描第 0 行與第 1 行找日期，絕對不碰底下的趟次數字！
+                let dateCols = {};
+                let headerRow = js[0];
+                if (!headerRow.some(c => String(c).includes('日') || String(c).includes('/'))) headerRow = js[1];
+
+                for(let c = 1; c < headerRow.length; c++) {
+                    let s = String(headerRow[c]).trim();
+                    // 匹配 "2026-06-24", "6/24", "24(三)", "24" 等格式
+                    let dMatch = s.match(/20\d{2}-\d{1,2}-(\d{1,2})/) || s.match(/\d{1,2}[\/\-](\d{1,2})/) || s.match(/^(\d{1,2})\s*\(/) || s.match(/^(\d{1,2})$/);
+                    if (dMatch) {
+                        let d = parseInt(dMatch[1] || dMatch[2]);
+                        if (d >= 1 && d <= 31) {
+                            dateCols[c] = `2026-${String(currentMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                        }
+                    }
+                }
+
+                // ✅ 2. 【嚴格字眼比對】：強制攔截換行的夜配指標
+                let matchItem = (name) => {
+                    let n = name.replace(/[\s\n\r]/g, ''); // 殺除所有換行與空白
+                    if(n.includes('夜配') && n.includes('簽到')) return '夜配簽到率';
+                    if(n.includes('夜配') && n.includes('準點')) return '夜配準點率';
+                    if(n.includes('全台') && n.includes('簽到')) return '全台共配簽到率';
+                    if(n.includes('全台') && n.includes('準點')) return '全台共配準點率';
+                    if(n.includes('特殊') && n.includes('簽到')) return '特殊專車簽到率';
+                    if(n.includes('特殊') && n.includes('準點')) return '特殊專車準點率';
+                    if(n.includes('件數達成')) return '件數達成率';
+                    if(n.includes('爆量自')) return n.includes('費用') ? '爆量自揹費用' : '爆量自揹';
+
+                    return targetItems.find(t => n.includes(t) || t.includes(n));
+                };
+
+                // 3. 開始匯入資料
+                ['appData', 'state', 'mainState', 'vueData', 'ms_backup'].forEach(varName => {
+                    let st = (varName === 'ms_backup') ? ms : window[varName];
+                    if (!st) return;
+
+                    let getDaily = (dStr) => {
+                        if (st.warehouses && st.warehouses[wh]) {
+                            if (!st.warehouses[wh].daily) st.warehouses[wh].daily = {};
+                            if (!st.warehouses[wh].daily[dStr]) st.warehouses[wh].daily[dStr] = {};
+                            return st.warehouses[wh].daily[dStr];
+                        } else {
+                            if (!st.daily) st.daily = {};
+                            if (!st.daily[dStr]) st.daily[dStr] = {};
+                            return st.daily[dStr];
+                        }
+                    };
+
+                    let passCnt = 0;
+                    for (let r = 1; r < js.length; r++) {
+                        let row = js[r];
+                        if (!row || !row[0]) continue;
+                        
+                        let matched = matchItem(String(row[0]));
+                        if (!matched) continue;
+
+                        let isRate = matched.includes('率');
+                        let isCostOrCount = !isRate && !matched.includes('備註'); // 費用、趟次、件數
+
+                        // 只針對有找到日期的欄位進行資料寫入
+                        for (let c in dateCols) {
+                            let dStr = dateCols[c];
+                            let valStr = String(row[c] === undefined || row[c] === null ? '' : row[c]).trim();
+
+                            // ✅ 3. 【空白強制補 0】：遇到空白的費用/趟次欄位，強制寫入 '0'
+                            if (valStr === '' && isCostOrCount) {
+                                valStr = '0';
+                            }
+
+                            if (valStr !== '') {
+                                let pVal = parseFloat(valStr.replace(/[,%]/g, ''));
+                                if (!isNaN(pVal)) {
+                                    if (isRate && !valStr.includes('%') && pVal <= 1 && pVal > 0) pVal *= 100; // 百分比還原
+                                    
+                                    let dailyObj = getDaily(dStr);
+                                    dailyObj[matched] = pVal;
+
+                                    if (matched === '出貨件數') dailyObj['出貨'] = pVal;
+                                    if (matched === '回收件數') dailyObj['回收'] = pVal;
+                                    if (matched === '預算件數') dailyObj['預算'] = pVal;
+                                    
+                                    passCnt++; 
+                                }
+                            }
+                        }
+                    }
+                    if (varName === 'ms_backup') cnt = passCnt;
+                });
+            }); 
+            
+            localStorage.setItem('freightData_115', JSON.stringify(ms));
+
+            if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
+            if (typeof window.renderAll === 'function') window.renderAll();
+            
+            // 使用防護罩延遲 1.5 秒再觸發總存檔，確保不跑版
+            setTimeout(() => {
+                if (typeof window.saveData === 'function') window.saveData(true, true);
+                alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。\n(已執行：空白自動補 0、嚴格日期對位、修復夜配指標)。`);
+            }, 1500);
+            e.target.value = '';
+        }; 
+        r.readAsArrayBuffer(file);
+    });
+
+    // --- 下方程式碼維持原樣 (主線匯入、MIS 匯入、匯出明細、匯出大表等) ---
     setInterval(() => {
         let b1 = document.querySelector('button[onclick*="handleMainlineExcelImport"]');
         let b2 = document.querySelector('button[onclick*="handleVendorCheckoutExcelImportNew"]');
@@ -3281,171 +3375,7 @@ setInterval(() => {
         }
     }, 1000);
 
-    // ============================================================================
-    // 💡 大滿貫匯入引擎：精準修復夜配指標、解決日期錯位、空白強制補 0
-    // ============================================================================
-    window.makeInvincible('handleDailyExcelImport', function(e) {
-        if (!e.target.files || e.target.files.length === 0) return;
-        let file = e.target.files[0];
-        
-        let r = new FileReader();
-        r.onload = ev => {
-            let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-            
-            // 完整清單，確保不漏接任何字眼
-            let targetItems = [
-                "預算件數", "出貨件數", "件數達成率", "裝載率", "回收件數",
-                "主線條數", "爆量趟次", "爆量自揹", "回收趟次", "回頭收趟次", "其他專車", "特殊點專車", "新開店", "離島", "轉運",
-                "主線費用", "爆量費用", "爆量自揹費用", "回收費用", "回頭收費用", "其他專車費用", "特殊點專車費用", "新開店費用", "違規罰款",
-                "上收申請案件數", "B2C件數", "C2C件數", "B2C專車趟次", "B2C回頭趟次", "C2C專車趟次", "C2C回頭趟次", "B2C專車費用", "B2C回頭費用", "C2C專車費用", "C2C回頭費用",
-                "特殊專車準點率", "特殊專車簽到率", "全台共配準點率", "全台共配簽到率", "夜配準點率", "夜配簽到率"
-            ];
-            
-            let cnt = 0;
-            let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-            let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
-            let currentMonth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
-
-            // 最強的日期解析法：解決錯位問題
-            function extractDate(str, mth) { 
-                let s=String(str||'').trim().replace(/[\/\.]/g, '-'); if(s.length<3) return null;
-                let m1=s.match(/(?:20\d{2}|11[0-9])-(\d{1,2})-(\d{1,2})/), m2=s.match(/^(\d{1,2})-(\d{1,2})$/), m3=s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/), m4=s.match(/^(\d{1,2})-(\d{1,2})-(?:20\d{2}|\d{2})$/);
-                let check = m => m && parseInt(m[1])===mth ? `2026-${String(mth).padStart(2,'0')}-${String(m[m===m1||m===m4?2:2]).padStart(2,'0')}` : null;
-                let rx=check(m1)||check(m2)||check(m3)||check(m4); if(rx) return rx;
-                if(/^4[456]\d{3}$/.test(s)) { let d=new Date(Math.round((parseInt(s)-25569)*86400*1000)); if(d.getUTCMonth()+1===mth) return `2026-${String(mth).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; } return null;
-            }
-
-            // 精準對位法：修復抓錯欄位的問題
-            function findItem(s, items) { 
-                s=(s||'').replace(/[ \(\)（）\n]/g,''); if(!s) return null; 
-                let ex=items.find(i=>i===s); if(ex) return ex; 
-                if(/日配|預算|達成|目標|去年|差異/.test(s)&&!s.includes('件數')) return null; 
-                let isC=/費用|運費|金額|成本/.test(s), isI=/件數/.test(s);
-                if(/B2C|上收/.test(s)&&!s.includes('C2C')) return isC?(s.includes('回頭')?'B2C回頭費用':'B2C專車費用'):(isI?'B2C件數':(s.includes('回頭')?'B2C回頭趟次':'B2C專車趟次'));
-                if(s.includes('C2C')) return isC?(s.includes('回頭')?'C2C回頭費用':'C2C專車費用'):(isI?'C2C件數':(s.includes('回頭')?'C2C回頭趟次':'C2C專車趟次'));
-                
-                // 強制攔截夜配與全台共配，解決文字跳行漏抓
-                if(s.includes('全台共配')) return s.includes('準點')?'全台共配準點率':(s.includes('簽到')?'全台共配簽到率':null);
-                if(s.includes('夜配')) return s.includes('準點')?'夜配準點率':(s.includes('簽到')?'夜配簽到率':null);
-                if(s.includes('特殊')&&s.includes('準點')) return '特殊專車準點率'; if(s.includes('特殊')&&s.includes('簽到')) return '特殊專車簽到率';
-                if(s.includes('件數達成')) return '件數達成率';
-
-                if(s.includes('主線')) return isC?'主線費用':'主線條數'; if(/爆量自[揹背]/.test(s)) return isC?'爆量自揹費用':'爆量自揹'; if(/爆量|加派/.test(s)) return isC?'爆量費用':'爆量趟次';
-                if(/回頭收|店回/.test(s)) return isC?'回頭收費用':'回頭收趟次'; if(/回收/.test(s)) return isC?'回收費用':'回收趟次'; if(s.includes('特殊')) return isC?'特殊點專車費用':'特殊點專車';
-                if(s.includes('新開店')) return isC?'新開店費用':'新開店'; if(s.includes('其他')) return isC?'其他專車費用':'其他專車'; if(/違規|罰款/.test(s)) return '違規罰款'; return null;
-            }
-
-            let ms = {};
-            try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(e){}
-
-            wb.SheetNames.forEach(sn => { 
-                let js=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,dateNF:'yyyy-mm-dd'});
-                let rI={}, cI={}, rD={}, cD={}, hd=new Set(), maxC=Math.max(...js.map(r=>r?r.length:0));
-                
-                let getM = s => { 
-                    let m=['主線','爆量自揹','爆量自背','爆量','加派','回頭收','店回','回收','特殊','新開店','B2C','C2C','其他','簽到','準點','出貨件數','預算件數'].find(k=>s.includes(k)); 
-                    if(m==='爆量自背')return'爆量自揹'; 
-                    if(m==='加派')return'爆量'; 
-                    if(m==='店回')return'回頭收'; 
-                    if(m==='B2C'||(s.includes('上收')&&!s.includes('C2C')))return'B2C'; 
-                    return m||""; 
-                };
-                
-                let scan = (max, isR) => { 
-                    let lastM=""; 
-                    for(let i=0;i<max;i++){ 
-                        let s=""; 
-                        for(let j=0;j<5;j++){ 
-                            let v=isR?js[i]?.[j]:js[j]?.[i]; 
-                            if(v!=null&&v!==''){ let vs=String(v).trim(); if(isNaN(parseFloat(vs))||vs.includes('C')) s+=vs; } 
-                        } 
-                        if(s){ 
-                            let m=getM(s); if(m) lastM=m; 
-                            let eff=lastM&&/費用|趟次|金額|運費|成本|車|條|件數|率/.test(s)&&!s.includes(lastM)?lastM+s:s;
-                            let match=findItem(eff, targetItems); 
-                            
-                            // 強力補充攔截
-                            if (s.includes('夜配') && s.includes('簽到')) match = '夜配簽到率';
-                            if (s.includes('夜配') && s.includes('準點')) match = '夜配準點率';
-                            if (s.includes('全台') && s.includes('簽到')) match = '全台共配簽到率';
-                            if (s.includes('全台') && s.includes('準點')) match = '全台共配準點率';
-
-                            if(match){ if(isR)rI[i]=match; else cI[i]=match; } 
-                        } 
-                    } 
-                };
-                scan(js.length, true); scan(maxC, false);
-                
-                // 掃描日期，確保即使有空欄也不會錯位
-                for(let r=0;r<js.length;r++) for(let c=0;c<(js[r]?.length||0);c++) { let d=extractDate(js[r][c], currentMonth); if(d){rD[r]=d; cD[c]=d; hd.add(`${r}-${c}`);} }
-                
-                // 寫入變數
-                ['appData', 'state', 'mainState', 'vueData', 'ms_backup'].forEach(varName => {
-                    let st = (varName === 'ms_backup') ? ms : window[varName];
-                    if (!st) return;
-
-                    let getDaily = (dateStr) => {
-                        if (st.warehouses && st.warehouses[wh]) {
-                            if (!st.warehouses[wh].daily) st.warehouses[wh].daily = {};
-                            if (!st.warehouses[wh].daily[dateStr]) st.warehouses[wh].daily[dateStr] = {};
-                            return st.warehouses[wh].daily[dateStr];
-                        } else {
-                            if (!st.daily) st.daily = {};
-                            if (!st.daily[dateStr]) st.daily[dateStr] = {};
-                            return st.daily[dateStr];
-                        }
-                    };
-
-                    let passCnt = 0;
-                    for(let r=0;r<js.length;r++) {
-                        for(let c=0;c<(js[r]?.length||0);c++) { 
-                            if(hd.has(`${r}-${c}`)) continue; 
-                            
-                            let v=js[r][c];
-                            let itm=rI[r]||cI[c];
-                            let dt=cD[c]||rD[r]; 
-
-                            // ✅ 大絕招：空白強制補 0！
-                            let isRate = itm && itm.includes('率');
-                            let isCostOrCount = itm && !isRate && !itm.includes('備註');
-                            if ((v == null || v === '') && isCostOrCount) { v = '0'; }
-
-                            if(v!=null&&v!==''&&itm&&dt&&!extractDate(String(v).trim(),currentMonth)){ 
-                                let p=parseFloat(String(v).replace(/[,%]/g,'')); 
-                                if(!isNaN(p)){ 
-                                    if(isRate && !String(v).includes('%') && p<=1 && p>0) p*=100; 
-                                    
-                                    let dailyObj = getDaily(dt);
-                                    dailyObj[itm] = p;
-
-                                    if (itm === '出貨件數') dailyObj['出貨'] = p;
-                                    if (itm === '回收件數') dailyObj['回收'] = p;
-                                    if (itm === '預算件數') dailyObj['預算'] = p;
-                                    
-                                    passCnt++; 
-                                } 
-                            } 
-                        }
-                    }
-                    if (varName === 'ms_backup') cnt = passCnt;
-                });
-            }); 
-            
-            localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-            if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-            if (typeof window.renderAll === 'function') window.renderAll();
-            
-            // 使用防護罩延遲 1.5 秒再觸發總存檔，確保不跑版
-            setTimeout(() => {
-                if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據 (已包含空白補 0 及夜配指標)。`);
-            }, 1500);
-            e.target.value = '';
-        }; r.readAsArrayBuffer(file);
-    });
-
-    // --- 1. 主線匯入引擎 ---
+    // 主線匯入引擎
     window.makeInvincible('handleMainlineExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3508,7 +3438,7 @@ setInterval(() => {
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 2. MIS 非主線匯入引擎 ---
+    // MIS 非主線匯入引擎
     window.makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
         let file = e.target.files[0];
@@ -3636,7 +3566,7 @@ setInterval(() => {
         }; r.readAsArrayBuffer(file);
     });
 
-    // --- 3. 每日明細下載引擎 ---
+    // 每日明細下載引擎
     window.makeInvincible('exportVendorDailyToExcel', function() {
         let vendorSel = document.getElementById('vendorSelect');
         let vendorName = vendorSel ? vendorSel.value : '創新';
@@ -3752,7 +3682,7 @@ setInterval(() => {
         XLSX.writeFile(wb, `${vendorName}_每日對帳明細_${whName}倉_${dateRange}.xlsx`);
     });
 
-    // --- 4. 另存新檔 Excel 引擎 (結帳大表) ---
+    // 結帳大表匯出引擎
     window.makeInvincible('exportSummaryToExcel', function() {
         let table = document.querySelector('#vendorSummaryModal .csv-table');
         if(!table) return; 
@@ -3854,7 +3784,7 @@ setInterval(() => {
         XLSX.writeFile(wb, `${vendorName}_運費對帳結帳大表_${whName}倉_${dateRange}.xlsx`);
     });
 
-    // --- 5. 結帳總表輸出顯示引擎 ---
+    // 結帳總表 UI 生成引擎
     window.makeInvincible('openVendorSummaryModal', function() {
         let whSel = document.getElementById('checkoutWhSelect');
         let vendorSel = document.getElementById('vendorSelect');
