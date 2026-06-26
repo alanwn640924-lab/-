@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🛡️ 啟動【大滿貫無敵版】：修復身分喪失Bug、強制Vue深度響應同步、完美雙軌日期！");
+    console.log("🛡️ 啟動【返璞歸真穩定版】：回歸最穩定的 Vue 原生綁定，加裝超級打字模擬器！");
     
     // ============================================================================
     // 🧹 清理殘留：確保沒有私人金鑰干擾，全體統一使用官方大金庫
@@ -2943,9 +2943,8 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 👑 最強雙軌日期引擎與 MIS 精準映射器
+    // 👑 雙軌日期引擎與 MIS 精準映射器 (保留今天的升級)
     // ============================================================================
-    // 1. 專給【每日登錄表】用：強制綁定當前月份，防止錯位
     window.extractDate = function(str, mth) { 
         let s = String(str||'').trim().replace(/[\/\.]/g, '-'); 
         if(s.length < 3) return null;
@@ -2963,11 +2962,9 @@ setInterval(() => {
         return null;
     };
 
-    // 2. 專給【MIS / 主線】用：無視月份濾網，完整保留跨月真實日期 (如 05-26)
     window.parseExcelDateUnified = function(cell) {
         if (!cell) return null;
         let s = String(cell).trim();
-        // 處理純數字 Excel 序號
         if (/^4[456]\d{3}(?:\.\d+)?$/.test(s)) {
             let d = new Date(Math.round((parseFloat(s) - 25569) * 86400 * 1000));
             return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
@@ -3000,7 +2997,6 @@ setInterval(() => {
         if(/B2C|上收/.test(s) && !s.includes('C2C')) return isC?(s.includes('回頭')?'B2C回頭費用':'B2C專車費用'):(isI?'B2C件數':(s.includes('回頭')?'B2C回頭趟次':'B2C專車趟次'));
         if(s.includes('C2C')) return isC?(s.includes('回頭')?'C2C回頭費用':'C2C專車費用'):(isI?'C2C件數':(s.includes('回頭')?'C2C回頭趟次':'C2C專車趟次'));
         
-        // 夜配與全台共配精準攔截
         if(s.includes('夜配') && s.includes('簽到')) return '夜配簽到率';
         if(s.includes('夜配') && s.includes('準點')) return '夜配準點率';
         if(s.includes('全台') && s.includes('簽到')) return '全台共配簽到率';
@@ -3022,150 +3018,20 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🛡️ 核心救星：【安全神經重連】 (解決 Vue 響應式掉字，直接採用 $set)
-    // ============================================================================
-    window.getCoords = (target) => {
-        let date = target.getAttribute('data-date');
-        if (!date) {
-            let container = target.closest('tr, .card, .mobile-item, div.mb-3, li, .form-group');
-            if (container) {
-                let dEl = container.querySelector('[data-date]');
-                if (dEl) date = dEl.getAttribute('data-date');
-            }
-        }
-
-        let key = target.getAttribute('data-key') || target.getAttribute('data-col') || target.name || target.id;
-        if (!key) {
-            let td = target.closest('td');
-            if (td && td.getAttribute('data-label')) key = td.getAttribute('data-label');
-            if (!key && td) {
-                let tr = target.closest('tr');
-                let table = target.closest('table');
-                if (tr && table) {
-                    let idx = Array.from(tr.children).indexOf(td);
-                    let thead = table.querySelector('thead');
-                    if (thead) {
-                        let ths = thead.querySelectorAll('th');
-                        if (ths && ths[idx]) key = ths[idx].innerText.trim();
-                    }
-                }
-            }
-        }
-        if (!key) {
-            let prev = target.previousElementSibling;
-            if (prev && prev.innerText && !['INPUT', 'TEXTAREA'].includes(prev.tagName)) {
-                key = prev.innerText;
-            } else {
-                let parent = target.closest('div, li, label, .form-group');
-                if (parent) {
-                    let lbl = parent.querySelector('label, span, strong');
-                    if (lbl && lbl !== target) key = lbl.innerText;
-                }
-            }
-        }
-
-        if (key) {
-            let cleanKey = key.replace(/[\n\r]/g, '').replace(/[:：\s*]/g, '').trim();
-            if (cleanKey.includes('出勤')) key = '出勤數';
-            else if (cleanKey === '出貨' || cleanKey.includes('出貨件數')) key = '出貨件數'; 
-            else if (cleanKey.includes('回收') || cleanKey === '件數') key = '回收件數';
-            else if (cleanKey.includes('預算')) key = '預算件數';
-            else if (cleanKey.includes('簽到')) key = '簽到率';
-            else if (cleanKey.includes('準點')) key = '準點率';
-            else if (cleanKey.includes('備註') && !cleanKey.includes('車數')) key = '備註';
-            else key = cleanKey;
-        }
-
-        if (!key || key === '日期' || key === '星期' || key === '') return null;
-        return { date, key };
-    };
-
-    window.forceInjectState = (wh, date, key, val) => {
-        let rawVal = (val === undefined || val === null) ? '' : String(val).trim();
-        
-        // 1. 更新本機 LocalStorage
-        let ms = {};
-        try { ms = JSON.parse(localStorage.getItem('freightData_115') || '{}'); } catch(err){}
-        if (!ms.warehouses) ms.warehouses = {};
-        if (!ms.warehouses[wh]) ms.warehouses[wh] = { daily: {} };
-        if (!ms.warehouses[wh].daily) ms.warehouses[wh].daily = {};
-        if (!ms.warehouses[wh].daily[date]) ms.warehouses[wh].daily[date] = {};
-        
-        let tObj = ms.warehouses[wh].daily[date];
-        if (rawVal === '') {
-            delete tObj[key];
-            if (key === '出貨件數' || key === '出貨') { delete tObj['出貨']; delete tObj['出貨件數']; }
-            if (key === '回收件數' || key === '回收') { delete tObj['回收']; delete tObj['回收件數']; }
-            if (key === '預算件數' || key === '預算') { delete tObj['預算']; delete tObj['預算件數']; }
-        } else {
-            tObj[key] = rawVal;
-            if (key === '出貨件數' || key === '出貨') { tObj['出貨'] = rawVal; tObj['出貨件數'] = rawVal; }
-            if (key === '回收件數' || key === '回收') { tObj['回收'] = rawVal; tObj['回收件數'] = rawVal; }
-            if (key === '預算件數' || key === '預算') { tObj['預算'] = rawVal; tObj['預算件數'] = rawVal; }
-        }
-        ms.customVendorDB = window.customVendorCheckoutDB; 
-        localStorage.setItem('freightData_115', JSON.stringify(ms));
-
-        // 2. 💎 深度響應式寫入 Vue 大腦，保證畫面與雲端同步
-        ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-            let vm = window[varName];
-            if (vm && vm.warehouses && vm.warehouses[wh]) {
-                if (!vm.warehouses[wh].daily) {
-                    if (typeof vm.$set === 'function') vm.$set(vm.warehouses[wh], 'daily', {});
-                    else vm.warehouses[wh].daily = {};
-                }
-                if (!vm.warehouses[wh].daily[date]) {
-                    if (typeof vm.$set === 'function') vm.$set(vm.warehouses[wh].daily, date, {});
-                    else vm.warehouses[wh].daily[date] = {};
-                }
-                
-                let vObj = vm.warehouses[wh].daily[date];
-                let setProp = (k, v) => { if (typeof vm.$set === 'function') vm.$set(vObj, k, v); else vObj[k] = v; };
-                let delProp = (k) => { if (typeof vm.$delete === 'function') vm.$delete(vObj, k); else delete vObj[k]; };
-
-                if (rawVal === '') {
-                    delProp(key);
-                    if (key === '出貨件數' || key === '出貨') { delProp('出貨'); delProp('出貨件數'); }
-                    if (key === '回收件數' || key === '回收') { delProp('回收'); delProp('回收件數'); }
-                    if (key === '預算件數' || key === '預算') { delProp('預算'); delProp('預算件數'); }
-                } else {
-                    setProp(key, rawVal);
-                    if (key === '出貨件數' || key === '出貨') { setProp('出貨', rawVal); setProp('出貨件數', rawVal); }
-                    if (key === '回收件數' || key === '回收') { setProp('回收', rawVal); setProp('回收件數', rawVal); }
-                    if (key === '預算件數' || key === '預算') { setProp('預算', rawVal); setProp('預算件數', rawVal); }
-                }
-            }
-        });
-    };
-
-    // ============================================================================
-    // 🚦 絕對防禦機制：攔截存檔，並修復「身分喪失 (Context Loss)」的致命 Bug
+    // 🚦 核心一：攔截存檔，偷偷把廠商資料帶上雲端
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = function(...args) {
-                // 💎 核心修復：當透過外掛的 setTimeout 呼叫時，this 會變成 window，導致 Firebase 收到 undefined 雲端清空！
-                // 這裡強制綁回 Vue 的大腦實體，確保 Firebase 100% 讀到正確資料！
-                let vm = (this === window) ? (window.appData || window.state || window.mainState) : this;
-                
-                if (vm && vm.customVendorDB !== undefined) { 
-                    vm.customVendorDB = window.customVendorCheckoutDB; 
-                } else if (window.appData) {
-                    window.appData.customVendorDB = window.customVendorCheckoutDB;
-                }
+                // 將我們專屬的下方廠商 DB 塞進 Vue 的大腦
+                if (window.appData) window.appData.customVendorDB = window.customVendorCheckoutDB;
+                if (window.state) window.state.customVendorDB = window.customVendorCheckoutDB;
+                if (window.mainState) window.mainState.customVendorDB = window.customVendorCheckoutDB;
 
-                if (args[0] === true || args[1] === true) {
-                    if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-                    return origSave.apply(vm, args); // 必須帶入 vm
-                }
-
-                if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-                window.autoSaveTimer = setTimeout(() => {
-                    console.log("🛡️ 防護罩解開：身分已鎖定，完美發車上雲端！");
-                    origSave.apply(vm, args); // 必須帶入 vm
-                }, 2500); 
+                // 回歸昨天 17:00 穩定邏輯：不擋延遲，直接呼叫原廠存檔
+                return origSave.apply(this, args);
             };
             window.saveData._isHooked = true;
             clearInterval(syncHookInterval);
@@ -3173,17 +3039,19 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💥 超級還原貼上器：用 Vue 原生 $set 直接灌滿大腦
+    // 💥 核心二：超級打字模擬器 (解決貼上掉字與 Firebase 覆寫問題)
     // ============================================================================
     document.addEventListener('paste', function(e) {
         let target = e.target;
-        if (target.tagName !== 'INPUT' || target.closest('#vendorSummaryModal')) return;
+        // 如果不是文字框，或是下方廠商明細框，就不攔截
+        if (target.tagName !== 'INPUT' || target.closest('#vendorSummaryModal') || target.classList.contains('vendor-daily-cell')) return;
         
         let clipboardData = e.clipboardData || window.clipboardData;
         let pastedText = clipboardData.getData('text');
         
         if (!pastedText || (!pastedText.includes('\t') && !pastedText.includes('\n'))) return;
         
+        // 攔截預設的龜速貼上
         e.preventDefault();
         e.stopImmediatePropagation();
         
@@ -3196,9 +3064,6 @@ setInterval(() => {
         let startRowIdx = Array.from(tbody.children).indexOf(tr);
         let startColIdx = Array.from(tr.children).indexOf(td);
         
-        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
-
         let updates = [];
         for (let i = 0; i < rows.length; i++) {
             if (rows[i].length === 1 && rows[i][0] === '') continue; 
@@ -3212,40 +3077,35 @@ setInterval(() => {
                 let inp = targetTd.querySelector('input');
                 if (inp && !inp.disabled && !inp.readOnly) {
                     let valStr = rows[i][j].trim().replace(/,/g, '');
-                    let coords = window.getCoords(inp);
-                    if (coords && coords.date && coords.key) {
-                        updates.push({ date: coords.date, key: coords.key, val: valStr, input: inp });
-                    }
+                    updates.push({ val: valStr, input: inp });
                 }
             }
         }
         
+        // 🌟 關鍵：不修改底層，直接「模擬人類快速打字」，順著 Vue 原生邏輯走！
         updates.forEach(u => {
-            let isRate = u.key.includes('率');
-            let isCostOrCount = !isRate && !u.key.includes('備註');
             let finalVal = u.val;
             
-            if (finalVal === '' && isCostOrCount) finalVal = '0';
+            // 判斷是否為率，非率才加千分位
+            let key = u.input.getAttribute('data-key') || u.input.name || '';
+            let isRate = key.includes('率');
             
-            if (finalVal !== '') {
-                u.input.value = isRate ? finalVal : Number(finalVal).toLocaleString('en-US');
-            } else {
-                u.input.value = '';
-            }
-            // 利用 $set 強制寫入
-            window.forceInjectState(wh, u.date, u.key, finalVal);
+            u.input.value = isRate ? finalVal : (finalVal !== '' ? Number(finalVal).toLocaleString('en-US') : '');
+            
+            // 觸發 Vue 原生 v-model，Firebase 絕對能抓到！
+            u.input.dispatchEvent(new Event('input', { bubbles: true }));
+            u.input.dispatchEvent(new Event('change', { bubbles: true }));
         });
         
-        if (typeof window.renderAll === 'function') window.renderAll();
-        
+        // 等待所有模擬打字完成，再一次性呼叫存檔
         if (typeof window.saveData === 'function') {
             if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-            window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 800);
+            window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 1500);
         }
     }, true); 
 
     // ============================================================================
-    // 🚀 一般打字監聽 
+    // 🚀 一般打字監聽 (處理下方廠商邏輯)
     // ============================================================================
     var isLocalDirty = false;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
@@ -3299,21 +3159,17 @@ setInterval(() => {
                     window.setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
                 }
             }
-        } else {
-            let coords = window.getCoords(target);
-            if (coords && coords.date && coords.key) {
-                window.forceInjectState(wh, coords.date, coords.key, target.value);
-            }
-        }
 
-        isLocalDirty = true;
-        if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-        window.autoSaveTimer = setTimeout(() => {
-            if (isLocalDirty && typeof window.saveData === 'function') {
-                isLocalDirty = false;
-                window.saveData(false); 
-            }
-        }, 1500);
+            // 下方廠商的存檔延遲
+            isLocalDirty = true;
+            if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
+            window.autoSaveTimer = setTimeout(() => {
+                if (isLocalDirty && typeof window.saveData === 'function') {
+                    isLocalDirty = false;
+                    window.saveData(true, true); 
+                }
+            }, 1500);
+        }
     };
 
     document.addEventListener('input', window.handleAction, true);
@@ -3352,7 +3208,7 @@ setInterval(() => {
     }, 1500);
 
     // ============================================================================
-    // 💡 【每日登錄表匯入引擎】：完美喚醒 Vue 並同步雲端
+    // 💡 每日登錄表匯入引擎 (退回穩定模式，純輔助解析)
     // ============================================================================
     window.makeInvincible('handleDailyExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3371,10 +3227,30 @@ setInterval(() => {
             ];
             
             let cnt = 0;
-            let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-            let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
             let currentMonth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
             
+            // 尋找畫面上的所有 input 建立座標索引
+            let domInputs = {};
+            document.querySelectorAll('table tbody input.data-cell').forEach(inp => {
+                let date = inp.getAttribute('data-date');
+                if (!date) {
+                    let dEl = inp.closest('td, th')?.getAttribute('data-date');
+                    if (dEl) date = dEl;
+                }
+                
+                let key = inp.getAttribute('data-key') || inp.name || inp.id || '';
+                let tr = inp.closest('tr');
+                if (!key && tr) {
+                    let firstTd = tr.querySelector('td.sticky-left') || tr.cells[0];
+                    if (firstTd) key = firstTd.innerText.replace(/[\n\r]/g, '').trim();
+                }
+                
+                if (date && key) {
+                    if (!domInputs[date]) domInputs[date] = {};
+                    domInputs[date][key] = inp;
+                }
+            });
+
             wb.SheetNames.forEach(sn => { 
                 let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: false, defval: ''});
                 if (js.length < 2) return;
@@ -3424,30 +3300,33 @@ setInterval(() => {
                             if (!isNaN(pVal)) {
                                 if (isRate && !valStr.includes('%') && pVal <= 1 && pVal > 0) pVal *= 100; 
                                 
-                                // 直接運用最新修正的 forceInjectState 強制寫入並觸發 Vue 響應
-                                window.forceInjectState(wh, dStr, matched, pVal);
-                                cnt++; 
+                                // 🌟 核心：模擬打字灌入畫面格子，讓 Vue 原生捕捉
+                                let targetInput = null;
+                                if (domInputs[dStr]) {
+                                    targetInput = domInputs[dStr][matched] || domInputs[dStr][matched.replace('件數', '')];
+                                }
+                                
+                                if (targetInput && !targetInput.disabled && !targetInput.readOnly) {
+                                    targetInput.value = isRate ? pVal : Number(pVal).toLocaleString('en-US');
+                                    targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+                                    targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                    cnt++;
+                                }
                             }
                         }
                     }
                 }
             }); 
             
-            if (typeof window.renderAll === 'function') window.renderAll();
-            
             if (cnt > 0) {
                 setTimeout(() => {
                     if (typeof window.saveData === 'function') {
-                        // 確保用 Vue 身分呼叫 saveData
-                        let vm = window.appData || window.state || window;
-                        if (typeof vm.saveData === 'function') vm.saveData(true, true);
-                        else window.saveData(true, true);
-                        
-                        alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據！\n(已修復雲端同步問題)`);
+                        window.saveData(true, true);
+                        alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。\n(已利用打字模擬器強制同步雲端)`);
                     }
-                }, 1500);
+                }, 2000);
             } else {
-                alert('⚠️ 未找到任何有效數據！');
+                alert('⚠️ 未找到任何對應畫面格子的數據！');
             }
             e.target.value = '';
         }; 
@@ -3577,8 +3456,7 @@ setInterval(() => {
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
             setTimeout(() => {
-                let vm = window.appData || window;
-                if (typeof vm.saveData === 'function') vm.saveData(true, true);
+                if (typeof window.saveData === 'function') window.saveData(true, true);
                 alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。`);
             }, 500);
             e.target.value = '';
@@ -3586,7 +3464,7 @@ setInterval(() => {
     });
 
     // ============================================================================
-    // 💡 MIS 匯入引擎 (精準還原舊版邏輯，只寫入下方結帳總表)
+    // 💡 MIS 匯入引擎 (精準還原舊版 11504 邏輯，只寫入下方結帳總表)
     // ============================================================================
     window.makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3708,8 +3586,7 @@ setInterval(() => {
             
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
             setTimeout(() => {
-                let vm = window.appData || window;
-                if (typeof vm.saveData === 'function') vm.saveData(true, true);
+                if (typeof window.saveData === 'function') window.saveData(true, true);
                 alert(`✅ 非主線MIS匯入成功！共處理 ${importedCount} 筆數據！`);
             }, 500);
             e.target.value = '';
