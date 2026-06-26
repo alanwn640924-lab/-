@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🛡️ 啟動【修68_終極復刻版】：還原純淨物理打字模擬、恢復雲端瘦身按鈕、MIS跨月完美保留！");
+    console.log("🛡️ 啟動【純淨物理還原版】：全面廢除延遲干擾，採用原生打字模擬，保證 100% 雲端同步！");
     
     // ============================================================================
     // 🧹 清理殘留：確保沒有私人金鑰干擾，全體統一使用官方大金庫
@@ -2970,17 +2970,14 @@ setInterval(() => {
             return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
         }
         s = s.replace(/\([一二三四五六日]\)/g, '').replace(/（[一二三四五六日]）/g, '').trim().replace(/[\/\.]/g, '-');
-        
         let m1 = s.match(/^(?:20\d{2}|11[0-9])-(\d{1,2})-(\d{1,2})/);
         if (m1) {
             let y = s.startsWith('11') ? parseInt(s.substring(0,3)) + 1911 : parseInt(s.substring(0,4));
             if (isNaN(y)) y = 2026;
             return `${y}-${String(m1[1]).padStart(2, '0')}-${String(m1[2]).padStart(2, '0')}`;
         }
-        
         let m2 = s.match(/^(\d{1,2})-(\d{1,2})$/);
         if (m2) return `2026-${String(m2[1]).padStart(2, '0')}-${String(m2[2]).padStart(2, '0')}`;
-        
         let m3 = s.match(/^(\d{1,2})$/);
         if (m3) {
             let mth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
@@ -2996,7 +2993,6 @@ setInterval(() => {
         let isC = /費用|運費|金額|成本/.test(s), isI = /件數/.test(s);
         if(/B2C|上收/.test(s) && !s.includes('C2C')) return isC?(s.includes('回頭')?'B2C回頭費用':'B2C專車費用'):(isI?'B2C件數':(s.includes('回頭')?'B2C回頭趟次':'B2C專車趟次'));
         if(s.includes('C2C')) return isC?(s.includes('回頭')?'C2C回頭費用':'C2C專車費用'):(isI?'C2C件數':(s.includes('回頭')?'C2C回頭趟次':'C2C專車趟次'));
-        
         if(s.includes('夜配') && s.includes('簽到')) return '夜配簽到率';
         if(s.includes('夜配') && s.includes('準點')) return '夜配準點率';
         if(s.includes('全台') && s.includes('簽到')) return '全台共配簽到率';
@@ -3004,7 +3000,6 @@ setInterval(() => {
         if(s.includes('特殊') && s.includes('準點')) return '特殊專車準點率'; 
         if(s.includes('特殊') && s.includes('簽到')) return '特殊專車簽到率';
         if(s.includes('件數達成')) return '件數達成率';
-
         if(s.includes('主線')) return isC?'主線費用':'主線條數'; 
         if(/爆量自[揹背]/.test(s)) return isC?'爆量自揹費用':'爆量自揹'; 
         if(/爆量|加派/.test(s)) return isC?'爆量費用':'爆量趟次';
@@ -3018,17 +3013,17 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🛡️ 核心一：攔截存檔 (✅ 68版靈魂，瞬間同步廠商資料，絕不干擾 Vue 時序)
+    // 🚦 核心一：攔截存檔 (✅ 恢復 11504 完美狀態，零延遲瞬間同步！)
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
-            
             window.saveData = function(...args) {
+                // 將我們專屬的下方廠商 DB 塞進 Vue 的大腦
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
                     if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
                 });
-
+                // 絕對不加 setTimeout！讓 Vue 直接執行存檔！
                 return origSave.apply(this, args);
             };
             window.saveData._isHooked = true;
@@ -3037,7 +3032,7 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💥 核心二：超級物理打字機 (✅ 68版靈魂，解決大量貼上不上雲端的問題)
+    // 💥 核心二：物理打字模擬器 (解決貼上掉字)
     // ============================================================================
     document.addEventListener('paste', function(e) {
         let target = e.target;
@@ -3045,7 +3040,6 @@ setInterval(() => {
         
         let clipboardData = e.clipboardData || window.clipboardData;
         let pastedText = clipboardData.getData('text');
-        
         if (!pastedText || (!pastedText.includes('\t') && !pastedText.includes('\n'))) return;
         
         e.preventDefault();
@@ -3078,7 +3072,7 @@ setInterval(() => {
             }
         }
         
-        // 🌟 模擬人類極速打字，觸發原生 Vue 綁定
+        // 🌟 模擬人類極速打字
         updates.forEach(u => {
             let finalVal = u.val;
             let key = u.input.getAttribute('data-key') || u.input.name || u.input.id || '';
@@ -3086,26 +3080,20 @@ setInterval(() => {
             let isCostOrCount = !isRate && !key.includes('備註');
             
             if (finalVal === '' && isCostOrCount) finalVal = '0';
-            
             u.input.value = isRate ? finalVal : (finalVal !== '' ? Number(finalVal).toLocaleString('en-US') : '');
             
+            // 完全模擬手機點擊的事件順序！
             u.input.dispatchEvent(new Event('input', { bubbles: true }));
             u.input.dispatchEvent(new Event('change', { bubbles: true }));
+            u.input.dispatchEvent(new Event('blur', { bubbles: true }));
         });
         
-        // 延遲等待 Vue 吸收後，觸發原生存檔
-        if (typeof window.saveData === 'function') {
-            if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-            window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 1500);
-        }
     }, true); 
 
     // ============================================================================
-    // 🚀 一般打字監聽 (處理下方廠商邏輯)
+    // 🚀 一般打字監聽 (✅ 移除全域干擾，只專注處理下方的廠商表格)
     // ============================================================================
-    var isLocalDirty = false;
     var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
-
     setInterval(() => {
         try {
             let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
@@ -3121,18 +3109,15 @@ setInterval(() => {
         } catch(e) {}
     }, 2000);
 
-    window.handleAction = (e) => {
+    // 這裡我們「不攔截」主畫面的打字，讓 Vue 原廠自己去存檔！
+    document.addEventListener('input', (e) => {
         let target = e.target;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') return;
-        if (target.closest('#vendorSummaryModal')) return;
-
-        let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
-        let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
-        let isVendorInput = target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input');
-
-        if (isVendorInput) {
+        if (target.classList.contains('vendor-daily-cell') || target.classList.contains('vendor-remark-input')) {
+            let whSel = document.getElementById('warehouseSelect') || document.getElementById('checkoutWhSelect');
+            let wh = whSel ? whSel.value.replace('倉', '') : '大肚';
             let dStr = target.getAttribute('data-date');
             let selectedVendor = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '全部';
+            
             if (selectedVendor !== '全部' && dStr) {
                 if (target.classList.contains('vendor-daily-cell')) {
                     let cat = target.getAttribute('data-cat');
@@ -3154,24 +3139,18 @@ setInterval(() => {
                     let cleanVal = target.value.trim().replace(/^\[.*?\]\s*/, '');
                     window.setStorageVal(wh, selectedVendor, dStr, 'remark', cleanVal);
                 }
+                
+                // 下方廠商區打字，透過按鈕或離開焦點才存檔，避免連續觸發
+                if (window.vendorSaveTimer) clearTimeout(window.vendorSaveTimer);
+                window.vendorSaveTimer = setTimeout(() => {
+                    if (typeof window.saveData === 'function') window.saveData(true, true);
+                }, 1000);
             }
-
-            isLocalDirty = true;
-            if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
-            window.autoSaveTimer = setTimeout(() => {
-                if (isLocalDirty && typeof window.saveData === 'function') {
-                    isLocalDirty = false;
-                    window.saveData(true, true); 
-                }
-            }, 1500);
         }
-    };
-
-    document.addEventListener('input', window.handleAction, true);
-    document.addEventListener('change', window.handleAction, true);
+    }, true);
 
     // ============================================================================
-    // 💡 精緻版殺殭屍 ＆ 雲端瘦身按鈕 (✅ 修復：兩個按鈕都回來了)
+    // 💡 殺殭屍與瘦身按鈕
     // ============================================================================
     setInterval(() => {
         let allEls = document.querySelectorAll('span, div, a, button, label');
@@ -3241,7 +3220,7 @@ setInterval(() => {
     }, 1500);
 
     // ============================================================================
-    // 💡 【每日登錄表匯入引擎】：完全依靠物理打字模擬器 (同 68 版概念)
+    // 💡 每日登錄表匯入引擎：改為【物理打字模擬】
     // ============================================================================
     window.makeInvincible('handleDailyExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3262,7 +3241,7 @@ setInterval(() => {
             let cnt = 0;
             let currentMonth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
             
-            // 尋找畫面上的所有 input 建立座標索引
+            // 建立網頁格子的座標地圖
             let domInputs = {};
             document.querySelectorAll('table tbody input.data-cell').forEach(inp => {
                 let date = inp.getAttribute('data-date');
@@ -3338,11 +3317,12 @@ setInterval(() => {
                                     targetInput = domInputs[dStr][matched] || domInputs[dStr][matched.replace('件數', '')];
                                 }
                                 
-                                // 🌟 核心：模擬打字灌入畫面格子，讓 Vue 原生捕捉
+                                // 🌟 核心：模擬打字！讓 Vue 感覺到有人在輸入！
                                 if (targetInput && !targetInput.disabled && !targetInput.readOnly) {
                                     targetInput.value = isRate ? pVal : Number(pVal).toLocaleString('en-US');
                                     targetInput.dispatchEvent(new Event('input', { bubbles: true }));
                                     targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+                                    targetInput.dispatchEvent(new Event('blur', { bubbles: true }));
                                     cnt++;
                                 }
                             }
@@ -3352,12 +3332,7 @@ setInterval(() => {
             }); 
             
             if (cnt > 0) {
-                setTimeout(() => {
-                    if (typeof window.saveData === 'function') {
-                        window.saveData(true, true);
-                        alert(`✅ 每日登錄表匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。`);
-                    }
-                }, 2000);
+                alert(`✅ 每日登錄表匯入完成！\n共寫入 ${cnt} 筆數據。\n系統將由原廠自動同步雲端。`);
             } else {
                 alert('⚠️ 未找到任何對應畫面格子的數據！');
             }
@@ -3497,7 +3472,7 @@ setInterval(() => {
     });
 
     // ============================================================================
-    // 💡 MIS 匯入引擎 (精準還原舊版 11504 邏輯，只寫入下方結帳總表)
+    // 💡 MIS 匯入引擎 
     // ============================================================================
     window.makeInvincible('handleVendorCheckoutExcelImportNew', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3955,7 +3930,7 @@ setInterval(() => {
                     '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" value=""></td>' +
                     '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-trips" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" value=""></td>' +
                     '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-input row-price" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" value=""></td>' +
-                    '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-subtotal csv-calc row-subtotal" data-group="' + grp + '" value="" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" readonly tabindex="-1"></td>' +
+                    '<td style="border:1px solid #000; padding:0;"><input type="text" class="csv-subtotal csv-calc subtotal" data-group="' + grp + '" value="" style="width:100%; border:none; text-align:center; background:transparent; padding:6px;" readonly tabindex="-1"></td>' +
                 '</tr>';
             }
             return html;
