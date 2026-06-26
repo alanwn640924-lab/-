@@ -2892,7 +2892,7 @@ setInterval(() => {
 }, 500);
 </script><script id="perfect-dual-engine">
 (function() {
-    console.log("🛡️ 啟動【返璞歸真穩定版】：回歸最穩定的 Vue 原生綁定，加裝超級打字模擬器！");
+    console.log("🛡️ 啟動【修68_終極復刻版】：還原純淨物理打字模擬、恢復雲端瘦身按鈕、MIS跨月完美保留！");
     
     // ============================================================================
     // 🧹 清理殘留：確保沒有私人金鑰干擾，全體統一使用官方大金庫
@@ -2943,7 +2943,7 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 👑 雙軌日期引擎與 MIS 精準映射器 (保留今天的升級)
+    // 👑 雙軌日期引擎與 MIS 精準映射器
     // ============================================================================
     window.extractDate = function(str, mth) { 
         let s = String(str||'').trim().replace(/[\/\.]/g, '-'); 
@@ -3018,19 +3018,17 @@ setInterval(() => {
     };
 
     // ============================================================================
-    // 🚦 核心一：攔截存檔，偷偷把廠商資料帶上雲端
+    // 🛡️ 核心一：攔截存檔 (✅ 68版靈魂，瞬間同步廠商資料，絕不干擾 Vue 時序)
     // ============================================================================
     var syncHookInterval = setInterval(() => {
         if (typeof window.saveData === 'function' && !window.saveData._isHooked) {
             let origSave = window.saveData;
             
             window.saveData = function(...args) {
-                // 將我們專屬的下方廠商 DB 塞進 Vue 的大腦
-                if (window.appData) window.appData.customVendorDB = window.customVendorCheckoutDB;
-                if (window.state) window.state.customVendorDB = window.customVendorCheckoutDB;
-                if (window.mainState) window.mainState.customVendorDB = window.customVendorCheckoutDB;
+                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
+                    if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
+                });
 
-                // 回歸昨天 17:00 穩定邏輯：不擋延遲，直接呼叫原廠存檔
                 return origSave.apply(this, args);
             };
             window.saveData._isHooked = true;
@@ -3039,11 +3037,10 @@ setInterval(() => {
     }, 500);
 
     // ============================================================================
-    // 💥 核心二：超級打字模擬器 (解決貼上掉字與 Firebase 覆寫問題)
+    // 💥 核心二：超級物理打字機 (✅ 68版靈魂，解決大量貼上不上雲端的問題)
     // ============================================================================
     document.addEventListener('paste', function(e) {
         let target = e.target;
-        // 如果不是文字框，或是下方廠商明細框，就不攔截
         if (target.tagName !== 'INPUT' || target.closest('#vendorSummaryModal') || target.classList.contains('vendor-daily-cell')) return;
         
         let clipboardData = e.clipboardData || window.clipboardData;
@@ -3051,7 +3048,6 @@ setInterval(() => {
         
         if (!pastedText || (!pastedText.includes('\t') && !pastedText.includes('\n'))) return;
         
-        // 攔截預設的龜速貼上
         e.preventDefault();
         e.stopImmediatePropagation();
         
@@ -3082,22 +3078,22 @@ setInterval(() => {
             }
         }
         
-        // 🌟 關鍵：不修改底層，直接「模擬人類快速打字」，順著 Vue 原生邏輯走！
+        // 🌟 模擬人類極速打字，觸發原生 Vue 綁定
         updates.forEach(u => {
             let finalVal = u.val;
-            
-            // 判斷是否為率，非率才加千分位
-            let key = u.input.getAttribute('data-key') || u.input.name || '';
+            let key = u.input.getAttribute('data-key') || u.input.name || u.input.id || '';
             let isRate = key.includes('率');
+            let isCostOrCount = !isRate && !key.includes('備註');
+            
+            if (finalVal === '' && isCostOrCount) finalVal = '0';
             
             u.input.value = isRate ? finalVal : (finalVal !== '' ? Number(finalVal).toLocaleString('en-US') : '');
             
-            // 觸發 Vue 原生 v-model，Firebase 絕對能抓到！
             u.input.dispatchEvent(new Event('input', { bubbles: true }));
             u.input.dispatchEvent(new Event('change', { bubbles: true }));
         });
         
-        // 等待所有模擬打字完成，再一次性呼叫存檔
+        // 延遲等待 Vue 吸收後，觸發原生存檔
         if (typeof window.saveData === 'function') {
             if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
             window.autoSaveTimer = setTimeout(() => { window.saveData(true, true); }, 1500);
@@ -3160,7 +3156,6 @@ setInterval(() => {
                 }
             }
 
-            // 下方廠商的存檔延遲
             isLocalDirty = true;
             if (window.autoSaveTimer) clearTimeout(window.autoSaveTimer);
             window.autoSaveTimer = setTimeout(() => {
@@ -3176,7 +3171,7 @@ setInterval(() => {
     document.addEventListener('change', window.handleAction, true);
 
     // ============================================================================
-    // 💡 精緻版迷你殺殭屍按鈕
+    // 💡 精緻版殺殭屍 ＆ 雲端瘦身按鈕 (✅ 修復：兩個按鈕都回來了)
     // ============================================================================
     setInterval(() => {
         let allEls = document.querySelectorAll('span, div, a, button, label');
@@ -3204,11 +3199,49 @@ setInterval(() => {
                 };
                 connectionTag.insertAdjacentElement('afterend', syncBtn);
             }
+
+            if (!document.getElementById('btnCleanJunkModal')) {
+                let cleanBtn = document.createElement('button');
+                cleanBtn.id = 'btnCleanJunkModal';
+                cleanBtn.innerHTML = '🧹雲端瘦身';
+                cleanBtn.title = '清理系統多餘空值';
+                cleanBtn.style.cssText = 'background-color: #dc3545; color: white; border: none; padding: 4px 10px; font-size: 12px; border-radius: 20px; font-weight: bold; cursor: pointer; margin-left: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: 0.2s; display: inline-block; vertical-align: middle;';
+                cleanBtn.onclick = function(e) {
+                    e.preventDefault(); 
+                    if(!confirm('這將清除系統遺留的無效日期包裹。是否執行？')) return;
+                    let db = window.customVendorCheckoutDB || {};
+                    for (let wh in db) {
+                        for (let vendor in db[wh]) {
+                            for (let date in db[wh][vendor]) {
+                                let record = db[wh][vendor][date];
+                                let isG = true;
+                                for(let k in record){
+                                    if(['__ob__','date','日期','id','wh','warehouse','倉別'].includes(k)) continue;
+                                    let v = record[k];
+                                    if(v !== '' && v !== 0 && v !== '0' && v !== null && v !== undefined && !(typeof v === 'number' && isNaN(v))) { isG = false; break; }
+                                }
+                                if(isG) delete db[wh][vendor][date];
+                            }
+                        }
+                    }
+                    window.customVendorCheckoutDB = db;
+                    localStorage.setItem('freight_vendor_db', JSON.stringify(db));
+                    if(window.saveData) window.saveData(true, true);
+                    alert(`✅ 雲端大掃除成功！`);
+                };
+                
+                let syncBtn = document.getElementById('btnForceSyncModal');
+                if (syncBtn) {
+                    syncBtn.insertAdjacentElement('afterend', cleanBtn);
+                } else {
+                    connectionTag.insertAdjacentElement('afterend', cleanBtn);
+                }
+            }
         }
     }, 1500);
 
     // ============================================================================
-    // 💡 每日登錄表匯入引擎 (退回穩定模式，純輔助解析)
+    // 💡 【每日登錄表匯入引擎】：完全依靠物理打字模擬器 (同 68 版概念)
     // ============================================================================
     window.makeInvincible('handleDailyExcelImport', function(e) {
         if (!e.target.files || e.target.files.length === 0) return;
@@ -3300,12 +3333,12 @@ setInterval(() => {
                             if (!isNaN(pVal)) {
                                 if (isRate && !valStr.includes('%') && pVal <= 1 && pVal > 0) pVal *= 100; 
                                 
-                                // 🌟 核心：模擬打字灌入畫面格子，讓 Vue 原生捕捉
                                 let targetInput = null;
                                 if (domInputs[dStr]) {
                                     targetInput = domInputs[dStr][matched] || domInputs[dStr][matched.replace('件數', '')];
                                 }
                                 
+                                // 🌟 核心：模擬打字灌入畫面格子，讓 Vue 原生捕捉
                                 if (targetInput && !targetInput.disabled && !targetInput.readOnly) {
                                     targetInput.value = isRate ? pVal : Number(pVal).toLocaleString('en-US');
                                     targetInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3322,7 +3355,7 @@ setInterval(() => {
                 setTimeout(() => {
                     if (typeof window.saveData === 'function') {
                         window.saveData(true, true);
-                        alert(`✅ 大滿貫匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。\n(已利用打字模擬器強制同步雲端)`);
+                        alert(`✅ 每日登錄表匯入成功！\n共完美對齊並寫入 ${cnt} 筆數據。`);
                     }
                 }, 2000);
             } else {
@@ -3751,8 +3784,9 @@ setInterval(() => {
 
                 if (typeof cell.v === 'string') {
                     let cleanStr = cell.v.replace(/,/g, '').trim();
-                    if (cleanStr === '') cell.v = ''; 
-                    else if (!isNaN(cleanStr) && cleanStr !== '-') { cell.v = Number(cleanStr); cell.t = 'n'; }
+                    if (cleanStr === '' || cleanStr === String.fromCharCode(160)) {
+                        cell.v = ''; 
+                    } else if (!isNaN(cleanStr) && cleanStr !== '-') { cell.v = Number(cleanStr); cell.t = 'n'; }
                 }
 
                 let borderStyle = { style: "thin", color: { rgb: "000000" } };
@@ -3879,17 +3913,17 @@ setInterval(() => {
             daysCount++; let m = current.getMonth()+1, d = current.getDate();
             let dStr = current.getFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
             
-            sum35_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
-            sum8_cost += Number(getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
+            sum35_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
+            sum8_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
             
             if (m === targetMonth) {
-                let d35 = Number(getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
-                let d8 = Number(getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
+                let d35 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
+                let d8 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
                 if (d35 > max35_cars) max35_cars = d35;
                 if (d8 > max8_cars) max8_cars = d8;
             }
 
-            let misDetails = getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
+            let misDetails = window.getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
             if (Array.isArray(misDetails)) {
                 misDetails.forEach(dt => {
                     let cat = dt.mainCat, p = dt.price || 0, type = dt.typeStr || '';
