@@ -546,7 +546,31 @@
 
         let db, auth, user, appId, isCloudSyncEnabled = false;
 
-        window.addEventListener('beforeunload', () => { if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem('freightData_115', JSON.stringify(state)); } });
+        window.addEventListener('beforeunload', (e) => {
+            if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem('freightData_115', JSON.stringify(state)); }
+            // 🩹 修復：若雲端寫入還在進行中「或」還有一筆存檔正在排隊等待重試，離開就會遺失，
+            //         這裡都要跳出離開前的確認提示，讓使用者有機會等一下再關閉。
+            //         （舊版只檢查 isSaving，漏掉了排隊等待重試的 1.5 秒空檔，這裡一併補上。）
+            if (window.isSaving || window._pendingSaveArgs) {
+                e.preventDefault();
+                e.returnValue = '資料正在同步至雲端，請稍候再離開，避免最後一筆修改遺失！';
+                return e.returnValue;
+            }
+        });
+
+        // 🩹 最後一道防線：自我修復安全網
+        //    不管前面哪一個環節（isSaving 忙碌被排隊、衝突重試、或任何還沒想到的競爭情況）
+        //    導致某筆編輯遲遲沒真正送上雲端，這裡每 3 秒巡邏一次：
+        //    只要「本機資料的修改時間」比「最後一次確認同步雲端的時間」還新，且目前沒有存檔正在進行/排隊，
+        //    就自動補送一次，確保資料最終一定會落地雲端，不會停留在只存本機的狀態。
+        setInterval(() => {
+            if (window.userRole && window.userRole.startsWith('ro')) return;
+            if (window.isSaving || window._pendingSaveArgs) return;
+            if (!window.state || !window.isCloudSyncEnabled) return;
+            if ((window.state.lastModified || 0) > (window.lastSyncTime || 0)) {
+                window.saveData(false);
+            }
+        }, 3000);
         
         window.scrollToToday = () => {
             if (currentActiveTab !== 1) return; 
@@ -719,6 +743,10 @@
                             window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); window.renderAll(); window.checkAndTriggerStartupEvents(); 
                         }
                     } else if (JSON.stringify(window.state) !== JSON.stringify(cloudData)) {
+                        // 🩹 修復：本機正在寫入雲端時，這批回聲可能還不包含最新的本機編輯（例如連續打好幾格時，
+                        //         中間有幾格因為 isSaving 忙碌被排隊卡住，還沒真正送出）。
+                        //         這時候先跳過，等我們自己的寫入完成、下一次回聲進來時再套用，避免蓋掉剛打好的資料。
+                        if (window.isSaving) return;
                         if ((cloudData.lastModified || 0) > window.state.lastModified) {
                             const activeEl = document.activeElement; let fInfo = null, cVal = null;
                             if (activeEl && activeEl.classList.contains('data-cell') && activeEl.dataset.item !== '件數達成率') { fInfo = { d: activeEl.dataset.date, i: activeEl.dataset.item }; cVal = activeEl.value; }
@@ -743,8 +771,15 @@
         };
 
         window.isSaving = false;
+        window._pendingSaveArgs = null; // 🩹 排隊中的存檔請求（被擋下時用來自動補送，不再靜默丟棄）
         window.saveData = async function(showMsg = false, forceOverwrite = false) {
-            if (window.isSaving) return; window.isSaving = true;
+            if (window.isSaving) {
+                // 🩹 修復：以前這裡直接 return 會讓這筆存檔「憑空消失」，除非使用者剛好再打一次字才會被補救。
+                //         現在改成記住「還有一筆沒送出」，目前這筆寫完後會自動用最新資料補送一次。
+                window._pendingSaveArgs = { showMsg, forceOverwrite };
+                return;
+            }
+            window.isSaving = true;
             window.state.lastModified = Date.now();
             
             // 🌟 防護點 4：保證每次按下儲存，廠商結帳資料一定跟著上雲端，不怕遺失！
@@ -755,11 +790,31 @@
             if (window.isCloudSyncEnabled) {
                 try {
                     const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
-                    if (!forceOverwrite) { const snap = await getDoc(docRef); if (snap.exists()) { let cloudData = snap.data(); if (cloudData.lastModified > window.lastSyncTime) { window.showToast('⚠️ 警告：雲端有更新的資料！為防止覆蓋同事輸入的數據，已攔截本次存檔。請備份資料並重新整理網頁！', 8000); window.isSaving = false; return; } } }
+                    if (!forceOverwrite) {
+                        const snap = await getDoc(docRef);
+                        if (snap.exists()) {
+                            let cloudData = snap.data();
+                            if (cloudData.lastModified > window.lastSyncTime) {
+                                window.showToast('⚠️ 警告：雲端有更新的資料！為防止覆蓋同事輸入的數據，已攔截本次存檔，資料同步後會自動重試。', 8000);
+                                window.isSaving = false;
+                                // 🩹 修復：以前這裡攔截後就直接放棄，這筆編輯永遠不會再上雲端。
+                                //         現在改成排隊，等本機收到最新的雲端回聲、資料對齊後自動重試存檔。
+                                window._pendingSaveArgs = { showMsg, forceOverwrite };
+                                setTimeout(() => { if (window._pendingSaveArgs) { let a = window._pendingSaveArgs; window._pendingSaveArgs = null; window.saveData(a.showMsg, a.forceOverwrite); } }, 400);
+                                return;
+                            }
+                        }
+                    }
                     let cleanState = JSON.parse(JSON.stringify(window.state)); await setDoc(docRef, cleanState); window.lastSyncTime = window.state.lastModified; if (showMsg) window.showToast('☁️ 資料已成功同步至雲端！');
                 } catch(e) { console.error("Firestore Error:", e); window.showToast('⚠️ 雲端寫入失敗，已轉存本機備份。請檢查網路狀態。'); }
             } else { if (showMsg) window.showToast('💾 資料已成功儲存至本機！(尚未連接雲端)'); }
             window.isSaving = false;
+            // 🩹 修復：這次存檔進行期間如果又有新編輯被排隊卡住，這裡用最新資料自動補送一次，
+            //         確保「最後打的那幾筆」一定會被送出去，不會停留在只存本機的狀態。
+            if (window._pendingSaveArgs) {
+                let a = window._pendingSaveArgs; window._pendingSaveArgs = null;
+                window.saveData(a.showMsg, a.forceOverwrite);
+            }
         };
 
         document.addEventListener("DOMContentLoaded", async () => {
@@ -3112,6 +3167,11 @@ setInterval(() => {
         
         // 確保點擊的地方真的有輸入框
         if (!inputEl || inputEl.disabled || inputEl.readOnly || target.closest('#vendorSummaryModal')) return;
+
+        // 🩹 修復：日別登錄表(data-cell)的批次貼上，交還給主流程的貼上處理器（一次寫完全部儲存格才 renderTab1 一次），
+        //         不在這裡逐格 dispatch 事件。原本逐格處理會在第一格觸發 renderTab1() 整表重繪，
+        //         導致後面幾格抓到的還是「已從畫面移除」的舊輸入框，事件送出去沒人接、資料就悄悄不見了。
+        if (inputEl.classList.contains('data-cell')) return;
         
         let clipboardData = e.clipboardData || window.clipboardData;
         let pastedText = clipboardData.getData('text');
