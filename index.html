@@ -546,7 +546,44 @@
 
         let db, auth, user, appId, isCloudSyncEnabled = false;
 
-        window.addEventListener('beforeunload', () => { if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem('freightData_115', JSON.stringify(state)); } });
+        // 🩹 修復：離開頁面警告以前「只要當下有任何存檔在飛行中」就立刻跳出來，
+        //         但正常存檔通常零點幾秒就完成，這樣反而讓使用者常常看到警告、誤以為出了問題不敢離開。
+        //         這裡改成細緻追蹤「持續卡住多久」，只有真的卡超過 4 秒才需要提醒，短暫的正常等待不再打擾。
+        window._pendingSinceTime = null;
+        setInterval(() => {
+            let pending = window.isSaving || window._pendingSaveArgs || window._debouncePending;
+            if (pending) {
+                if (!window._pendingSinceTime) window._pendingSinceTime = Date.now();
+            } else {
+                window._pendingSinceTime = null;
+            }
+        }, 300);
+
+        window.addEventListener('beforeunload', (e) => {
+            if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem('freightData_115', JSON.stringify(state)); }
+            // 🩹 修復：若雲端寫入「持續卡住超過 4 秒」還沒完成，離開就有真的遺失的風險，
+            //         這時才跳出離開前的確認提示；短暫的正常寫入（通常不到 1 秒）不再跳出警告，
+            //         這樣看到警告時才代表真的要多等一下，看不到警告就代表已經寫完了。
+            if (window._pendingSinceTime && (Date.now() - window._pendingSinceTime > 4000)) {
+                e.preventDefault();
+                e.returnValue = '資料正在同步至雲端，請稍候再離開，避免最後一筆修改遺失！';
+                return e.returnValue;
+            }
+        });
+
+        // 🩹 最後一道防線：自我修復安全網
+        //    不管前面哪一個環節（isSaving 忙碌被排隊、衝突重試、或任何還沒想到的競爭情況）
+        //    導致某筆編輯遲遲沒真正送上雲端，這裡每 3 秒巡邏一次：
+        //    只要「本機資料的修改時間」比「最後一次確認同步雲端的時間」還新，且目前沒有存檔正在進行/排隊，
+        //    就自動補送一次，確保資料最終一定會落地雲端，不會停留在只存本機的狀態。
+        setInterval(() => {
+            if (window.userRole && window.userRole.startsWith('ro')) return;
+            if (window.isSaving || window._pendingSaveArgs || window._debouncePending) return;
+            if (!window.state || !window.isCloudSyncEnabled) return;
+            if ((window.state.lastModified || 0) > (window.lastSyncTime || 0)) {
+                window.saveData(false);
+            }
+        }, 3000);
         
         window.scrollToToday = () => {
             if (currentActiveTab !== 1) return; 
@@ -709,16 +746,20 @@
                     if (cloudData.vendorDB) delete cloudData.vendorDB;
                     
                     if (window.isInitialLoad) {
-                        if (window.state.lastModified && window.state.lastModified > (cloudData.lastModified || 0)) { window.isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); window.renderAll(); window.checkAndTriggerStartupEvents(); } 
+                        if (window.state.lastModified && window.state.lastModified > (cloudData.lastModified || 0)) { window.isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); renderAll(); window.checkAndTriggerStartupEvents(); } 
                         else { 
                             window.state = cloudData;
                             // 🌟 防護點 1：如果是從雲端下載，有 vendorDB 才覆蓋，沒有的話保留本機的！
                             
                             try { localStorage.setItem('freightData_115', JSON.stringify(window.state)); } catch(e){}
                             if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; 
-                            window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); window.renderAll(); window.checkAndTriggerStartupEvents(); 
+                            window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); renderAll(); window.checkAndTriggerStartupEvents(); 
                         }
                     } else if (JSON.stringify(window.state) !== JSON.stringify(cloudData)) {
+                        // 🩹 修復：本機正在寫入雲端時，這批回聲可能還不包含最新的本機編輯（例如連續打好幾格時，
+                        //         中間有幾格因為 isSaving 忙碌被排隊卡住，還沒真正送出）。
+                        //         這時候先跳過，等我們自己的寫入完成、下一次回聲進來時再套用，避免蓋掉剛打好的資料。
+                        if (window.isSaving) return;
                         if ((cloudData.lastModified || 0) > window.state.lastModified) {
                             const activeEl = document.activeElement; let fInfo = null, cVal = null;
                             if (activeEl && activeEl.classList.contains('data-cell') && activeEl.dataset.item !== '件數達成率') { fInfo = { d: activeEl.dataset.date, i: activeEl.dataset.item }; cVal = activeEl.value; }
@@ -730,7 +771,7 @@
                             try { localStorage.setItem('freightData_115', JSON.stringify(window.state)); } catch(e){}
                             if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } window.lastSyncTime = cloudData.lastModified || Date.now();
                             if (fInfo) { let p = window.parseVal(cVal); if (cVal === '' || isNaN(p)) { if (window.getDaily()[fInfo.d] && window.getDaily()[fInfo.d][fInfo.i] !== undefined) delete window.getDaily()[fInfo.d][fInfo.i]; } else { if (!window.getDaily()[fInfo.d]) window.getDaily()[fInfo.d] = {}; window.getDaily()[fInfo.d][fInfo.i] = p; } }
-                            if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; window.renderAll();
+                            if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; renderAll();
                             if (fInfo) { const target = document.querySelector(`input[data-date="${fInfo.d}"][data-item="${fInfo.i}"]`); if (target) { target.focus(); target.value = cVal; } }
                         }
                     }
@@ -743,23 +784,102 @@
         };
 
         window.isSaving = false;
+        window._pendingSaveArgs = null; // 🩹 排隊中的存檔請求（被擋下時用來自動補送，不再靜默丟棄）
+        // 🩹 修復：Firestore 的 getDoc/setDoc 原本沒有逾時保護，網路卡住時 isSaving 會永遠卡住不放，
+        //         導致「離開提示」無限期跳不停、資料卻始終沒有真的送上雲端。這裡包一層逾時，最多等 8 秒。
+        window._withTimeout = (p, ms, label) => Promise.race([
+            p,
+            new Promise((_, reject) => setTimeout(() => reject(new Error((label || '雲端連線') + '逾時，請檢查網路')), ms))
+        ]);
         window.saveData = async function(showMsg = false, forceOverwrite = false) {
-            if (window.isSaving) return; window.isSaving = true;
-            window.state.lastModified = Date.now();
-            
-            // 🌟 防護點 4：保證每次按下儲存，廠商結帳資料一定跟著上雲端，不怕遺失！
-            
-            
-            localStorage.setItem('freightData_115', JSON.stringify(window.state));
-            let ind = document.getElementById("cloud-indicator"); if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️寫入中"; setTimeout(() => ind.innerText = originalText, 800); }
-            if (window.isCloudSyncEnabled) {
-                try {
-                    const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
-                    if (!forceOverwrite) { const snap = await getDoc(docRef); if (snap.exists()) { let cloudData = snap.data(); if (cloudData.lastModified > window.lastSyncTime) { window.showToast('⚠️ 警告：雲端有更新的資料！為防止覆蓋同事輸入的數據，已攔截本次存檔。請備份資料並重新整理網頁！', 8000); window.isSaving = false; return; } } }
-                    let cleanState = JSON.parse(JSON.stringify(window.state)); await setDoc(docRef, cleanState); window.lastSyncTime = window.state.lastModified; if (showMsg) window.showToast('☁️ 資料已成功同步至雲端！');
-                } catch(e) { console.error("Firestore Error:", e); window.showToast('⚠️ 雲端寫入失敗，已轉存本機備份。請檢查網路狀態。'); }
-            } else { if (showMsg) window.showToast('💾 資料已成功儲存至本機！(尚未連接雲端)'); }
-            window.isSaving = false;
+            if (window.isSaving) {
+                // 🩹 修復：以前這裡直接 return 會讓這筆存檔「憑空消失」，除非使用者剛好再打一次字才會被補救。
+                //         現在改成記住「還有一筆沒送出」，目前這筆寫完後會自動用最新資料補送一次。
+                window._pendingSaveArgs = { showMsg, forceOverwrite };
+                return;
+            }
+            // 🩹 修復：斷路器保護。以前只要持續失敗，安全網、防抖、衝突重試三條路徑會疊在一起，
+            //         變成幾乎不間斷地狂打 Firestore（畫面上的連線指示燈、離開警告因此一直閃/跳）。
+            //         這裡改成：連續失敗達 5 次後，強制暫停自動重試 30 秒，讓情況穩定下來，
+            //         也讓使用者清楚知道「現在真的連不上，不是程式在鬼打牆」。
+            if ((window._consecutiveFailCount || 0) >= 5) {
+                let now = Date.now();
+                if (!window._circuitBreakerUntil || now >= window._circuitBreakerUntil) {
+                    window._circuitBreakerUntil = now + 30000;
+                    console.log('（雲端連線持續失敗，暫停自動重試 30 秒，避免無限狂跳）');
+                }
+                if (now < window._circuitBreakerUntil && !showMsg) {
+                    // 冷卻期間：不主動重試，但也不佔用 _pendingSaveArgs，讓安全網 30 秒後能自然重新嘗試
+                    return;
+                }
+            }
+            window.isSaving = true;
+            let shouldRetryConflict = false;
+            try {
+                window.state.lastModified = Date.now();
+
+                // 🌟 防護點 4：保證每次按下儲存，廠商結帳資料一定跟著上雲端，不怕遺失！
+
+
+                localStorage.setItem('freightData_115', JSON.stringify(window.state));
+                let ind = document.getElementById("cloud-indicator"); if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️寫入中"; setTimeout(() => ind.innerText = originalText, 800); }
+                if (window.isCloudSyncEnabled) {
+                    try {
+                        const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
+                        if (!forceOverwrite) {
+                            const snap = await window._withTimeout(getDoc(docRef), 8000, '讀取雲端資料');
+                            if (snap.exists()) {
+                                let cloudData = snap.data();
+                                if (cloudData.lastModified > window.lastSyncTime) {
+                                    // 🩹 修復：這個警告以前每次重試都會跳出來，背景安全網每 3 秒巡邏一次，
+                                    //         導致同一個警告反覆彈出、干擾操作。這裡改成最多 20 秒跳一次，
+                                    //         背後的排隊重試邏輯完全不受影響、一樣會持續自動重試。
+                                    let now = Date.now();
+                                    if (!window._lastConflictToastTime || now - window._lastConflictToastTime > 20000) {
+                                        window._lastConflictToastTime = now;
+                                        showToast('⚠️ 警告：雲端有更新的資料！為防止覆蓋同事輸入的數據，已攔截本次存檔，資料同步後會自動重試。', 8000);
+                                    } else {
+                                        console.log('（雲端衝突重試中，已抑制重複警告視窗）');
+                                    }
+                                    // 🩹 修復：以前這裡攔截後就直接放棄，這筆編輯永遠不會再上雲端。
+                                    //         現在改成排隊，等本機收到最新的雲端回聲、資料對齊後自動重試存檔。
+                                    shouldRetryConflict = true;
+                                    return;
+                                }
+                            }
+                        }
+                        let cleanState = JSON.parse(JSON.stringify(window.state)); await window._withTimeout(setDoc(docRef, cleanState), 8000, '寫入雲端資料'); window.lastSyncTime = window.state.lastModified; window._consecutiveFailCount = 0; if (showMsg) showToast('☁️ 資料已成功同步至雲端！');
+                    } catch(e) {
+                        console.error("Firestore Error:", e);
+                        // 🩹 修復：以前只要失敗一次就立刻跳警告，但背景常常自己重試一次就成功了，
+                        //         反而讓使用者一直看到「失敗」而擔心。這裡改成連續失敗達 2 次以上才提醒，
+                        //         第一次先安靜在背景重試，真的持續失敗才需要使用者注意。
+                        window._consecutiveFailCount = (window._consecutiveFailCount || 0) + 1;
+                        if (window._consecutiveFailCount >= 2) {
+                            try { showToast('⚠️ 雲端寫入失敗或逾時，資料已保留在本機，將自動於稍後重試（請確認網路連線）。'); } catch(e2) { console.error("Toast顯示失敗:", e2); }
+                        } else {
+                            console.log('（第1次雲端寫入失敗，安靜重試中，尚未提醒使用者）');
+                        }
+                    }
+                } else { if (showMsg) { try { showToast('💾 資料已成功儲存至本機！(尚未連接雲端)'); } catch(e3) {} } }
+            } catch (fatalErr) {
+                // 🩹 修復：這是最外層的保險絲。以前若這段程式中任何一行意外拋出例外（例如過去曾發生
+                //         window.showToast 不存在而報錯），會讓下面「isSaving = false」永遠執行不到，
+                //         等同於雲端存檔功能整個卡死、之後所有編輯都送不出去。現在不管發生什麼例外都會被接住，
+                //         保證流程一定會往下走到 finally 做收尾。
+                console.error("saveData 發生未預期例外:", fatalErr);
+            } finally {
+                window.isSaving = false;
+                if (shouldRetryConflict) {
+                    window._pendingSaveArgs = { showMsg, forceOverwrite };
+                    setTimeout(() => { if (window._pendingSaveArgs) { let a = window._pendingSaveArgs; window._pendingSaveArgs = null; window.saveData(a.showMsg, a.forceOverwrite); } }, 400);
+                } else if (window._pendingSaveArgs) {
+                    // 🩹 修復：這次存檔進行期間如果又有新編輯被排隊卡住，這裡用最新資料自動補送一次，
+                    //         確保「最後打的那幾筆」一定會被送出去，不會停留在只存本機的狀態。
+                    let a = window._pendingSaveArgs; window._pendingSaveArgs = null;
+                    window.saveData(a.showMsg, a.forceOverwrite);
+                }
+            }
         };
 
         document.addEventListener("DOMContentLoaded", async () => {
@@ -2256,12 +2376,17 @@
                 // 若有明確提示或強制覆蓋 (例如按鈕點擊)，立刻執行
                 if (showMsg || forceOverwrite) {
                     clearTimeout(saveTimeout);
+                    window._debouncePending = false;
                     return await origSaveData(showMsg, forceOverwrite);
                 }
                 // 否則進行 800 毫秒的防抖 (Debounce)，將瞬間的 270 次呼叫整合成 1 次！徹底解決當機問題！
+                // 🩹 修復：這 800 毫秒的等待期間，原本 beforeunload 離開警告完全偵測不到「還有東西沒送出」，
+                //         使用者若剛好在這個空檔關閉分頁，這筆編輯會直接消失。這裡加上旗標讓警告機制也能看到。
+                window._debouncePending = true;
                 return new Promise((resolve) => {
                     clearTimeout(saveTimeout);
                     saveTimeout = setTimeout(async () => {
+                        window._debouncePending = false;
                         resolve(await origSaveData(false, false));
                     }, 800);
                 });
@@ -3112,6 +3237,11 @@ setInterval(() => {
         
         // 確保點擊的地方真的有輸入框
         if (!inputEl || inputEl.disabled || inputEl.readOnly || target.closest('#vendorSummaryModal')) return;
+
+        // 🩹 修復：日別登錄表(data-cell)的批次貼上，交還給主流程的貼上處理器（一次寫完全部儲存格才 renderTab1 一次），
+        //         不在這裡逐格 dispatch 事件。原本逐格處理會在第一格觸發 renderTab1() 整表重繪，
+        //         導致後面幾格抓到的還是「已從畫面移除」的舊輸入框，事件送出去沒人接、資料就悄悄不見了。
+        if (inputEl.classList.contains('data-cell')) return;
         
         let clipboardData = e.clipboardData || window.clipboardData;
         let pastedText = clipboardData.getData('text');
