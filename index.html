@@ -252,7 +252,7 @@
         <div class="actions">
             <label><strong>📅 月份：</strong></label><select id="monthSelect"></select><button id="btnAdminReport" onclick="window.openDailyReportSafe()" style="display: none; margin-left: 10px;" class="btn-admin-report">📋 三倉重點</button>
             
-            <button class="btn-success rw-only circle-btn" title="儲存同步" onclick="window.commitActiveInput(); if(document.activeElement &amp;&amp; document.activeElement.tagName==='INPUT') document.activeElement.blur(); saveData(true, true);">💾<br>儲存</button>
+            <button class="btn-success rw-only circle-btn" title="儲存同步" onclick="window.confirmSaveAndClose();">💾<br>儲存</button>
             <button class="btn-export circle-btn" title="匯出報表" onclick="exportCurrentPage()">📤<br>匯出</button>
             <input type="file" id="excelFile" accept=".xlsx, .xls" class="hidden">
             
@@ -549,6 +549,23 @@
         // 🩹 修復：離開頁面警告以前「只要當下有任何存檔在飛行中」就立刻跳出來，
         //         但正常存檔通常零點幾秒就完成，這樣反而讓使用者常常看到警告、誤以為出了問題不敢離開。
         //         這裡改成細緻追蹤「持續卡住多久」，只有真的卡超過 4 秒才需要提醒，短暫的正常等待不再打擾。
+        // 🩹 新功能：儲存按鈕改為「強制存檔並確認雲端寫入成功」，成功後在資料沒有再變動之前，
+        //         離開分頁不會再跳出瀏覽器警告——比照大家熟悉的「按儲存、安心關檔」習慣。
+        //         只要按下儲存之後又編輯了任何資料，這個「已確認」狀態就會自動失效，
+        //         離開警告會照常恢復保護，不會因此犧牲資料安全。
+        window.confirmSaveAndClose = async function() {
+            window.commitActiveInput();
+            if (document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
+            let targetTime = window.state.lastModified;
+            await window.saveData(false, true);
+            if (window.state.lastModified === targetTime && window.lastSyncTime >= targetTime) {
+                window._confirmedSavedLastModified = targetTime;
+                showToast('✅ 已儲存完成，可以安心離開！（若之後又編輯資料，離開前會再次提醒）');
+            } else {
+                showToast('⚠️ 儲存尚未完全確認，請稍候片刻再嘗試離開。');
+            }
+        };
+
         window._pendingSinceTime = null;
         setInterval(() => {
             let pending = window.isSaving || window._pendingSaveArgs || window._debouncePending;
@@ -561,6 +578,11 @@
 
         window.addEventListener('beforeunload', (e) => {
             if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem('freightData_115', JSON.stringify(state)); }
+            // 🩹 新功能：若使用者剛按過「儲存」且已確認成功寫入雲端，期間資料沒有再變動過，
+            //         直接放行、不再跳出離開警告——符合「按儲存＝可以安心關檔」的直覺。
+            if (window._confirmedSavedLastModified != null && window.state && window.state.lastModified === window._confirmedSavedLastModified) {
+                return;
+            }
             // 🩹 修復：若雲端寫入「持續卡住超過 4 秒」還沒完成，離開就有真的遺失的風險，
             //         這時才跳出離開前的確認提示；短暫的正常寫入（通常不到 1 秒）不再跳出警告，
             //         這樣看到警告時才代表真的要多等一下，看不到警告就代表已經寫完了。
