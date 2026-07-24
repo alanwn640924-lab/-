@@ -556,10 +556,13 @@
         window.confirmSaveAndClose = async function() {
             window.commitActiveInput();
             if (document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
-            let targetTime = window.state.lastModified;
             await window.saveData(false, true);
-            if (window.state.lastModified === targetTime && window.lastSyncTime >= targetTime) {
-                window._confirmedSavedLastModified = targetTime;
+            // 🩹 修復：saveData 本身在存檔一開始就會自動推進 lastModified 時間戳記（這是正常機制，
+            //         用來標記「這是最新一批要存的資料」），所以不能拿「存檔前」記下的舊時間點來比對，
+            //         那樣一定對不上，導致成功提示永遠跳不出來。正確做法是存檔完成後，
+            //         直接看「雲端確認同步的時間」是否等於「目前資料的時間」——相等就代表真的存好了。
+            if (window.lastSyncTime === window.state.lastModified) {
+                window._confirmedSavedLastModified = window.state.lastModified;
                 showToast('✅ 已儲存完成，可以安心離開！（若之後又編輯資料，離開前會再次提醒）');
             } else {
                 showToast('⚠️ 儲存尚未完全確認，請稍候片刻再嘗試離開。');
