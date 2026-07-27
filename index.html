@@ -812,11 +812,17 @@
         window._pendingSaveArgs = null; // 🩹 排隊中的存檔請求（被擋下時用來自動補送，不再靜默丟棄）
         // 🩹 修復：Firestore 的 getDoc/setDoc 原本沒有逾時保護，網路卡住時 isSaving 會永遠卡住不放，
         //         導致「離開提示」無限期跳不停、資料卻始終沒有真的送上雲端。這裡包一層逾時，最多等 8 秒。
-        window._withTimeout = (p, ms, label) => {
+        window._withTimeout = (p, ms, label, onLateSuccess) => {
             // 🔍 診斷用：就算已經先判定逾時往下走，背後真正的 Firestore 請求還是會繼續等它落地，
             //         等到真正成功或失敗時，把「真實原因」補印在主控台，方便排查為什麼一直卡住。
+            //         🩹 修復：以前「慢但最終成功」的情況，因為主線程已經先判定逾時失敗，
+            //         程式完全不知道它後來其實成功了，導致一直誤判成沒同步。現在補上 onLateSuccess，
+            //         讓這種「慢一點但真的成功了」的情況也能正確記錄同步狀態。
             p.then(
-                () => console.log(`（🔍診斷：「${label}」背後的真實請求，其實在逾時之後才成功回來了）`),
+                (result) => {
+                    console.log(`（🔍診斷：「${label}」背後的真實請求，其實在逾時之後才成功回來了）`);
+                    if (typeof onLateSuccess === 'function') { try { onLateSuccess(result); } catch(e) {} }
+                },
                 (realErr) => console.error(`🔍診斷：「${label}」背後真正失敗的原因是 →`, realErr && realErr.code, realErr && realErr.message, realErr)
             ).catch(() => {});
             return Promise.race([
@@ -860,7 +866,7 @@
                     try {
                         const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
                         if (!forceOverwrite) {
-                            const snap = await window._withTimeout(getDoc(docRef), 8000, '讀取雲端資料');
+                            const snap = await window._withTimeout(getDoc(docRef), 15000, '讀取雲端資料');
                             if (snap.exists()) {
                                 let cloudData = snap.data();
                                 if (cloudData.lastModified > window.lastSyncTime) {
@@ -881,7 +887,14 @@
                                 }
                             }
                         }
-                        let cleanState = JSON.parse(JSON.stringify(window.state)); await window._withTimeout(setDoc(docRef, cleanState), 8000, '寫入雲端資料'); window.lastSyncTime = window.state.lastModified; window._consecutiveFailCount = 0; if (showMsg) showToast('☁️ 資料已成功同步至雲端！');
+                        let cleanState = JSON.parse(JSON.stringify(window.state));
+                        let writeStartTime = window.state.lastModified;
+                        await window._withTimeout(setDoc(docRef, cleanState), 20000, '寫入雲端資料', () => {
+                            // 🩹 修復：這筆寫入「慢但最終成功」，補記錄同步狀態，避免程式一直誤判成沒同步過。
+                            if ((window.lastSyncTime || 0) < writeStartTime) window.lastSyncTime = writeStartTime;
+                            window._consecutiveFailCount = 0;
+                        });
+                        window.lastSyncTime = window.state.lastModified; window._consecutiveFailCount = 0; if (showMsg) showToast('☁️ 資料已成功同步至雲端！');
                     } catch(e) {
                         console.error("Firestore Error:", e);
                         // 🩹 修復：以前只要失敗一次就立刻跳警告，但背景常常自己重試一次就成功了，
