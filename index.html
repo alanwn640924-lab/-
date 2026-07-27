@@ -812,10 +812,18 @@
         window._pendingSaveArgs = null; // 🩹 排隊中的存檔請求（被擋下時用來自動補送，不再靜默丟棄）
         // 🩹 修復：Firestore 的 getDoc/setDoc 原本沒有逾時保護，網路卡住時 isSaving 會永遠卡住不放，
         //         導致「離開提示」無限期跳不停、資料卻始終沒有真的送上雲端。這裡包一層逾時，最多等 8 秒。
-        window._withTimeout = (p, ms, label) => Promise.race([
-            p,
-            new Promise((_, reject) => setTimeout(() => reject(new Error((label || '雲端連線') + '逾時，請檢查網路')), ms))
-        ]);
+        window._withTimeout = (p, ms, label) => {
+            // 🔍 診斷用：就算已經先判定逾時往下走，背後真正的 Firestore 請求還是會繼續等它落地，
+            //         等到真正成功或失敗時，把「真實原因」補印在主控台，方便排查為什麼一直卡住。
+            p.then(
+                () => console.log(`（🔍診斷：「${label}」背後的真實請求，其實在逾時之後才成功回來了）`),
+                (realErr) => console.error(`🔍診斷：「${label}」背後真正失敗的原因是 →`, realErr && realErr.code, realErr && realErr.message, realErr)
+            ).catch(() => {});
+            return Promise.race([
+                p,
+                new Promise((_, reject) => setTimeout(() => reject(new Error((label || '雲端連線') + '逾時，請檢查網路')), ms))
+            ]);
+        };
         window.saveData = async function(showMsg = false, forceOverwrite = false) {
             if (window.isSaving) {
                 // 🩹 修復：以前這裡直接 return 會讓這筆存檔「憑空消失」，除非使用者剛好再打一次字才會被補救。
