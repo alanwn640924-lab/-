@@ -1757,7 +1757,7 @@
                 wb.SheetNames.forEach(sn => { 
                     let js=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1, raw: true}), rI={}, cI={}, rD={}, cD={}, hd=new Set(), maxC=Math.max(...js.map(r=>r?r.length:0));
                     let getM = s => { let m=['主線','爆量自揹','爆量自背','爆量','加派','回頭收','店回','回收','特殊','新開店','離島','轉運','B2C','C2C','其他', '違規罰款'].find(k=>s.includes(k)); if(m==='爆量自背')return'爆量自揹'; if(m==='加派')return'爆量'; if(m==='店回')return'回頭收'; if(m==='B2C'||(s.includes('上收')&&!s.includes('C2C')))return'B2C'; return m||""; };
-                    let scan = (max, isR) => { let lastM=""; for(let i=0;i<max;i++){ let s=""; for(let j=0;j<5;j++){ let v=isR?js[i]?.[j]:js[j]?.[i]; if(v!=null&&v!==''){ let vs=String(v).trim(); if(isNaN(parseFloat(vs))||vs.includes('C')) s+=vs; } } if(s){ let m=getM(s); if(m) lastM=m; let eff=lastM&&/費用|趟次|金額|運費|成本|車|條|件數/.test(s)&&!s.includes(lastM)?lastM+s:s, match=findItem(eff, items); if(match){ if(isR)rI[i]=match; else cI[i]=match; } } } };
+                    let scan = (max, isR) => { let lastM=""; for(let i=0;i<max;i++){ let s=""; for(let j=0;j<5;j++){ let v=isR?js[i]?.[j]:js[j]?.[i]; if(v!=null&&v!==''){ let vs=String(v).trim(); if(isNaN(parseFloat(vs))||vs.includes('C')) s+=vs; } } if(s){ if(/小計|合計/.test(s)) continue; let m=getM(s); if(m) lastM=m; let eff=lastM&&/費用|趟次|金額|運費|成本|車|條|件數/.test(s)&&!s.includes(lastM)?lastM+s:s, match=findItem(eff, items); if(match){ if(isR)rI[i]=match; else cI[i]=match; } } } };
                     scan(js.length, true); scan(maxC, false);
                     for(let r=0;r<js.length;r++) for(let c=0;c<(js[r]?.length||0);c++) { let d=extractDate(js[r][c], state.currentMonth); if(d){rD[r]=d; cD[c]=d; hd.add(`${r}-${c}`);} }
                     for(let r=0;r<js.length;r++) for(let c=0;c<(js[r]?.length||0);c++) { 
@@ -1788,7 +1788,7 @@
                 if (dateIdx === -1 || reasonIdx === -1 || costIdx === -1) { showToast('⚠️ 找不到必要的欄位(進貨日/派車原因/費用小計)，請確認檔案格式！'); document.getElementById('dispatchExcelFile').value = ''; return; }
 
                 let cnt = 0, tempData = { '大肚': {}, '大溪': {}, '岡山': {} }, skippedRows = new Set(), validDates = new Set();
-                let trackingItems = ['爆量自揹', '爆量自揹費用', '爆量趟次', '爆量費用', '回收趟次', '回收費用', '回頭收趟次', '回頭收費用', 'B2C回頭趟次', 'B2C回頭費用', 'B2C專車趟次', 'B2C專車費用', 'C2C回頭趟次', 'C2C回頭費用', 'C2C專車趟次', 'C2C回頭趟次', '特殊點專車', '特殊點專車費用', '新開店', '新開店費用', '違規罰款', '其他專車', '其他專車費用', '離島', '離島費用', '轉運', '轉運費用'];
+                let trackingItems = ['爆量自揹', '爆量自揹費用', '爆量趟次', '爆量費用', '回收趟次', '回收費用', '回頭收趟次', '回頭收費用', 'B2C回頭趟次', 'B2C回頭費用', 'B2C專車趟次', 'B2C專車費用', 'C2C回頭趟次', 'C2C回頭費用', 'C2C專車趟次', 'C2C專車費用', '特殊點專車', '特殊點專車費用', '新開店', '新開店費用', '違規罰款', '其他專車', '其他專車費用', '離島', '離島費用', '轉運', '轉運費用'];
 
                 for (let i = 1; i < js.length; i++) {
                     let row = js[i]; if (!row || row.length === 0) continue;
