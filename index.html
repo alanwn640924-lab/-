@@ -331,7 +331,16 @@
     <div id="tab6" class="tab-content">
         <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button style="background: #17a2b8; color: white;" onclick="window.exportEstActual()">📥 下載預估實績表 (.xlsx)</button>
+            <button style="background: #6f42c1; color: white;" onclick="window.generateAIForecast()">🤖 一鍵生成整月預估</button>
+            <button id="btnDownloadAIForecast" style="background: #20c997; color: white;" disabled onclick="window.downloadAIForecastDetail()">📥 下載整月預估明細(日別格式)</button>
             <span style="font-size: 13px; color: #666; font-weight: bold;">※ 提示：於日別登錄未來格填寫會自動判定為預估。</span>
+        </div>
+        <div id="aiForecastPanel" style="display:none; margin-bottom:20px; background:#f8f5ff; border:1px solid #d8c8f0; border-radius:8px; padding:15px;">
+            <div id="aiForecastMeta" style="font-size:13px; color:#5a3d99; font-weight:bold; margin-bottom:10px;"></div>
+            <div class="table-container" style="max-height:520px; overflow:auto; border:1px solid #d8c8f0;">
+                <table id="aiForecastSummaryTable" style="width:100%; border-collapse:collapse;"></table>
+            </div>
+            <div style="font-size:12px; color:#888; margin-top:8px; line-height:1.5;">🤖 AI預估邏輯：自動抓取本倉近3個月同星期別的實際費用與相關件數/趟次，換算「單位費用」後，依本月各日星期別推算每日費用，可反映週間費用起伏；預估結果僅供月初試算各科目與預算落差、判斷是否需要調整動支使用，<b>不會覆蓋或影響日別登錄表的實際登打資料</b>。</div>
         </div>
         <div class="table-container" style="max-height: 65vh; overflow: auto; border:none;">
             <table id="estTable" style="width: 100%; max-width: 1000px; border-collapse: collapse;"></table>
@@ -1569,6 +1578,7 @@
         }
 
         function renderTab6() {
+            if (typeof window.refreshAIForecastPanel === 'function') window.refreshAIForecastPanel();
             let m = state.currentMonth, days = getDays(m), leftTotal = 0, today = new Date(), simTodayStr = `${YEAR}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
             const EST_CATS = [ { label: '主線調節', budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { label: '爆量加派', budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { label: '店回專車', budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { label: '其他專車', budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { label: '違規罰款', budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, { label: '離島', budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { label: '轉運', budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
 
@@ -1613,14 +1623,14 @@
             for (let i = 0; i < maxRows; i++) {
                 let row = ["", "", "", "", "", "", "", ""]; 
                 if (i === 0) { row[0] = '日期'; row[1] = '星期'; row[2] = '配送'; } 
-                else if (i >= 1 && i <= leftData.length) { let d = leftData[i - 1]; row[0] = d.dateFull; row[1] = d.dow; row[2] = (d.isEstimate && d.cost === 0) ? null : d.cost; } 
+                else if (i >= 1 && i <= leftData.length) { let d = leftData[i - 1]; row[0] = d.dateFull; row[1] = d.dow; row[2] = (d.isEstimate && d.cost === 0) ? '' : d.cost; } 
                 else if (i === leftData.length + 1) { row[0] = '預算目標'; row[2] = totalBudget; } else if (i === leftData.length + 2) { row[0] = '實績'; row[2] = leftTotal; } else if (i === leftData.length + 3) { row[0] = '差異'; row[2] = leftDiff; } else if (i === leftData.length + 4) { row[0] = '動支率'; row[2] = leftRate; }
                 if (i < rightData.length) { row[4] = rightData[i].cat; row[5] = rightData[i].diff; row[6] = rightData[i].note; } else if (i === rightData.length) { row[4] = '合計'; row[5] = totalDiff; } else if (i === rightData.length + 1) { row[4] = '數值需等於實績差異(綠底)'; rightNoteRowIdx = i + 1; }
                 aoa.push(row);
             }
 
             let ws = XLSX.utils.aoa_to_sheet(aoa); ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:1}}]; 
-            for(let j = leftData.length + 1; j <= leftData.length + 4; j++) ws['!merges'].push({s:{r:j, c:0}, e:{r:j, c:1}});
+            for(let j = leftData.length + 2; j <= leftData.length + 5; j++) ws['!merges'].push({s:{r:j, c:0}, e:{r:j, c:1}});
             if (rightNoteRowIdx > -1) ws['!merges'].push({s:{r:rightNoteRowIdx, c:4}, e:{r:rightNoteRowIdx, c:6}});
             ws['!cols'] = [{wch:15}, {wch:8}, {wch:12}, {wch:4}, {wch:15}, {wch:12}, {wch:50}, {wch:25}];
 
@@ -1631,16 +1641,207 @@
                 if (R === 0 && [0,1,2,4,5,6,7].includes(C)) { cell.s.fill = { fgColor: { rgb: "2F5597" } }; cell.s.font = { bold: true, color: { rgb: "FFFFFF" } }; }
                 if (R === 1 && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "DDEBF7" } }; cell.s.font = { bold: true, color: { rgb: "000000" } }; }
                 if (C === 6 && R > 0) cell.s.alignment.horizontal = "left"; if ((C === 7 && R > 0) || C === 3) cell.s.border = {}; 
-                if ([leftData.length+1, leftData.length+2].includes(R) && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "DDEBF7" } }; cell.s.font = { bold: true }; }
-                if (R === leftData.length+3 && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "E2EFDA" } }; cell.s.font = { bold: true }; }
-                if (R === leftData.length+4 && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "FFF2CC" } }; cell.s.font = { bold: true }; }
-                if (R >= 2 && R <= leftData.length && C === 2 && leftData[R-1].isEstimate && leftData[R-1].cost !== 0) { cell.s.fill = { fgColor: { rgb: "FFF2CC" } }; cell.s.font = { color: { rgb: "B38000" }, bold: true }; }
+                if ([leftData.length+2, leftData.length+3].includes(R) && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "DDEBF7" } }; cell.s.font = { bold: true }; }
+                if (R === leftData.length+4 && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "E2EFDA" } }; cell.s.font = { bold: true }; }
+                if (R === leftData.length+5 && [0,1,2].includes(C)) { cell.s.fill = { fgColor: { rgb: "FFF2CC" } }; cell.s.font = { bold: true }; }
+                if (R >= 2 && R <= leftData.length + 1 && C === 2 && leftData[R-2].isEstimate && leftData[R-2].cost !== 0) { cell.s.fill = { fgColor: { rgb: "FFF2CC" } }; cell.s.font = { color: { rgb: "B38000" }, bold: true }; }
                 if (rightNoteRowIdx > -1 && R >= rightNoteRowIdx && C >= 4) { cell.s.border = {}; if (R === rightNoteRowIdx && C === 4) { cell.s.font = { color: { rgb: "555555" } }; cell.s.border.bottom = { style: 'thin' }; } }
-                if (R > leftData.length + 4 && C <= 2) cell.s.border = {}; 
+                if (R > leftData.length + 5 && C <= 2) cell.s.border = {}; 
                 if (R === rightData.length + 1 && C === 5) { cell.s.fill = { fgColor: { rgb: "E2EFDA" } }; cell.s.font = { bold: true }; }
             }
 
             let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${m}月預估實績`); XLSX.writeFile(wb, `${YEAR}${String(m).padStart(2,'0')}_${window.currentWarehouse}倉_預估實績.xlsx`); showToast('📥 預估實績表已成功匯出！');
+        };
+
+        // ============================================================
+        // 🤖 AI 一鍵生成整月預估（依星期別費用起伏 + 歷史類似件數比對推算）
+        // ============================================================
+        const AI_FORECAST_COST_ITEMS = ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款','離島費用','轉運費用','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用'];
+        const AI_FORECAST_COUNT_ITEMS = ['預算件數','出貨件數','回收件數','主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店','離島','轉運','上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次'];
+        const AI_FORECAST_DRIVER_MAP = { '主線費用':'主線條數', '爆量費用':'爆量趟次', '爆量自揹費用':'爆量自揹', '回收費用':'回收趟次', '回頭收費用':'回頭收趟次', '其他專車費用':'其他專車', '特殊點專車費用':'特殊點專車', '新開店費用':'新開店', '離島費用':'離島', '轉運費用':'轉運', 'B2C專車費用':'B2C專車趟次', 'B2C回頭費用':'B2C回頭趟次', 'C2C專車費用':'C2C專車趟次', 'C2C回頭費用':'C2C回頭趟次' };
+        window.__aiForecastCache = window.__aiForecastCache || {}; // { [wh]: { [m]: { forecast, model, monthsUsed, generatedAt } } }
+
+        function aiFindHistoricalMonths(daily, m, maxMonths = 3) {
+            let found = [];
+            for (let mm = m - 1; mm >= 1 && found.length < maxMonths; mm--) {
+                let hasData = getDays(mm).some(d => daily[d.dateStr] && Object.keys(daily[d.dateStr]).length > 0);
+                if (hasData) found.push(mm);
+            }
+            return found; // 由近至遠，如 [7,6,5]
+        }
+
+        function aiWeekdayWeightedStats(samples) {
+            // samples: [{dow, val, weight}]
+            let byDow = {}, totalSum = 0, totalW = 0;
+            samples.forEach(s => { if(!byDow[s.dow]) byDow[s.dow] = {sum:0, wsum:0}; byDow[s.dow].sum += s.val * s.weight; byDow[s.dow].wsum += s.weight; totalSum += s.val * s.weight; totalW += s.weight; });
+            let overallAvg = totalW > 0 ? totalSum / totalW : 0, dowAvg = {};
+            for (let dow = 0; dow < 7; dow++) dowAvg[dow] = (byDow[dow] && byDow[dow].wsum > 0) ? (byDow[dow].sum / byDow[dow].wsum) : overallAvg;
+            return { dowAvg, overallAvg, sampleCount: samples.length };
+        }
+
+        function buildAIForecastModel(wh, m) {
+            let daily = state.warehouses[wh].daily;
+            let monthsUsed = aiFindHistoricalMonths(daily, m, 3);
+            let weights = {}; monthsUsed.forEach((mm, idx) => weights[mm] = monthsUsed.length - idx); // 越近權重越高：3,2,1
+
+            function collect(item) {
+                let out = [];
+                monthsUsed.forEach(mm => getDays(mm).forEach(d => {
+                    let v = daily[d.dateStr]?.[item];
+                    if (v !== undefined && v !== null && v !== '') out.push({ dow: d.dow, val: Number(v), weight: weights[mm] });
+                }));
+                return out;
+            }
+
+            let model = { monthsUsed, countModel: {}, costModel: {} };
+            AI_FORECAST_COUNT_ITEMS.forEach(item => { model.countModel[item] = aiWeekdayWeightedStats(collect(item)); });
+
+            AI_FORECAST_COST_ITEMS.forEach(item => {
+                let driver = AI_FORECAST_DRIVER_MAP[item];
+                if (driver) {
+                    let pairs = [];
+                    monthsUsed.forEach(mm => getDays(mm).forEach(d => {
+                        let c = daily[d.dateStr]?.[item], q = daily[d.dateStr]?.[driver];
+                        if (c !== undefined && c !== null && c !== '' && q !== undefined && q !== null && Number(q) > 0) pairs.push({ dow: d.dow, val: Number(c) / Number(q), weight: weights[mm] });
+                    }));
+                    let unitStats = aiWeekdayWeightedStats(pairs);
+                    model.costModel[item] = { type: 'driver', driver, unitStats };
+                } else {
+                    model.costModel[item] = { type: 'direct', stats: aiWeekdayWeightedStats(collect(item)) };
+                }
+            });
+            return model;
+        }
+
+        function runAIForecastForMonth(wh, m) {
+            let model = buildAIForecastModel(wh, m), days = getDays(m), forecast = {};
+            days.forEach(d => {
+                forecast[d.dateStr] = {};
+                AI_FORECAST_COUNT_ITEMS.forEach(item => { forecast[d.dateStr][item] = Math.max(0, Math.round(model.countModel[item].dowAvg[d.dow] || 0)); });
+                AI_FORECAST_COST_ITEMS.forEach(item => {
+                    let cm = model.costModel[item], val = 0;
+                    if (cm.type === 'driver') {
+                        let qty = forecast[d.dateStr][cm.driver] ?? 0;
+                        let unit = cm.unitStats.dowAvg[d.dow] || cm.unitStats.overallAvg || 0;
+                        val = qty * unit;
+                    } else { val = cm.stats.dowAvg[d.dow] || 0; }
+                    forecast[d.dateStr][item] = Math.round(Math.max(0, val));
+                });
+            });
+            return { forecast, model, monthsUsed: model.monthsUsed };
+        }
+
+        window.generateAIForecast = () => {
+            let wh = window.currentWarehouse, m = state.currentMonth;
+            let daily = state.warehouses[wh].daily;
+            let monthsUsed = aiFindHistoricalMonths(daily, m, 3);
+            if (monthsUsed.length === 0) { showToast('⚠️ 查無前幾個月的實績資料，無法產生AI預估！'); return; }
+            let result = runAIForecastForMonth(wh, m);
+            window.__aiForecastCache[wh] = window.__aiForecastCache[wh] || {};
+            window.__aiForecastCache[wh][m] = { ...result, generatedAt: Date.now() };
+            showToast(`🤖 已依 ${monthsUsed.map(x=>x+'月').join('、')} 實績資料，產生 ${m}月 整月每日預估！`);
+            renderAIForecastSummary();
+        };
+
+        function renderAIForecastSummary() {
+            let wh = window.currentWarehouse, m = state.currentMonth;
+            let cache = window.__aiForecastCache[wh]?.[m];
+            let panel = document.getElementById('aiForecastPanel'), metaEl = document.getElementById('aiForecastMeta'), tblEl = document.getElementById('aiForecastSummaryTable'), dlBtn = document.getElementById('btnDownloadAIForecast');
+            if (!panel) return;
+            if (!cache) { panel.style.display = 'none'; if (dlBtn) dlBtn.disabled = true; return; }
+
+            const EST_CATS = [ { budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, { budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
+            let days = getDays(m), totalBudget = 0, totalForecast = 0, rows = [];
+            EST_CATS.forEach(cat => {
+                let b = getBudget()[m]?.[cat.budgetKey] || 0, f = 0;
+                days.forEach(d => cat.items.forEach(i => { f += Number(cache.forecast[d.dateStr]?.[i] || 0); }));
+                totalBudget += b; totalForecast += f;
+                rows.push({ cat: cat.budgetKey, budget: b, forecast: f, diff: f - b, rate: b > 0 ? (f / b * 100) : (f > 0 ? null : 0) });
+            });
+            let totalDiff = totalForecast - totalBudget, totalRate = totalBudget > 0 ? (totalForecast / totalBudget * 100) : (totalForecast > 0 ? null : 0);
+
+            metaEl.innerText = `📅 ${m}月整月預估｜依據 ${cache.monthsUsed.map(x=>x+'月').join('、')} 歷史實績（同星期別＋類似件數換算單位費用）自動試算　｜產生時間：${new Date(cache.generatedAt).toLocaleString('zh-TW')}`;
+
+            const COLW = '16.66%';
+            let html = `<colgroup><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"></colgroup>
+            <thead><tr>
+                <th style="background:#5a3d99; color:#fff; border:1px solid #d8c8f0; padding:8px; text-align:center;">差異科目</th>
+                <th style="background:#5a3d99; color:#fff; border:1px solid #d8c8f0; padding:8px; text-align:center;">預算目標</th>
+                <th style="background:#5a3d99; color:#fff; border:1px solid #d8c8f0; padding:8px; text-align:center;">🤖AI整月預估合計</th>
+                <th style="background:#5a3d99; color:#fff; border:1px solid #d8c8f0; padding:8px; text-align:center;">預估差異(超支為紅)</th>
+                <th style="background:#5a3d99; color:#fff; border:1px solid #d8c8f0; padding:8px; text-align:center;">動支率</th>
+                <th style="background:#5a3d99; color:#fff; border:1px solid #d8c8f0; padding:8px; text-align:center;">是否需調整動支</th>
+            </tr></thead><tbody>`;
+            rows.forEach(r => {
+                let overBudget = r.diff > 0;
+                html += `<tr>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold;">${r.cat}</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right;">${formatVal(r.budget,'cost')}</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:#5a3d99;">${formatVal(r.forecast,'cost')}</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${overBudget?'#dc3545':'#28a745'};">${formatVal(r.diff,'cost')}</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${r.rate!=null && r.rate>100 ? '#dc3545' : '#333'};">${r.rate!=null ? formatVal(r.rate,'rate') : '—'}</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold; color:${overBudget?'#dc3545':'#28a745'};">${overBudget ? '⚠️ 建議確認調整' : '✅ 尚在預算內'}</td>
+                </tr>`;
+            });
+            html += `<tr style="background:#efe6fb;">
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold;">合計</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold;">${formatVal(totalBudget,'cost')}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:#5a3d99;">${formatVal(totalForecast,'cost')}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${totalDiff>0?'#dc3545':'#28a745'};">${formatVal(totalDiff,'cost')}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${totalRate!=null && totalRate>100 ? '#dc3545' : '#333'};">${totalRate!=null ? formatVal(totalRate,'rate') : '—'}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold; color:${totalDiff>0?'#dc3545':'#28a745'};">${totalDiff>0 ? '⚠️ 整月預估超出預算' : '✅ 整月預估在預算內'}</td>
+            </tr>`;
+            tblEl.style.tableLayout = 'fixed';
+            tblEl.innerHTML = html + '</tbody>';
+            panel.style.display = 'block';
+            if (dlBtn) dlBtn.disabled = false;
+        }
+
+        window.refreshAIForecastPanel = () => {
+            let wh = window.currentWarehouse, m = state.currentMonth, cache = window.__aiForecastCache[wh]?.[m];
+            if (cache) renderAIForecastSummary(); else { let panel = document.getElementById('aiForecastPanel'); if (panel) panel.style.display = 'none'; let dlBtn = document.getElementById('btnDownloadAIForecast'); if (dlBtn) dlBtn.disabled = true; }
+        };
+
+        window.downloadAIForecastDetail = () => {
+            let wh = window.currentWarehouse, m = state.currentMonth, cache = window.__aiForecastCache[wh]?.[m];
+            if (!cache) { showToast('⚠️ 請先點擊「一鍵生成整月預估」！'); return; }
+            let days = getDays(m);
+            let forecastGroups = [
+                { name: '【件數統計】', items: ['預算件數','出貨件數','回收件數'] },
+                { name: '【夜配】趟次與數量', items: ['主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店','離島','轉運'] },
+                { name: '【夜配】費用金額', items: ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款','離島費用','轉運費用'], subtotalLabel: '每日小計' },
+                { name: '【上收/商流】趟次與費用', items: ['上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用'], subtotalLabel: '費用合計', subtotalFilter: i => i.includes('費用') }
+            ];
+            let header = ['營運項目 / 日期', ...days.map(d => `${m}/${parseInt(d.dateStr.split('-')[2])}(${DOW_LABELS[d.dow]})`), '月合計'];
+            let aoa = [header], subtotalRowIdxs = [];
+            forecastGroups.forEach(g => {
+                aoa.push([g.name, ...days.map(() => null), null]);
+                let dayTotals = days.map(() => 0), monthGrandTotal = 0;
+                g.items.forEach(item => {
+                    let sum = 0, row = [item], isSub = g.subtotalFilter ? g.subtotalFilter(item) : true;
+                    days.forEach((d, di) => { let v = cache.forecast[d.dateStr]?.[item] || 0; sum += v; row.push(v); if (isSub) dayTotals[di] += v; });
+                    row.push(sum);
+                    aoa.push(row);
+                });
+                if (g.subtotalLabel) {
+                    monthGrandTotal = dayTotals.reduce((a,b)=>a+b, 0);
+                    subtotalRowIdxs.push(aoa.length);
+                    aoa.push([g.subtotalLabel, ...dayTotals, monthGrandTotal]);
+                }
+            });
+            let ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!cols'] = [{ wch: 14 }, ...days.map(()=>({wch:9})), { wch: 10 }];
+            let mergeIdx = 1;
+            forecastGroups.forEach((g) => { let rowIdx = mergeIdx; ws['!merges'] = ws['!merges'] || []; ws['!merges'].push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: header.length - 1 } }); mergeIdx += 1 + g.items.length + (g.subtotalLabel ? 1 : 0); });
+            for (let c in ws) {
+                if (c[0] === '!') continue; let cell = ws[c], ref = XLSX.utils.decode_cell(c);
+                cell.s = { alignment: { vertical: 'center', horizontal: ref.c === 0 ? 'left' : 'center' }, border: { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} } };
+                if (ref.r === 0) { cell.s.fill = { fgColor: { rgb: '6F42C1' } }; cell.s.font = { bold: true, color: { rgb: 'FFFFFF' } }; }
+                if (subtotalRowIdxs.includes(ref.r)) { cell.s.fill = { fgColor: { rgb: 'D4EDDA' } }; cell.s.font = { bold: true, color: { rgb: '155724' } }; }
+            }
+            let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${m}月AI預估明細`);
+            XLSX.writeFile(wb, `${YEAR}${String(m).padStart(2,'0')}_${wh}倉_AI整月預估明細.xlsx`);
+            showToast('📥 整月AI預估明細已下載！可與日別登錄表下載檔於月底進行比對。');
         };
 
         function exportCurrentPage() {
