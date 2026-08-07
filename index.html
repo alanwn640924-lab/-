@@ -335,6 +335,80 @@
             <button id="btnDownloadAIForecast" style="background: #20c997; color: white;" disabled onclick="window.downloadAIForecastDetail()">📥 下載整月預估明細(日別格式)</button>
             <span style="font-size: 13px; color: #666; font-weight: bold;">※ 提示：於日別登錄未來格填寫會自動判定為預估。</span>
         </div>
+        <div id="aiParamPanel" style="margin-bottom:15px; background:#fff8f0; border:1px solid #f0d8b8; border-radius:8px; padding:10px 15px; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+            <div style="font-size:13px; color:#8a6d3b; font-weight:bold; align-self:center; padding-right:6px; border-right:1px solid #e6d2a8; margin-right:2px;">參數設定</div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">件數成長%</label>
+                <input type="number" id="aiParamQtyGrowth" step="0.1" value="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">運費成長%</label>
+                <input type="number" id="aiParamCostGrowth" step="0.1" value="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">箱件比</label>
+                <input type="number" id="aiParamBoxRatio" step="0.1" placeholder="4.5" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label" title="主線大車每趟可裝箱數">大車箱數</label>
+                <input type="number" id="aiParamBigCap" step="1" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label" title="大車每天出車趟數，可隨時調整後重新儲存套用">大車趟數</label>
+                <input type="number" id="aiParamBigCount" step="1" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label" title="主線小車每趟可裝箱數">小車箱數</label>
+                <input type="number" id="aiParamSmallCap" step="1" placeholder="0" class="ai-param-input">
+            </div>
+            <div style="width:0; border-left:1px dashed #e6d2a8; align-self:stretch;"></div>
+            <div style="font-size:12px; color:#8a6d3b; font-weight:bold; align-self:center; white-space:nowrap;" title="依星期別填「主線總出車趟數」，系統自動扣掉大車趟數算出小車趟數，只需填一次">星期別車輛</div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">一</label>
+                <input type="number" id="aiParamTrip1" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">二</label>
+                <input type="number" id="aiParamTrip2" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">三</label>
+                <input type="number" id="aiParamTrip3" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">四</label>
+                <input type="number" id="aiParamTrip4" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">五</label>
+                <input type="number" id="aiParamTrip5" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">六</label>
+                <input type="number" id="aiParamTrip6" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label">日</label>
+                <input type="number" id="aiParamTrip0" placeholder="0" class="ai-param-input">
+            </div>
+            <div style="width:0; border-left:1px dashed #e6d2a8; align-self:stretch;"></div>
+            <div class="ai-param-group">
+                <label class="ai-param-label" title="車廂預留裝載緩衝%，例如10代表只用90%滿載容量">預留%</label>
+                <input type="number" id="aiParamReserve" step="1" placeholder="0" class="ai-param-input">
+            </div>
+            <div class="ai-param-group">
+                <label class="ai-param-label" title="整月一次性已知調整金額，可負數">其他調整</label>
+                <input type="number" id="aiParamOtherAdj" step="100" value="0" class="ai-param-input">
+            </div>
+            <button style="background:#fd7e14; color:white;" onclick="window.saveAIParams()">💾 儲存參數</button>
+        </div>
+        <style>
+            #aiParamPanel .ai-param-group { display:flex; flex-direction:column; align-items:center; }
+            #aiParamPanel .ai-param-label { font-size:12px; color:#8a6d3b; font-weight:bold; margin-bottom:3px; white-space:nowrap; }
+            #aiParamPanel .ai-param-input { width:60px; padding:4px 2px; border:1px solid #d8c8a8; border-radius:4px; box-sizing:border-box; text-align:center; }
+            #aiParamPanel .ai-param-input::-webkit-outer-spin-button, #aiParamPanel .ai-param-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+            #aiParamPanel .ai-param-input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+        </style>
         <div id="aiForecastPanel" style="display:none; margin-bottom:20px; background:#f8f5ff; border:1px solid #d8c8f0; border-radius:8px; padding:15px;">
             <div id="aiForecastMeta" style="font-size:13px; color:#5a3d99; font-weight:bold; margin-bottom:10px;"></div>
             <div class="table-container" style="max-height:520px; overflow:auto; border:1px solid #d8c8f0;">
@@ -1659,7 +1733,48 @@
         const AI_FORECAST_COST_ITEMS = ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款','離島費用','轉運費用','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用'];
         const AI_FORECAST_COUNT_ITEMS = ['預算件數','出貨件數','回收件數','主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店','離島','轉運','上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次'];
         const AI_FORECAST_DRIVER_MAP = { '主線費用':'主線條數', '爆量費用':'爆量趟次', '爆量自揹費用':'爆量自揹', '回收費用':'回收趟次', '回頭收費用':'回頭收趟次', '其他專車費用':'其他專車', '特殊點專車費用':'特殊點專車', '新開店費用':'新開店', '離島費用':'離島', '轉運費用':'轉運', 'B2C專車費用':'B2C專車趟次', 'B2C回頭費用':'B2C回頭趟次', 'C2C專車費用':'C2C專車趟次', 'C2C回頭費用':'C2C回頭趟次' };
-        window.__aiForecastCache = window.__aiForecastCache || {}; // { [wh]: { [m]: { forecast, model, monthsUsed, generatedAt } } }
+        window.__aiForecastCache = window.__aiForecastCache || {}; // { [wh]: { [m]: { forecast, model, monthsUsed, generatedAt, params } } }
+
+        function getAIParams() {
+            let wh = window.currentWarehouse, m = state.currentMonth;
+            let p = state.warehouses[wh]?.aiParams?.[m];
+            return p || { qtyGrowth: 0, costGrowth: 0, boxRatio: '', otherAdj: 0, bigCap: 0, bigCount: 0, smallCap: 0, weekdayTrips: {}, reserveRatio: 0 };
+        }
+
+        window.saveAIParams = () => {
+            let wh = window.currentWarehouse, m = state.currentMonth;
+            if (!state.warehouses[wh].aiParams) state.warehouses[wh].aiParams = {};
+            let boxRatioRaw = document.getElementById('aiParamBoxRatio').value;
+            let weekdayTrips = {};
+            for (let dow = 0; dow <= 6; dow++) { let el = document.getElementById('aiParamTrip' + dow); weekdayTrips[dow] = el ? (Number(el.value) || 0) : 0; }
+            state.warehouses[wh].aiParams[m] = {
+                qtyGrowth: Number(document.getElementById('aiParamQtyGrowth').value) || 0,
+                costGrowth: Number(document.getElementById('aiParamCostGrowth').value) || 0,
+                boxRatio: boxRatioRaw === '' ? '' : Number(boxRatioRaw),
+                otherAdj: Number(document.getElementById('aiParamOtherAdj').value) || 0,
+                bigCap: Number(document.getElementById('aiParamBigCap').value) || 0,
+                bigCount: Number(document.getElementById('aiParamBigCount').value) || 0,
+                smallCap: Number(document.getElementById('aiParamSmallCap').value) || 0,
+                weekdayTrips,
+                reserveRatio: Number(document.getElementById('aiParamReserve').value) || 0
+            };
+            state.lastModified = Date.now();
+            if (typeof window.saveData === 'function') window.saveData(true);
+            showToast('💾 AI預估參數已儲存！下次點擊「一鍵生成整月預估」將套用新參數重新計算。');
+        };
+
+        window.loadAIParamsToUI = () => {
+            let p = getAIParams();
+            let q = document.getElementById('aiParamQtyGrowth'); if (q) q.value = p.qtyGrowth;
+            let c = document.getElementById('aiParamCostGrowth'); if (c) c.value = p.costGrowth;
+            let b = document.getElementById('aiParamBoxRatio'); if (b) b.value = (p.boxRatio === '' || p.boxRatio === undefined) ? '' : p.boxRatio;
+            let o = document.getElementById('aiParamOtherAdj'); if (o) o.value = p.otherAdj;
+            let bc = document.getElementById('aiParamBigCap'); if (bc) bc.value = p.bigCap || '';
+            let bn = document.getElementById('aiParamBigCount'); if (bn) bn.value = p.bigCount || '';
+            let sc = document.getElementById('aiParamSmallCap'); if (sc) sc.value = p.smallCap || '';
+            let rr = document.getElementById('aiParamReserve'); if (rr) rr.value = p.reserveRatio || '';
+            for (let dow = 0; dow <= 6; dow++) { let el = document.getElementById('aiParamTrip' + dow); if (el) el.value = (p.weekdayTrips && p.weekdayTrips[dow]) || ''; }
+        };
 
         function aiFindHistoricalMonths(daily, m, maxMonths = 3) {
             let found = [];
@@ -1713,22 +1828,69 @@
             return model;
         }
 
+        function applyCapacityModelToForecast(forecast, days, params) {
+            let boxRatio = Number(params.boxRatio) || 0;
+            let bigCap = Number(params.bigCap) || 0, bigCount = Number(params.bigCount) || 0;
+            let smallCap = Number(params.smallCap) || 0;
+            let reserve = Number(params.reserveRatio) || 0;
+            let weekdayTrips = params.weekdayTrips;
+            let hasTrips = weekdayTrips && Object.values(weekdayTrips).some(v => Number(v) > 0);
+            let capacityModeOn = boxRatio > 0 && bigCap > 0 && smallCap > 0 && hasTrips;
+            if (!capacityModeOn) return { on: false };
+            let perTripBoxCap = smallCap; // 爆量趟次以小車容量估算
+            let usableItemCapByDow = {};
+            days.forEach(d => {
+                if (usableItemCapByDow[d.dow] === undefined) {
+                    let totalTrips = Number(weekdayTrips[d.dow]) || 0;
+                    let smallCount = Math.max(0, totalTrips - bigCount);
+                    let totalBoxCap = bigCap * bigCount + smallCap * smallCount;
+                    usableItemCapByDow[d.dow] = totalBoxCap * (1 - reserve / 100) * boxRatio;
+                }
+                let usableItemCap = usableItemCapByDow[d.dow];
+                let shipQty = forecast[d.dateStr]['出貨件數'] || 0;
+                let overQty = Math.max(0, shipQty - usableItemCap);
+                let overBoxes = overQty / boxRatio;
+                forecast[d.dateStr]['爆量趟次'] = Math.ceil(overBoxes / perTripBoxCap);
+            });
+            let avgUsableItemCap = Object.values(usableItemCapByDow).reduce((a,b)=>a+b,0) / Object.keys(usableItemCapByDow).length;
+            return { on: true, usableItemCap: avgUsableItemCap, usableItemCapByDow };
+        }
+
         function runAIForecastForMonth(wh, m) {
             let model = buildAIForecastModel(wh, m), days = getDays(m), forecast = {};
+            let params = getAIParams();
+            let qtyFactor = 1 + (Number(params.qtyGrowth) || 0) / 100;
+            let costFactor = 1 + (Number(params.costGrowth) || 0) / 100;
+
+            // 階段1：先算出所有件數/趟次科目的基本預估（尚未套用主線運能門檻）
             days.forEach(d => {
                 forecast[d.dateStr] = {};
-                AI_FORECAST_COUNT_ITEMS.forEach(item => { forecast[d.dateStr][item] = Math.max(0, Math.round(model.countModel[item].dowAvg[d.dow] || 0)); });
-                AI_FORECAST_COST_ITEMS.forEach(item => {
-                    let cm = model.costModel[item], val = 0;
+                AI_FORECAST_COUNT_ITEMS.forEach(item => { forecast[d.dateStr][item] = Math.max(0, Math.round((model.countModel[item].dowAvg[d.dow] || 0) * qtyFactor)); });
+            });
+
+            // 階段2：若有填「箱件比」+「主線運能設定」，改用門檻邏輯覆寫「爆量趟次」
+            let capacityInfo = applyCapacityModelToForecast(forecast, days, params);
+
+            // 階段2b：若有填「星期別車輛(主線總趟次)」，主線條數直接採用這組手動輸入值，
+            //         確保下載明細裡的「主線條數」跟參數設定欄位一致，不會產生對不上的落差。
+            let weekdayTrips = params.weekdayTrips;
+            let hasTrips = weekdayTrips && Object.values(weekdayTrips).some(v => Number(v) > 0);
+            if (hasTrips) { days.forEach(d => { forecast[d.dateStr]['主線條數'] = Number(weekdayTrips[d.dow]) || 0; }); }
+
+            // 階段3：依最終件數/趟次，換算費用科目
+            AI_FORECAST_COST_ITEMS.forEach(item => {
+                let cm = model.costModel[item];
+                days.forEach(d => {
+                    let val = 0;
                     if (cm.type === 'driver') {
-                        let qty = forecast[d.dateStr][cm.driver] ?? 0;
-                        let unit = cm.unitStats.dowAvg[d.dow] || cm.unitStats.overallAvg || 0;
+                        let qty = forecast[d.dateStr][cm.driver] ?? 0; // 已套用件數成長%與運能門檻覆寫
+                        let unit = (cm.unitStats.dowAvg[d.dow] || cm.unitStats.overallAvg || 0) * costFactor;
                         val = qty * unit;
-                    } else { val = cm.stats.dowAvg[d.dow] || 0; }
+                    } else { val = (cm.stats.dowAvg[d.dow] || 0) * costFactor; }
                     forecast[d.dateStr][item] = Math.round(Math.max(0, val));
                 });
             });
-            return { forecast, model, monthsUsed: model.monthsUsed };
+            return { forecast, model, monthsUsed: model.monthsUsed, params, capacityInfo };
         }
 
         window.generateAIForecast = () => {
@@ -1759,8 +1921,13 @@
                 rows.push({ cat: cat.budgetKey, budget: b, forecast: f, diff: f - b, rate: b > 0 ? (f / b * 100) : (f > 0 ? null : 0) });
             });
             let totalDiff = totalForecast - totalBudget, totalRate = totalBudget > 0 ? (totalForecast / totalBudget * 100) : (totalForecast > 0 ? null : 0);
+            let otherAdj = Number(cache.params?.otherAdj) || 0;
+            let grandTotalForecast = totalForecast + otherAdj, grandTotalDiff = grandTotalForecast - totalBudget, grandTotalRate = totalBudget > 0 ? (grandTotalForecast / totalBudget * 100) : (grandTotalForecast > 0 ? null : 0);
 
-            metaEl.innerText = `📅 ${m}月整月預估｜依據 ${cache.monthsUsed.map(x=>x+'月').join('、')} 歷史實績（同星期別＋類似件數換算單位費用）自動試算　｜產生時間：${new Date(cache.generatedAt).toLocaleString('zh-TW')}`;
+            let capOn = cache.capacityInfo?.on;
+            let tripsOn = cache.params?.weekdayTrips && Object.values(cache.params.weekdayTrips).some(v => Number(v) > 0);
+            let paramText = cache.params ? `　｜套用參數：件數成長 ${cache.params.qtyGrowth || 0}%、運費成長 ${cache.params.costGrowth || 0}%${cache.params.boxRatio !== '' && cache.params.boxRatio != null ? `、箱件比 ${cache.params.boxRatio}(件/箱)` : ''}${otherAdj ? `、其他已知調整 ${otherAdj > 0 ? '+' : ''}${otherAdj.toLocaleString()}` : ''}${tripsOn ? `、🚛主線條數已改採「星期別車輛」手動輸入值` : ''}${capOn ? `、爆量門檻已啟用(依星期別動態計算，平均每日可承載約${Math.round(cache.capacityInfo.usableItemCap).toLocaleString()}件，超出才計爆量趟次)` : (tripsOn ? '' : '（未設定主線運能，爆量趟次沿用歷史星期別平均值）')}` : '';
+            metaEl.innerText = `📅 ${m}月整月預估｜依據 ${cache.monthsUsed.map(x=>x+'月').join('、')} 歷史實績（同星期別＋類似件數換算單位費用）自動試算${paramText}　｜產生時間：${new Date(cache.generatedAt).toLocaleString('zh-TW')}`;
 
             const COLW = '16.66%';
             let html = `<colgroup><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"><col style="width:${COLW}"></colgroup>
@@ -1783,13 +1950,23 @@
                     <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold; color:${overBudget?'#dc3545':'#28a745'};">${overBudget ? '⚠️ 建議確認調整' : '✅ 尚在預算內'}</td>
                 </tr>`;
             });
+            if (otherAdj !== 0) {
+                html += `<tr style="background:#fff8f0;">
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold;">🔧 其他已知調整</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; color:#999;">—</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:#fd7e14;">${otherAdj > 0 ? '+' : ''}${formatVal(otherAdj,'cost')}</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; color:#999;">—</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; color:#999;">—</td>
+                    <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; color:#999; font-size:12px;">人工輸入之整月一次性調整</td>
+                </tr>`;
+            }
             html += `<tr style="background:#efe6fb;">
                 <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold;">合計</td>
                 <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold;">${formatVal(totalBudget,'cost')}</td>
-                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:#5a3d99;">${formatVal(totalForecast,'cost')}</td>
-                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${totalDiff>0?'#dc3545':'#28a745'};">${formatVal(totalDiff,'cost')}</td>
-                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${totalRate!=null && totalRate>100 ? '#dc3545' : '#333'};">${totalRate!=null ? formatVal(totalRate,'rate') : '—'}</td>
-                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold; color:${totalDiff>0?'#dc3545':'#28a745'};">${totalDiff>0 ? '⚠️ 整月預估超出預算' : '✅ 整月預估在預算內'}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:#5a3d99;">${formatVal(grandTotalForecast,'cost')}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${grandTotalDiff>0?'#dc3545':'#28a745'};">${formatVal(grandTotalDiff,'cost')}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:right; font-weight:bold; color:${grandTotalRate!=null && grandTotalRate>100 ? '#dc3545' : '#333'};">${grandTotalRate!=null ? formatVal(grandTotalRate,'rate') : '—'}</td>
+                <td style="border:1px solid #d8c8f0; padding:6px 10px; text-align:center; font-weight:bold; color:${grandTotalDiff>0?'#dc3545':'#28a745'};">${grandTotalDiff>0 ? '⚠️ 整月預估超出預算' : '✅ 整月預估在預算內'}</td>
             </tr>`;
             tblEl.style.tableLayout = 'fixed';
             tblEl.innerHTML = html + '</tbody>';
@@ -1798,6 +1975,7 @@
         }
 
         window.refreshAIForecastPanel = () => {
+            window.loadAIParamsToUI();
             let wh = window.currentWarehouse, m = state.currentMonth, cache = window.__aiForecastCache[wh]?.[m];
             if (cache) renderAIForecastSummary(); else { let panel = document.getElementById('aiForecastPanel'); if (panel) panel.style.display = 'none'; let dlBtn = document.getElementById('btnDownloadAIForecast'); if (dlBtn) dlBtn.disabled = true; }
         };
@@ -1813,7 +1991,11 @@
                 { name: '【上收/商流】趟次與費用', items: ['上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用'], subtotalLabel: '費用合計', subtotalFilter: i => i.includes('費用') }
             ];
             let header = ['營運項目 / 日期', ...days.map(d => `${m}/${parseInt(d.dateStr.split('-')[2])}(${DOW_LABELS[d.dow]})`), '月合計'];
-            let aoa = [header], subtotalRowIdxs = [];
+            let p = cache.params || getAIParams();
+            let capInfo = cache.capacityInfo;
+            let tripsOnDl = p.weekdayTrips && Object.values(p.weekdayTrips).some(v => Number(v) > 0);
+            let paramNote = `🎛 套用參數：件數成長 ${p.qtyGrowth || 0}%、運費成長 ${p.costGrowth || 0}%${p.boxRatio !== '' && p.boxRatio != null ? `、箱件比 ${p.boxRatio}(件/箱)` : ''}${p.otherAdj ? `、其他已知調整 ${p.otherAdj > 0 ? '+' : ''}${p.otherAdj}(整月一次性,未列入以下每日明細，請於月底比對時另行加總)` : ''}${tripsOnDl ? `、🚛主線條數已改採「星期別車輛」手動輸入值(下表主線條數＝你填的趟次，不再用歷史平均)` : ''}${capInfo?.on ? `、爆量門檻已啟用(依星期別動態計算每日可承載件數，平均約${Math.round(capInfo.usableItemCap).toLocaleString()}件，超出才計爆量趟次)` : (tripsOnDl ? '' : '（未設定主線運能，爆量趟次沿用歷史星期別平均值）')}`;
+            let aoa = [header, [paramNote, ...days.map(() => null), null]], subtotalRowIdxs = [];
             forecastGroups.forEach(g => {
                 aoa.push([g.name, ...days.map(() => null), null]);
                 let dayTotals = days.map(() => 0), monthGrandTotal = 0;
@@ -1831,12 +2013,14 @@
             });
             let ws = XLSX.utils.aoa_to_sheet(aoa);
             ws['!cols'] = [{ wch: 14 }, ...days.map(()=>({wch:9})), { wch: 10 }];
-            let mergeIdx = 1;
-            forecastGroups.forEach((g) => { let rowIdx = mergeIdx; ws['!merges'] = ws['!merges'] || []; ws['!merges'].push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: header.length - 1 } }); mergeIdx += 1 + g.items.length + (g.subtotalLabel ? 1 : 0); });
+            let mergeIdx = 2, paramRowIdx = 1;
+            ws['!merges'] = [{ s: { r: paramRowIdx, c: 0 }, e: { r: paramRowIdx, c: header.length - 1 } }];
+            forecastGroups.forEach((g) => { let rowIdx = mergeIdx; ws['!merges'].push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: header.length - 1 } }); mergeIdx += 1 + g.items.length + (g.subtotalLabel ? 1 : 0); });
             for (let c in ws) {
                 if (c[0] === '!') continue; let cell = ws[c], ref = XLSX.utils.decode_cell(c);
                 cell.s = { alignment: { vertical: 'center', horizontal: ref.c === 0 ? 'left' : 'center' }, border: { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} } };
                 if (ref.r === 0) { cell.s.fill = { fgColor: { rgb: '6F42C1' } }; cell.s.font = { bold: true, color: { rgb: 'FFFFFF' } }; }
+                if (ref.r === paramRowIdx) { cell.s.fill = { fgColor: { rgb: 'FFF3E0' } }; cell.s.font = { bold: true, color: { rgb: '8A6D3B' } }; cell.s.alignment.horizontal = 'left'; }
                 if (subtotalRowIdxs.includes(ref.r)) { cell.s.fill = { fgColor: { rgb: 'D4EDDA' } }; cell.s.font = { bold: true, color: { rgb: '155724' } }; }
             }
             let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${m}月AI預估明細`);
