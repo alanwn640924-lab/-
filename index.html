@@ -330,9 +330,9 @@
 
     <div id="tab6" class="tab-content">
         <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button style="background: #17a2b8; color: white;" onclick="window.exportEstActual()">📥 下載預估實績表 (.xlsx)</button>
-            <button style="background: #6f42c1; color: white;" onclick="window.generateAIForecast()">🤖 一鍵生成整月預估</button>
-            <button id="btnDownloadAIForecast" style="background: #20c997; color: white;" disabled onclick="window.downloadAIForecastDetail()">📥 下載整月預估明細(日別格式)</button>
+            <button style="background: #17a2b8; color: white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.exportEstActual()">📥 下載預估實績</button>
+            <button style="background: #6f42c1; color: white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.generateAIForecast()">🤖 一鍵生成預估</button>
+            <button id="btnDownloadAIForecast" style="background: #20c997; color: white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" disabled onclick="window.downloadAIForecastDetail()">📥 整月預估明細</button>
             <span style="font-size: 13px; color: #666; font-weight: bold;">※ 提示：於日別登錄未來格填寫會自動判定為預估。</span>
         </div>
         <div id="aiParamPanel" style="margin-bottom:15px; background:#fff8f0; border:1px solid #f0d8b8; border-radius:8px; padding:10px 15px; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
@@ -1811,9 +1811,36 @@
             let model = { monthsUsed, countModel: {}, costModel: {} };
             AI_FORECAST_COUNT_ITEMS.forEach(item => { model.countModel[item] = aiWeekdayWeightedStats(collect(item)); });
 
+            // 這些科目本質上是「依趟次數對應固定費率(如km級距)」，同樣的趟次數費用應該固定一致，
+            // 不應該因為星期別不同而算出不同金額，只有實際費率調整(如每月中的km級距變動)才會有差異。
+            const AI_FIXED_RATE_ITEMS = ['主線費用'];
+
             AI_FORECAST_COST_ITEMS.forEach(item => {
                 let driver = AI_FORECAST_DRIVER_MAP[item];
-                if (driver) {
+                if (driver && AI_FIXED_RATE_ITEMS.includes(item)) {
+                    // 依「趟次數」建立費率對照表(不分星期)：同樣的主線條數，直接採用「最新已發生」的那一筆實際費用
+                    // 範圍需包含「當月已經登錄的日子」，不能只看前幾個月，否則會抓到比當月已發生資料更舊的數字。
+                    let countLatestCost = {}; // 趟次數 -> { dateStr, cost }
+                    let lookupDays = [...monthsUsed.flatMap(mm => getDays(mm)), ...getDays(m).filter(d => daily[d.dateStr] && Object.keys(daily[d.dateStr]).length > 0)];
+                    lookupDays.forEach(d => {
+                        let c = daily[d.dateStr]?.[item], q = daily[d.dateStr]?.[driver];
+                        if (c !== undefined && c !== null && c !== '' && q !== undefined && q !== null && q !== '') {
+                            let qn = Number(q);
+                            if (!countLatestCost[qn] || d.dateStr > countLatestCost[qn].dateStr) {
+                                countLatestCost[qn] = { dateStr: d.dateStr, cost: Number(c) };
+                            }
+                        }
+                    });
+                    let lookup = {};
+                    Object.keys(countLatestCost).forEach(k => { lookup[k] = countLatestCost[k].cost; });
+                    // 保留星期別單位費率作為「歷史上從未出現過這個趟次數」時的備援估算
+                    let pairs = [];
+                    monthsUsed.forEach(mm => getDays(mm).forEach(d => {
+                        let c = daily[d.dateStr]?.[item], q = daily[d.dateStr]?.[driver];
+                        if (c !== undefined && c !== null && c !== '' && q !== undefined && q !== null && Number(q) > 0) pairs.push({ dow: d.dow, val: Number(c) / Number(q), weight: weights[mm] });
+                    }));
+                    model.costModel[item] = { type: 'countLookup', driver, lookup, unitStats: aiWeekdayWeightedStats(pairs) };
+                } else if (driver) {
                     let pairs = [];
                     monthsUsed.forEach(mm => getDays(mm).forEach(d => {
                         let c = daily[d.dateStr]?.[item], q = daily[d.dateStr]?.[driver];
@@ -1882,7 +1909,23 @@
                 let cm = model.costModel[item];
                 days.forEach(d => {
                     let val = 0;
-                    if (cm.type === 'driver') {
+                    if (cm.type === 'countLookup') {
+                        let qty = forecast[d.dateStr][cm.driver] ?? 0;
+                        let exact = cm.lookup[qty];
+                        if (exact !== undefined) {
+                            val = exact * costFactor; // 同樣趟次數，直接採用歷史上相同趟次數的固定費用
+                        } else {
+                            let keys = Object.keys(cm.lookup).map(Number);
+                            if (keys.length > 0) {
+                                let nearest = keys.reduce((a, b) => Math.abs(b - qty) < Math.abs(a - qty) ? b : a);
+                                let ratio = nearest > 0 ? cm.lookup[nearest] / nearest : 0;
+                                val = qty * ratio * costFactor; // 查無此趟次數，退而求其次用最接近趟次數的費率比例估算
+                            } else {
+                                let unit = (cm.unitStats.dowAvg[d.dow] || cm.unitStats.overallAvg || 0) * costFactor;
+                                val = qty * unit;
+                            }
+                        }
+                    } else if (cm.type === 'driver') {
                         let qty = forecast[d.dateStr][cm.driver] ?? 0; // 已套用件數成長%與運能門檻覆寫
                         let unit = (cm.unitStats.dowAvg[d.dow] || cm.unitStats.overallAvg || 0) * costFactor;
                         val = qty * unit;
@@ -1890,7 +1933,22 @@
                     forecast[d.dateStr][item] = Math.round(Math.max(0, val));
                 });
             });
-            return { forecast, model, monthsUsed: model.monthsUsed, params, capacityInfo };
+
+            // 階段4：已經有實際登錄資料的日子，直接採用實績數字（不用AI統計值覆蓋），
+            //         只有真正還沒登錄任何資料的未來日子，才保留AI預估值。
+            let dailyActual = state.warehouses[wh].daily || {};
+            let actualOverrideDayCount = 0;
+            let allForecastItems = [...AI_FORECAST_COUNT_ITEMS, ...AI_FORECAST_COST_ITEMS];
+            days.forEach(d => {
+                let dayHasActual = false;
+                allForecastItems.forEach(item => {
+                    let v = dailyActual[d.dateStr]?.[item];
+                    if (v !== undefined && v !== null && v !== '') { forecast[d.dateStr][item] = Number(v) || 0; dayHasActual = true; }
+                });
+                if (dayHasActual) actualOverrideDayCount++;
+            });
+
+            return { forecast, model, monthsUsed: model.monthsUsed, params, capacityInfo, actualOverrideDayCount };
         }
 
         window.generateAIForecast = () => {
@@ -1926,7 +1984,7 @@
 
             let capOn = cache.capacityInfo?.on;
             let tripsOn = cache.params?.weekdayTrips && Object.values(cache.params.weekdayTrips).some(v => Number(v) > 0);
-            let paramText = cache.params ? `　｜套用參數：件數成長 ${cache.params.qtyGrowth || 0}%、運費成長 ${cache.params.costGrowth || 0}%${cache.params.boxRatio !== '' && cache.params.boxRatio != null ? `、箱件比 ${cache.params.boxRatio}(件/箱)` : ''}${otherAdj ? `、其他已知調整 ${otherAdj > 0 ? '+' : ''}${otherAdj.toLocaleString()}` : ''}${tripsOn ? `、🚛主線條數已改採「星期別車輛」手動輸入值` : ''}${capOn ? `、爆量門檻已啟用(依星期別動態計算，平均每日可承載約${Math.round(cache.capacityInfo.usableItemCap).toLocaleString()}件，超出才計爆量趟次)` : (tripsOn ? '' : '（未設定主線運能，爆量趟次沿用歷史星期別平均值）')}` : '';
+            let paramText = cache.params ? `　｜套用參數：件數成長 ${cache.params.qtyGrowth || 0}%、運費成長 ${cache.params.costGrowth || 0}%${cache.params.boxRatio !== '' && cache.params.boxRatio != null ? `、箱件比 ${cache.params.boxRatio}(件/箱)` : ''}${otherAdj ? `、其他已知調整 ${otherAdj > 0 ? '+' : ''}${otherAdj.toLocaleString()}` : ''}${tripsOn ? `、🚛主線條數已改採「星期別車輛」手動輸入值` : ''}${capOn ? `、爆量門檻已啟用(依星期別動態計算，平均每日可承載約${Math.round(cache.capacityInfo.usableItemCap).toLocaleString()}件，超出才計爆量趟次)` : (tripsOn ? '' : '（未設定主線運能，爆量趟次沿用歷史星期別平均值）')}${cache.actualOverrideDayCount ? `、📌已有${cache.actualOverrideDayCount}天採用實際登錄資料(非AI估算)` : ''}` : '';
             metaEl.innerText = `📅 ${m}月整月預估｜依據 ${cache.monthsUsed.map(x=>x+'月').join('、')} 歷史實績（同星期別＋類似件數換算單位費用）自動試算${paramText}　｜產生時間：${new Date(cache.generatedAt).toLocaleString('zh-TW')}`;
 
             const COLW = '16.66%';
@@ -1994,7 +2052,7 @@
             let p = cache.params || getAIParams();
             let capInfo = cache.capacityInfo;
             let tripsOnDl = p.weekdayTrips && Object.values(p.weekdayTrips).some(v => Number(v) > 0);
-            let paramNote = `🎛 套用參數：件數成長 ${p.qtyGrowth || 0}%、運費成長 ${p.costGrowth || 0}%${p.boxRatio !== '' && p.boxRatio != null ? `、箱件比 ${p.boxRatio}(件/箱)` : ''}${p.otherAdj ? `、其他已知調整 ${p.otherAdj > 0 ? '+' : ''}${p.otherAdj}(整月一次性,未列入以下每日明細，請於月底比對時另行加總)` : ''}${tripsOnDl ? `、🚛主線條數已改採「星期別車輛」手動輸入值(下表主線條數＝你填的趟次，不再用歷史平均)` : ''}${capInfo?.on ? `、爆量門檻已啟用(依星期別動態計算每日可承載件數，平均約${Math.round(capInfo.usableItemCap).toLocaleString()}件，超出才計爆量趟次)` : (tripsOnDl ? '' : '（未設定主線運能，爆量趟次沿用歷史星期別平均值）')}`;
+            let paramNote = `🎛 套用參數：件數成長 ${p.qtyGrowth || 0}%、運費成長 ${p.costGrowth || 0}%${p.boxRatio !== '' && p.boxRatio != null ? `、箱件比 ${p.boxRatio}(件/箱)` : ''}${p.otherAdj ? `、其他已知調整 ${p.otherAdj > 0 ? '+' : ''}${p.otherAdj}(整月一次性,未列入以下每日明細，請於月底比對時另行加總)` : ''}${tripsOnDl ? `、🚛主線條數已改採「星期別車輛」手動輸入值(下表主線條數＝你填的趟次，不再用歷史平均)` : ''}${capInfo?.on ? `、爆量門檻已啟用(依星期別動態計算每日可承載件數，平均約${Math.round(capInfo.usableItemCap).toLocaleString()}件，超出才計爆量趟次)` : (tripsOnDl ? '' : '（未設定主線運能，爆量趟次沿用歷史星期別平均值）')}${cache.actualOverrideDayCount ? `、📌已有${cache.actualOverrideDayCount}天採用實際登錄資料(非AI估算，數字會等於日別登錄表)` : ''}`;
             let aoa = [header, [paramNote, ...days.map(() => null), null]], subtotalRowIdxs = [];
             forecastGroups.forEach(g => {
                 aoa.push([g.name, ...days.map(() => null), null]);
