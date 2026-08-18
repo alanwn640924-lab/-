@@ -1301,10 +1301,37 @@
                 let cb='', b='', cumB='', mItemAct=0, mItemBud=0; cb+=`<tr><td class="sticky-left" style="background:#e8f0fe;">出貨件數</td>`;
                 weeks.forEach((w) => { let a=0, bd=0; w.days.forEach(d=>{ a+=Number(daily[d]?.['出貨件數']||0); bd+=Number(daily[d]?.['預算件數']||0); }); let rt=bd?(a/bd*100).toFixed(1):'0.0'; let diff=a-bd; cb+=`<td style="background:#f8f9fa;">${formatVal(bd,'count')}</td><td style="background:#f8f9fa;">${formatVal(a,'count')}</td><td class="${diff<0?'text-red':'text-green'}" style="background:#f8f9fa;">${formatVal(diff,'count')}</td><td style="background:#f8f9fa;">${rt}%</td>`; mItemAct+=a; mItemBud+=bd; chartData['件數統計'].r.push(parseFloat(rt)); });
                 cb+=`<td class="total-col">${formatVal(mItemBud,'count')}</td><td class="total-col">${formatVal(mItemAct,'count')}</td><td class="total-col ${mItemAct-mItemBud<0?'text-red':'text-green'}">${formatVal(mItemAct-mItemBud,'count')}</td><td class="total-col">${mItemBud?(mItemAct/mItemBud*100).toFixed(1)+'%':'0.0%'}</td></tr>`;
+
+                // 累計出貨達成率（累計邏輯同動支率累計：逐週往前累加）
+                let cbCumRow = `<tr><td class="sticky-left" style="background:#fff8e1; color:#856404; font-weight:bold;">累計出貨達成率</td>`, cumShipAct=0, cumShipBud=0;
+                weeks.forEach((w) => {
+                    let a=0, bd=0; w.days.forEach(d=>{ a+=Number(daily[d]?.['出貨件數']||0); bd+=Number(daily[d]?.['預算件數']||0); });
+                    cumShipAct += a; cumShipBud += bd;
+                    let cumRt = cumShipBud ? (cumShipAct/cumShipBud*100).toFixed(1) : '0.0', cumDiff = cumShipAct - cumShipBud;
+                    cbCumRow += `<td style="background:#fff8e1;">${formatVal(cumShipBud,'count')}</td><td style="background:#fff8e1;">${formatVal(cumShipAct,'count')}</td><td class="${cumDiff<0?'text-red':'text-green'}" style="background:#fff8e1;">${formatVal(cumDiff,'count')}</td><td style="background:#fff8e1; font-weight:bold; color:${parseFloat(cumRt)>=100?'#28a745':'#dc3545'};">${cumRt}%</td>`;
+                });
+                cbCumRow += `<td class="total-col" style="background:#fff3cd;">${formatVal(mItemBud,'count')}</td><td class="total-col" style="background:#fff3cd;">${formatVal(mItemAct,'count')}</td><td class="total-col ${mItemAct-mItemBud<0?'text-red':'text-green'}" style="background:#fff3cd;">${formatVal(mItemAct-mItemBud,'count')}</td><td class="total-col" style="background:#fff3cd; font-weight:bold;">${mItemBud?(mItemAct/mItemBud*100).toFixed(1)+'%':'0.0%'}</td></tr>`;
+                cb += cbCumRow;
                 
                 let lBody = `<tr><td class="sticky-left" style="background:#e8f0fe;">裝載率</td>`, lSum=0, lValid=0;
                 weeks.forEach(w => { let s=0, v=0; w.days.forEach(d => { let val = daily[d]?.['裝載率']; if(val != null && val !== '') { s+=Number(val); v++; lSum+=Number(val); lValid++; } }); let avg = v ? s/v : 0; chartData['裝載率'].r.push(parseFloat(avg.toFixed(1))); lBody += `<td colspan="4" style="background:#f8f9fa; font-weight:bold; color:#0056b3; text-align:center;">${v ? formatVal(avg, 'rate') : ''}</td>`; });
                 lBody += `<td colspan="4" class="total-col" style="color:#0056b3; text-align:center;">${lValid ? formatVal(lSum/lValid, 'rate') : ''}</td></tr>`;
+
+                // 平日(週二~週六) / 假日(週日、週一) 裝載率細分
+                let dowOf = (dStr) => { let [yy,mm,dd] = dStr.split('-').map(Number); return new Date(yy, mm-1, dd).getDay(); };
+                let buildLoadSubRow = (label, filterFn, bg) => {
+                    let row = `<tr><td class="sticky-left" style="background:${bg};">${label}</td>`, sum=0, valid=0;
+                    weeks.forEach(w => {
+                        let s=0, v=0;
+                        w.days.forEach(d => { if (!filterFn(dowOf(d))) return; let val = daily[d]?.['裝載率']; if(val != null && val !== '') { s+=Number(val); v++; sum+=Number(val); valid++; } });
+                        let avg = v ? s/v : 0;
+                        row += `<td colspan="4" style="background:#fbfbfb; text-align:center; color:#555;">${v ? formatVal(avg, 'rate') : ''}</td>`;
+                    });
+                    row += `<td colspan="4" class="total-col" style="text-align:center; color:#555;">${valid ? formatVal(sum/valid, 'rate') : ''}</td></tr>`;
+                    return row;
+                };
+                lBody += buildLoadSubRow('平日裝載(二~六)', dow => dow >= 2 && dow <= 6, '#eef3fb');
+                lBody += buildLoadSubRow('假日裝載(日、一)', dow => dow === 0 || dow === 1, '#fdf1f1');
                 
                 let mAct=0, mBud=0, wAct=new Array(weeks.length).fill(0), wBud=new Array(weeks.length).fill(0);
                 Object.keys(BUDGET_MAPPING).forEach(cat => { 
