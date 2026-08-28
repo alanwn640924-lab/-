@@ -534,7 +534,8 @@
             <strong style="color:#5a3d99; font-size:17px;">📐 116 年度預算編列</strong>
             <span style="font-size:13px; color:#6c757d; margin-left:8px;">件數 → 箱數 → 主線車輛 → 加派車 → 回收車 → 其他項目 → 對比 115 年</span>
             <div class="bp-row" style="margin-top:10px;">
-                <button style="background:#fd7e14; color:white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.saveBudgetPlanParams()">💾 儲存資料</button>
+                <div id="bpWarehouseBox" style="display:flex; align-items:center; gap:6px; margin-right:6px;"></div>
+                <button id="bpBtnSave" class="rw-only" style="background:#fd7e14; color:white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.saveBudgetPlanParams()">💾 儲存資料</button>
                 <button style="background:#6f42c1; color:white; width:160px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.generateBudgetPlan()">🧮 產出建議預算</button>
                 <button id="btnDownloadBudgetPlan" style="background:#20c997; color:white; width:160px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" disabled onclick="window.downloadBudgetPlan()">📥 下載建議預算</button>
             </div>
@@ -590,12 +591,12 @@
                     <input type="file" id="bpFileQtyDaily" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportQtyDaily(event)">
                     <div class="ai-param-group"><label class="ai-param-label" title="匯入的表格若沒有項目名稱欄，數值會填到這個項目">匯入目標項目</label>
                         <select id="bp_importTarget" class="ai-param-input"><option value="EC">EC</option><option value="一般商品">一般商品</option><option value="團預購">團預購</option><option value="手揀">手揀</option><option value="POP">POP</option></select></div>
-                    <button class="bp-imp" style="background:#17a2b8;" onclick="document.getElementById('bpFileQty').click()">📥 匯入月別件數</button>
-                    <button class="bp-imp" style="background:#0d8a9c;" onclick="document.getElementById('bpFileQtyDaily').click()">📥 匯入日別件數</button>
-                    <button class="bp-clr" onclick="window.bpClearDaily('qty')">清空日別件數</button>
+                    <button class="bp-imp rw-only" style="background:#17a2b8;" onclick="document.getElementById('bpFileQty').click()">📥 匯入月別件數</button>
+                    <button class="bp-imp rw-only" style="background:#0d8a9c;" onclick="document.getElementById('bpFileQtyDaily').click()">📥 匯入日別件數</button>
+                    <button class="bp-clr rw-only" onclick="window.bpClearDaily('qty')">清空日別件數</button>
                     <div style="width:0; border-left:1px dashed #ccc; align-self:stretch;"></div>
                     <div class="ai-param-group"><label class="ai-param-label">新增配送項目</label><input type="text" id="bp_newItem" class="ai-param-input" placeholder="項目名稱" style="width:120px;"></div>
-                    <button class="bp-imp" style="background:#28a745;" onclick="window.bpAddItem()">➕ 新增項目</button>
+                    <button class="bp-imp rw-only" style="background:#28a745;" onclick="window.bpAddItem()">➕ 新增項目</button>
                 </div>
                 <div class="bp-scroll"><div id="bpQtyGrid"></div></div>
                 <div class="bp-note">📌 <b>資料單位</b>選「件」→ 箱數 = 件數 ÷ 箱件比；選「箱」→ 該欄數值直接就是箱數，箱件比自動鎖住不需填。各項獨立、最後加總為箱數需求。<br>
@@ -612,12 +613,12 @@
                     <input type="file" id="bpFileRoutes" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportRoutes(event)">
                     <input type="file" id="bpFileRouteDaily" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportRouteDaily(event)">
                     <input type="file" id="bpFileFleetDaily" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportFleetDaily(event)">
-                    <button class="bp-imp" style="background:#6f42c1;" onclick="document.getElementById('bpFileRoutes').click()">📥 匯入路線單價清單</button>
-                    <button class="bp-imp" style="background:#5a35a3;" onclick="document.getElementById('bpFileRouteDaily').click()">📥 匯入日別行駛路線</button>
-                    <button class="bp-clr" onclick="window.bpClearDaily('route')">清空日別路線</button>
+                    <button class="bp-imp rw-only" style="background:#6f42c1;" onclick="document.getElementById('bpFileRoutes').click()">📥 匯入路線單價清單</button>
+                    <button class="bp-imp rw-only" style="background:#5a35a3;" onclick="document.getElementById('bpFileRouteDaily').click()">📥 匯入日別行駛路線</button>
+                    <button class="bp-clr rw-only" onclick="window.bpClearDaily('route')">清空日別路線</button>
                     <div style="width:0; border-left:1px dashed #ccc; align-self:stretch;"></div>
-                    <button class="bp-imp" style="background:#17a2b8;" onclick="document.getElementById('bpFileFleetDaily').click()">📥 匯入日別大小車台數</button>
-                    <button class="bp-clr" onclick="window.bpClearDaily('fleet')">清空日別台數</button>
+                    <button class="bp-imp rw-only" style="background:#17a2b8;" onclick="document.getElementById('bpFileFleetDaily').click()">📥 匯入日別大小車台數</button>
+                    <button class="bp-clr rw-only" onclick="window.bpClearDaily('fleet')">清空日別台數</button>
                 </div>
                 <div id="bpRouteSummary"></div>
                 <div class="bp-scroll" style="margin-top:10px;"><div id="bpFleetGrid"></div></div>
@@ -633,7 +634,7 @@
             <div class="bp-body">
                 <div class="bp-row" style="margin-bottom:10px;">
                     <div class="bp-lbl">回收車 =（預算驗收件數 − 主線帶回件數）÷ 每趟件數 × 單趟費用</div>
-                    <button class="bp-imp" style="background:#17a2b8;" onclick="document.getElementById('bpFileQty').click()">📥 匯入（同月別件數匯入器）</button>
+                    <button class="bp-imp rw-only" style="background:#17a2b8;" onclick="document.getElementById('bpFileQty').click()">📥 匯入（同月別件數匯入器）</button>
                 </div>
                 <div class="bp-scroll"><div id="bpRecvGrid"></div></div>
                 <div class="bp-note">📌 匯入時，A欄請放「驗收件數」或「主線帶回件數」當列名，表頭列放「1月…12月」。</div>
@@ -2390,32 +2391,88 @@
         // 預設帶入：115 年度驗收件數預算
         const BP_RECV_DEFAULT = { 1:639810, 2:487710, 3:637048, 4:617909, 5:639273, 6:624022, 7:631089, 8:627764, 9:632585, 10:662597, 11:736288, 12:714335 };
 
-        function bpDefaults() {
+        // ============================================================
+        // 🔐 權限控制：倉別邊界與唯讀判斷
+        // 角色對應：rw_all(總管理員/編輯者)、ro_all(總部主管/唯讀) → 可看三倉
+        //           rw_dadu / rw_daxi / rw_gangshan(各倉) → 只能看自己那一倉
+        // 這裡不只是隱藏 UI，而是在資料存取的入口 bpGet() 強制夾住倉別，
+        // 避免 currentWarehouse 被其他程式碼改動時造成跨倉資料外洩。
+        // ============================================================
+        function bpAllowedWh() {
+            try { if (typeof window.getWhOrder === 'function') { let a = window.getWhOrder(); if (Array.isArray(a) && a.length) return a; } } catch (e) {}
+            return ['大肚'];
+        }
+        function bpCanSeeAllWh() { return ['rw_all', 'ro_all'].includes(window.userRole); }
+        function bpIsReadOnly() { return !!(window.userRole && String(window.userRole).startsWith('ro')); }
+        // 強制把目前倉別夾在允許範圍內，並回傳實際可用的倉別
+        function bpEnforceWh() {
+            let allowed = bpAllowedWh();
+            if (!allowed.includes(window.currentWarehouse)) window.currentWarehouse = allowed[0];
+            return window.currentWarehouse;
+        }
+
+        // 只有大肚倉預先帶入已知基準資料（EC件數、驗收件數、車隊台數、平均單價都是大肚實際數字）；
+        // 大溪／岡山各倉條件不同，一律留空白讓各倉自行填入或匯入，避免誤用大肚數字編出錯誤預算。
+        const BP_SEEDED_WH = '大肚';
+        function bpDefaults(wh) {
+            let seeded = (wh === BP_SEEDED_WH);
             let d = {
                 version: 2, items: [...BP_DEFAULT_ITEMS], units: {}, ratios: {}, qty: {}, qtyDaily: {},
-                bigCap: '', smallCap: '', avgBig: 5902, avgSmall: 4327,
+                bigCap: '', smallCap: '', avgBig: seeded ? 5902 : '', avgSmall: seeded ? 4327 : '',
                 fleetMonthly: {}, fleetDaily: {}, routes: [], routeDaily: {},
                 recv: {}, carryBack: {}, growth: { '其他':0, '違規罰款':0, '離島':0, '轉運':0 },
-                coef: { boxPerTrip: 70, tripCost: 2000, recvPerTrip: 400, recvTripCost: 2000 },
+                coef: seeded ? { boxPerTrip: 70, tripCost: 2000, recvPerTrip: 400, recvTripCost: 2000 }
+                             : { boxPerTrip: '', tripCost: '', recvPerTrip: '', recvTripCost: '' },
                 mainlineMode: 'A', otherBase: 'A'
             };
             d.items.forEach(it => { d.units[it] = BP_DEFAULT_UNITS[it] || '件'; d.ratios[it] = ''; d.qty[it] = {}; });
             for (let m = 1; m <= 12; m++) {
-                d.qty['EC'][m] = BP_EC_DEFAULT[m];
-                d.recv[m] = BP_RECV_DEFAULT[m]; d.carryBack[m] = 0;
-                d.fleetMonthly[m] = { big: 15, small: 46 };
+                d.qty['EC'][m] = seeded ? BP_EC_DEFAULT[m] : '';
+                d.recv[m] = seeded ? BP_RECV_DEFAULT[m] : '';
+                d.carryBack[m] = seeded ? 0 : '';
+                d.fleetMonthly[m] = seeded ? { big: 15, small: 46 } : { big: '', small: '' };
             }
             return d;
         }
 
+        // 🧹 一次性清理：舊版本會把大肚的基準值也預先寫進大溪／岡山並存上雲端。
+        // 這裡只在「該欄位值仍與大肚預設完全一致（代表從未被該倉修改過）」時才清空，
+        // 若倉管已經填過自己的數字就完全不動，避免誤刪各倉已輸入的資料。
+        function bpCleanSeededLeftovers(wh, p) {
+            if (wh === BP_SEEDED_WH || p.__whCleaned) return;
+            let ecUntouched = true, recvUntouched = true, fleetUntouched = true, cbUntouched = true;
+            for (let m = 1; m <= 12; m++) {
+                if (bpNum(p.qty?.['EC']?.[m]) !== BP_EC_DEFAULT[m]) ecUntouched = false;
+                if (bpNum(p.recv?.[m]) !== BP_RECV_DEFAULT[m]) recvUntouched = false;
+                if (bpNum(p.carryBack?.[m]) !== 0) cbUntouched = false;
+                let fm = p.fleetMonthly?.[m] || {};
+                if (bpNum(fm.big) !== 15 || bpNum(fm.small) !== 46) fleetUntouched = false;
+            }
+            if (ecUntouched && p.qty?.['EC']) for (let m = 1; m <= 12; m++) p.qty['EC'][m] = '';
+            if (recvUntouched && p.recv) for (let m = 1; m <= 12; m++) p.recv[m] = '';
+            if (cbUntouched && p.carryBack) for (let m = 1; m <= 12; m++) p.carryBack[m] = '';
+            if (fleetUntouched && p.fleetMonthly) for (let m = 1; m <= 12; m++) p.fleetMonthly[m] = { big: '', small: '' };
+            if (bpNum(p.avgBig) === 5902) p.avgBig = '';
+            if (bpNum(p.avgSmall) === 4327) p.avgSmall = '';
+            // 計價係數同樣處理：仍是大肚原始預設值就清空，已被該倉改過則保留
+            if (p.coef) {
+                if (bpNum(p.coef.boxPerTrip) === 70) p.coef.boxPerTrip = '';
+                if (bpNum(p.coef.tripCost) === 2000) p.coef.tripCost = '';
+                if (bpNum(p.coef.recvPerTrip) === 400) p.coef.recvPerTrip = '';
+                if (bpNum(p.coef.recvTripCost) === 2000) p.coef.recvTripCost = '';
+            }
+            p.__whCleaned = 1;
+        }
+
         // 取得目前倉別的 116 規劃資料（缺漏欄位自動補齊，不覆蓋既有輸入）
         function bpGet() {
-            let wh = window.currentWarehouse;
-            if (!state.warehouses[wh]) return bpDefaults();
+            let wh = bpEnforceWh(); // 🔐 強制夾在權限允許的倉別內
+            if (!state.warehouses[wh]) return bpDefaults(wh);
             if (!state.warehouses[wh].plan116 || state.warehouses[wh].plan116.version !== 2) {
-                state.warehouses[wh].plan116 = bpDefaults();
+                state.warehouses[wh].plan116 = bpDefaults(wh);
             }
-            let p = state.warehouses[wh].plan116, d = bpDefaults();
+            let p = state.warehouses[wh].plan116, d = bpDefaults(wh);
+            bpCleanSeededLeftovers(wh, p);
             if (!Array.isArray(p.items) || !p.items.length) p.items = [...BP_DEFAULT_ITEMS];
             ['units','ratios','qty','qtyDaily','fleetMonthly','fleetDaily','routeDaily','recv','carryBack','growth','coef'].forEach(k => { if (!p[k] || typeof p[k] !== 'object') p[k] = d[k]; });
             if (!Array.isArray(p.routes)) p.routes = [];
@@ -2424,12 +2481,14 @@
                 if (p.ratios[it] === undefined) p.ratios[it] = ''; if (!p.qty[it]) p.qty[it] = {};
             });
             BP_OTHER_CATS.forEach(c => { if (p.growth[c] === undefined) p.growth[c] = 0; });
-            Object.keys(d.coef).forEach(k => { if (p.coef[k] === undefined || p.coef[k] === '') p.coef[k] = d.coef[k]; });
-            for (let m = 1; m <= 12; m++) if (!p.fleetMonthly[m]) p.fleetMonthly[m] = { big: 0, small: 0 };
+            // ⚠️ 只補「欄位不存在」的情況；已存在的空白代表該倉尚未設定，不可自動補值，
+            //    否則大溪／岡山會在未察覺的情況下用到大肚的係數算出錯誤金額。
+            Object.keys(d.coef).forEach(k => { if (p.coef[k] === undefined) p.coef[k] = d.coef[k]; });
+            for (let m = 1; m <= 12; m++) if (!p.fleetMonthly[m]) p.fleetMonthly[m] = { ...d.fleetMonthly[m] };
             if (!p.mainlineMode) p.mainlineMode = 'A';
             if (!p.otherBase) p.otherBase = 'A';
-            if (p.avgBig === undefined) p.avgBig = 5902;
-            if (p.avgSmall === undefined) p.avgSmall = 4327;
+            if (p.avgBig === undefined) p.avgBig = d.avgBig;
+            if (p.avgSmall === undefined) p.avgSmall = d.avgSmall;
             return p;
         }
 
@@ -2506,8 +2565,14 @@
         function bpBuild(p, wh, scale) {
             scale = scale || 1;
             let bigCap = bpNum(p.bigCap), smallCap = bpNum(p.smallCap);
-            let coef = { bpt: bpNum(p.coef.boxPerTrip) || 70, tc: bpNum(p.coef.tripCost) || 2000, rpt: bpNum(p.coef.recvPerTrip) || 400, rtc: bpNum(p.coef.recvTripCost) || 2000 };
-            let flags = { ratioMissing: [], capMissing: false, routeMissing: false, unknownCodes: 0, baseFilled: [], carryBackZero: false };
+            // 計價係數不再有硬編碼保底值：沒設定就是算不出來，並在報表上明確警示。
+            // 用保底值會讓某倉在自己還沒設定係數時，安靜地套用別倉的規則算出看似正常卻錯誤的金額。
+            let coef = { bpt: bpNum(p.coef.boxPerTrip), tc: bpNum(p.coef.tripCost), rpt: bpNum(p.coef.recvPerTrip), rtc: bpNum(p.coef.recvTripCost) };
+            let flags = { ratioMissing: [], capMissing: false, routeMissing: false, unknownCodes: 0, baseFilled: [], carryBackZero: false, coefMissing: [] };
+            if (!(coef.bpt > 0)) flags.coefMissing.push('加派車每趟箱數');
+            if (!(coef.tc > 0)) flags.coefMissing.push('加派車單趟費用');
+            if (!(coef.rpt > 0)) flags.coefMissing.push('回收車每趟件數');
+            if (!(coef.rtc > 0)) flags.coefMissing.push('回收車單趟費用');
             let months = [], hasDailyQtyAny = false;
 
             p.items.forEach(it => {
@@ -2547,7 +2612,7 @@
 
                 // 加派車（月別淨額）
                 row.overBoxes = Math.max(0, boxTotal - cap);
-                row.overTrips = Math.ceil(row.overBoxes / coef.bpt);
+                row.overTrips = coef.bpt > 0 ? Math.ceil(row.overBoxes / coef.bpt) : 0;
 
                 // 加派車（日別逐日試算）：僅在該月有日別件數資料時計算，供對照
                 let dailyOver = 0, dailyDays = 0;
@@ -2563,14 +2628,14 @@
                     if (hasAny) { dailyDays++; let dc = dayCapList[d - 1].cap; dailyOver += Math.max(0, dayBox - dc); }
                 }
                 row.dailyMode = dailyDays > 0; if (row.dailyMode) hasDailyQtyAny = true;
-                row.overTripsDaily = row.dailyMode ? Math.ceil(dailyOver / coef.bpt) : null;
+                row.overTripsDaily = (row.dailyMode && coef.bpt > 0) ? Math.ceil(dailyOver / coef.bpt) : null;
                 row.overBoxesDaily = row.dailyMode ? dailyOver : null;
 
                 // 回收車
                 let recv = bpNum(p.recv[m]) * scale, cb = bpNum(p.carryBack[m]);
                 row.recvQty = recv; row.carryBack = cb;
                 row.recvRemain = Math.max(0, recv - cb);
-                row.recvTrips = Math.ceil(row.recvRemain / coef.rpt);
+                row.recvTrips = coef.rpt > 0 ? Math.ceil(row.recvRemain / coef.rpt) : 0;
                 if (recv > 0 && cb <= 0) flags.carryBackZero = true;
 
                 // 七大科目
@@ -2595,7 +2660,7 @@
         window.__bpCache = window.__bpCache || {};
 
         window.generateBudgetPlan = () => {
-            let wh = window.currentWarehouse, p = bpGet();
+            let wh = bpEnforceWh(), p = bpGet();
             let res = bpBuild(p, wh, 1);
             // 敏感度：件數與驗收件數同步縮放
             let sens = [0.9, 0.95, 1, 1.05, 1.1].map(s => ({ s, grand: bpBuild(p, wh, s).grand }));
@@ -2751,10 +2816,70 @@
             let rvc = document.getElementById('bpRecvGrid'); if (rvc) rvc.innerHTML = rv;
         }
 
+        // 🔐 唯讀模式：把 tab8 內所有輸入欄位設為 readonly/disabled
+        // ro_all(總部主管) 在其他分頁本來就是唯讀，預算編列頁必須一致，否則會出現
+        // 「唯讀帳號卻能改預算參數並儲存」的權限破口。
+        function bpApplyReadOnly() {
+            let ro = bpIsReadOnly(), tab = document.getElementById('tab8'); if (!tab) return;
+            tab.querySelectorAll('input, select, textarea').forEach(el => {
+                if (el.id === 'bpWhSelect') return; // 倉別切換仍允許（唯讀主管要能看三倉）
+                if (el.type === 'file') { el.disabled = ro; return; }
+                if (el.tagName === 'SELECT') { el.disabled = ro; return; }
+                el.readOnly = ro;
+                el.style.cursor = ro ? 'not-allowed' : '';
+            });
+            tab.querySelectorAll('.bp-del').forEach(b => { b.disabled = ro; b.style.display = ro ? 'none' : ''; });
+            let note = document.getElementById('bpReadOnlyNote');
+            if (ro && !note) {
+                let box = document.getElementById('bpWarehouseBox');
+                if (box && box.parentNode) {
+                    let d = document.createElement('div');
+                    d.id = 'bpReadOnlyNote'; d.style.cssText = 'font-size:12px; color:#856404; background:#fff3cd; border:1px solid #ffe8a1; border-radius:5px; padding:5px 10px; font-weight:bold; align-self:center;';
+                    d.textContent = '👁️ 唯讀模式：可檢視與試算，無法修改或儲存';
+                    box.parentNode.insertBefore(d, box.nextSibling);
+                }
+            } else if (!ro && note) note.remove();
+        }
+
+        // 🔐 倉別列：可看全部者顯示下拉選單，單倉使用者只顯示固定標籤（無法切換）
+        function bpRenderWarehouseBox() {
+            let el = document.getElementById('bpWarehouseBox'); if (!el) return;
+            let wh = bpEnforceWh(), allowed = bpAllowedWh();
+            if (allowed.length > 1) {
+                el.innerHTML = `<span style="font-size:12px; color:#5a3d99; font-weight:bold;">📍 編列倉別</span>
+                    <select id="bpWhSelect" class="ai-param-input" style="min-width:96px;" onchange="window.bpSwitchWarehouse(this.value)">
+                        ${allowed.map(w => `<option value="${w}"${w === wh ? ' selected' : ''}>${w}倉</option>`).join('')}
+                    </select>`;
+            } else {
+                el.innerHTML = `<span style="font-size:13px; font-weight:bold; color:#5a3d99; background:#f3ecff; border:1px solid #d8c8f0; border-radius:5px; padding:5px 10px;">📍 編列倉別：${wh}倉</span>`;
+            }
+            // 空倉提示：讓使用者知道是「尚未建立」而不是資料遺失
+            let hint = document.getElementById('bpEmptyWhHint');
+            let p = bpGet(), hasAny = false;
+            p.items.forEach(it => { for (let m = 1; m <= 12; m++) if (bpNum(p.qty[it]?.[m]) > 0) hasAny = true; });
+            for (let m = 1; m <= 12; m++) if (bpNum(p.recv[m]) > 0) hasAny = true;
+            if (!hasAny && !hint) {
+                let d = document.createElement('div');
+                d.id = 'bpEmptyWhHint';
+                d.style.cssText = 'font-size:12px; color:#0c5460; background:#d1ecf1; border:1px solid #b8daff; border-radius:5px; padding:5px 10px; font-weight:bold; align-self:center;';
+                d.textContent = `📝 ${wh}倉尚未建立 116 年度基礎資料，請自行填入或匯入`;
+                el.parentNode.insertBefore(d, el.nextSibling);
+            } else if (hasAny && hint) hint.remove();
+            else if (!hasAny && hint) hint.textContent = `📝 ${wh}倉尚未建立 116 年度基礎資料，請自行填入或匯入`;
+        }
+        window.bpSwitchWarehouse = (wh) => {
+            if (!bpAllowedWh().includes(wh)) { showToast('⚠️ 您的帳號沒有該倉別的權限'); bpRenderWarehouseBox(); return; }
+            if (typeof window.commitActiveInput === 'function' && !bpIsReadOnly()) window.commitActiveInput();
+            window.currentWarehouse = wh;
+            renderAll();
+            showToast(`📍 已切換至 ${wh}倉 的年度預算編列`);
+        };
+
         window.bpToggleRouteList = () => { let el = document.getElementById('bpRouteList'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
         window.bpToggleDailyDetail = (kind) => { let el = document.getElementById(kind === 'route' ? 'bpDailyRouteDetail' : 'bpDailyFleetDetail'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
 
         window.bpAddItem = () => {
+            if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法新增項目'); return; }
             let el = document.getElementById('bp_newItem'), name = (el?.value || '').trim();
             if (!name) { showToast('⚠️ 請輸入要新增的配送項目名稱'); return; }
             let p = bpGet();
@@ -2763,6 +2888,7 @@
             el.value = ''; bpTouch(); bpRenderInputs(); showToast(`✅ 已新增配送項目「${name}」，請填入箱件比與各月件數`);
         };
         window.bpRemoveItem = (name) => {
+            if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法刪除項目'); return; }
             let p = bpGet();
             if (BP_DEFAULT_ITEMS.includes(name)) { showToast('⚠️ 預設項目不可刪除'); return; }
             p.items = p.items.filter(x => x !== name); delete p.units[name]; delete p.ratios[name]; delete p.qty[name]; if (p.qtyDaily) delete p.qtyDaily[name];
@@ -2772,6 +2898,7 @@
         // 輸入即寫入 state（事件委派）
         window.bpOnInput = (e) => {
             let t = e.target; if (!t || !t.dataset || !t.dataset.bp) return;
+            if (bpIsReadOnly()) return; // 🔐 唯讀角色不得寫入任何預算參數
             let p = bpGet(), kind = t.dataset.bp, m = t.dataset.m, raw = t.value;
             // 千分位輸入框存的是「1,234」這種字串，需先去逗號才能轉數字；其餘(select等)原樣處理
             let isNumFmt = t.classList && t.classList.contains('bp-numfmt');
@@ -2797,6 +2924,7 @@
         };
 
         window.saveBudgetPlanParams = () => {
+            if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法儲存預算編列資料'); return; }
             bpGet(); bpTouch();
             if (typeof window.saveData === 'function') window.saveData(true);
             showToast('💾 116 年度預算編列資料已儲存！');
@@ -2817,7 +2945,7 @@
 
         // ---------------------------------------------------------------- 結果渲染
         function bpRenderResult() {
-            let wh = window.currentWarehouse, c = window.__bpCache[wh];
+            let wh = bpEnforceWh(), c = window.__bpCache[wh];
             let meta = document.getElementById('budgetPlanMeta'), t1 = document.getElementById('bpResultTable'), t2 = document.getElementById('bpCompareTable'), t3 = document.getElementById('bpSensTable');
             let dl = document.getElementById('btnDownloadBudgetPlan');
             if (!c) { if (meta) meta.innerHTML = ''; [t1, t2, t3].forEach(t => { if (t) t.innerHTML = ''; }); if (dl) dl.disabled = true; return; }
@@ -2825,6 +2953,7 @@
             let f = c.flags, warn = [];
             if (f.ratioMissing.length) warn.push(`⚠️ 這些項目的資料單位是「件」卻沒填箱件比，箱數需求無法計算：<b>${f.ratioMissing.join('、')}</b>（若該項資料本來就是箱數，請把單位改成「箱」）`);
             if (f.capMissing) warn.push('⚠️ 未填「大車／小車可載箱數」，承載量與裝載率無法計算，加派車會全部為 0');
+            if (f.coefMissing && f.coefMissing.length) warn.push(`⚠️ 尚未設定計價係數：<b>${f.coefMissing.join('、')}</b>　相關費用會算成 0，請到①基礎設定填入本倉的計價規則`);
             if (f.routeMissing && c.snapshot.mainlineMode === 'B') warn.push('⚠️ 已選 B版(8月單價) 但尚未匯入路線單價清單，主線費用為 0');
             if (f.unknownCodes) warn.push(`⚠️ 日別路線清單中有 <b>${f.unknownCodes}</b> 筆路線代號不在單價清單內，該筆未計費用`);
             if (f.carryBackZero) warn.push('⚠️ 部分月份「主線帶回件數」為 0，回收車會把全部驗收量當成需專車載運，金額可能高估');
@@ -2928,7 +3057,7 @@
 
         // ---------------------------------------------------------------- 下載
         window.downloadBudgetPlan = () => {
-            let wh = window.currentWarehouse, c = window.__bpCache[wh];
+            let wh = bpEnforceWh(), c = window.__bpCache[wh];
             if (!c) { showToast('⚠️ 請先點擊「產出建議預算」！'); return; }
             let wb = XLSX.utils.book_new();
             let styleSheet = (ws, headRow) => {
@@ -3076,6 +3205,7 @@
         }
 
         window.bpImportQty = (e) => {
+            if (bpIsReadOnly()) { e.target.value = ''; showToast('⚠️ 唯讀模式無法匯入資料'); return; }
             let file = e.target.files[0]; if (!file) return; e.target.value = '';
             let target = document.getElementById('bp_importTarget')?.value || 'EC';
             bpReadSheet(file, aoa => {
@@ -3110,6 +3240,7 @@
         };
 
         window.bpImportRoutes = (e) => {
+            if (bpIsReadOnly()) { e.target.value = ''; showToast('⚠️ 唯讀模式無法匯入資料'); return; }
             let file = e.target.files[0]; if (!file) return; e.target.value = '';
             bpReadSheet(file, aoa => {
                 let hRow = -1, cCode = -1, cType = -1, cPrice = -1;
@@ -3141,6 +3272,7 @@
         };
 
         window.bpImportRouteDaily = (e) => {
+            if (bpIsReadOnly()) { e.target.value = ''; showToast('⚠️ 唯讀模式無法匯入資料'); return; }
             let file = e.target.files[0]; if (!file) return; e.target.value = '';
             bpReadSheet(file, aoa => {
                 let p = bpGet(), o = bpDetectOrientation(aoa), acc = {}, cells = 0, dir = '';
@@ -3192,6 +3324,7 @@
         };
 
         window.bpImportFleetDaily = (e) => {
+            if (bpIsReadOnly()) { e.target.value = ''; showToast('⚠️ 唯讀模式無法匯入資料'); return; }
             let file = e.target.files[0]; if (!file) return; e.target.value = '';
             bpReadSheet(file, aoa => {
                 let p = bpGet(), o = bpDetectOrientation(aoa), acc = {}, dir = '';
@@ -3234,6 +3367,7 @@
         };
 
         window.bpImportQtyDaily = (e) => {
+            if (bpIsReadOnly()) { e.target.value = ''; showToast('⚠️ 唯讀模式無法匯入資料'); return; }
             let file = e.target.files[0]; if (!file) return; e.target.value = '';
             bpReadSheet(file, aoa => {
                 let p = bpGet(), o = bpDetectOrientation(aoa), recs = [], dir = '';
@@ -3299,6 +3433,7 @@
         };
 
         window.bpClearDaily = (kind) => {
+            if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法清除資料'); return; }
             let p = bpGet();
             if (kind === 'route') { p.routeDaily = {}; showToast('🗑️ 已清空日別路線清單'); }
             else if (kind === 'fleet') { p.fleetDaily = {}; showToast('🗑️ 已清空日別車輛台數'); }
@@ -3307,8 +3442,10 @@
         };
 
         function renderTab8() {
+            bpRenderWarehouseBox();
             bpRenderInputs();
             bpRenderSizeIndicator();
+            bpApplyReadOnly();
             let wh = window.currentWarehouse;
             if (window.__bpCache[wh]) bpRenderResult();
             else {
