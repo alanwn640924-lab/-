@@ -284,6 +284,7 @@
             <div class="tab-badge badge-orange">具</div>
             <button id="tabBtn_8" class="tab-btn btn-orange" onclick="window.switchTabSafe('tabBtn_8', 6)">預估實績表</button>
             <button id="tabBtn_9" class="tab-btn btn-orange" onclick="window.switchTabSafe('tabBtn_9', 7)">運費結帳比對</button>
+            <button id="tabBtn_10" class="tab-btn btn-orange" onclick="window.switchTabSafe('tabBtn_10', 8)">年度預算編列</button>
         </div>
     </div>
 
@@ -403,11 +404,11 @@
             <button style="background:#fd7e14; color:white;" onclick="window.saveAIParams()">💾 儲存參數</button>
         </div>
         <style>
-            #aiParamPanel .ai-param-group { display:flex; flex-direction:column; align-items:center; }
-            #aiParamPanel .ai-param-label { font-size:12px; color:#8a6d3b; font-weight:bold; margin-bottom:3px; white-space:nowrap; }
-            #aiParamPanel .ai-param-input { width:60px; padding:4px 2px; border:1px solid #d8c8a8; border-radius:4px; box-sizing:border-box; text-align:center; }
-            #aiParamPanel .ai-param-input::-webkit-outer-spin-button, #aiParamPanel .ai-param-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-            #aiParamPanel .ai-param-input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+            .ai-param-group { display:flex; flex-direction:column; align-items:center; }
+            .ai-param-label { font-size:12px; color:#8a6d3b; font-weight:bold; margin-bottom:3px; white-space:nowrap; }
+            .ai-param-input { width:60px; padding:4px 2px; border:1px solid #d8c8a8; border-radius:4px; box-sizing:border-box; text-align:center; font-variant-numeric:tabular-nums; }
+            .ai-param-input::-webkit-outer-spin-button, .ai-param-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+            .ai-param-input[type=number] { -moz-appearance:textfield; appearance:textfield; }
         </style>
         <div id="aiForecastPanel" style="display:none; margin-bottom:20px; background:#f8f5ff; border:1px solid #d8c8f0; border-radius:8px; padding:15px;">
             <div id="aiForecastMeta" style="font-size:13px; color:#5a3d99; font-weight:bold; margin-bottom:10px;"></div>
@@ -488,7 +489,186 @@
         </div>
     </div>
 
-    <!-- 預算警示 Modal -->
+    <div id="tab8" class="tab-content" oninput="window.bpOnInput(event)" onchange="window.bpOnInput(event)">
+        <style>
+            #tab8 .bp-sec { background:#fff; border:1px solid #dde3ea; border-radius:8px; margin-bottom:12px; overflow:hidden; }
+            #tab8 .bp-sec > summary { cursor:pointer; padding:10px 14px; font-weight:bold; font-size:15px; color:#0056b3; background:#f4f8fd; border-bottom:1px solid #dde3ea; list-style:none; display:flex; align-items:center; gap:8px; }
+            #tab8 .bp-sec > summary::before { content:'▶'; font-size:11px; color:#7a90a8; transition:transform .15s; }
+            #tab8 .bp-sec[open] > summary::before { transform:rotate(90deg); }
+            #tab8 .bp-sec > summary:hover { background:#e8f0fe; }
+            #tab8 .bp-body { padding:12px 14px; }
+            #tab8 .bp-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+            #tab8 .bp-sep { border-top:1px dashed #dde3ea; margin-top:10px; padding-top:10px; }
+            #tab8 .bp-lbl { font-size:12px; color:#666; font-weight:bold; align-self:center; }
+            #tab8 .bp-scroll { overflow:auto; max-height:340px; border:1px solid #e6ebf1; border-radius:6px; }
+            #tab8 table.bp-grid { border-collapse:collapse; width:100%; font-size:13px; background:#fff; }
+            #tab8 table.bp-grid th, #tab8 table.bp-grid td { border:1px solid #e2e8ef; padding:3px 6px; text-align:center; white-space:nowrap; }
+            #tab8 .bp-th { background:#6f42c1; color:#fff; font-weight:bold; position:sticky; top:0; z-index:5; }
+            #tab8 .bp-sticky { position:sticky; left:0; background:#f4f8fd; z-index:4; font-weight:bold; text-align:center; width:112px; min-width:112px; }
+            #tab8 .bp-th.bp-sticky { background:#5a35a3; color:#fff; z-index:6; }
+            #tab8 .bp-item { color:#0056b3; }
+            #tab8 .bp-sum { text-align:center; font-variant-numeric:tabular-nums; }
+            #tab8 table.bp-grid th, #tab8 table.bp-grid td { height:26px; box-sizing:border-box; }
+            #tab8 .bp-in, #tab8 .bp-in-ctr, #tab8 .bp-unitsel { width:82px; height:22px; box-sizing:border-box; border:1px solid transparent; background:transparent; font-size:13px; font-family:inherit; padding:2px 4px; border-radius:3px; font-variant-numeric:tabular-nums; }
+            #tab8 .bp-in { text-align:center; }
+            #tab8 .bp-in-ctr { text-align:center; }
+            #tab8 .bp-in:hover, #tab8 .bp-in-ctr:hover { border-color:#cfd8e3; }
+            #tab8 .bp-in:focus, #tab8 .bp-in-ctr:focus { border-color:#6f42c1; background:#f8f5ff; outline:none; }
+            #tab8 .bp-in.bp-bad, #tab8 .bp-in-ctr.bp-bad { background:#ffe8e8; border-color:#dc3545; }
+            #tab8 tr.bp-total td { background:#f4f8fd; font-weight:bold; text-align:center; font-variant-numeric:tabular-nums; }
+            #tab8 .bp-unitsel { width:62px; text-align:center; border:1px solid #cfd8e3; background:#fff; cursor:pointer; }
+            #tab8 .bp-nodiv { color:#adb5bd; background:#f7f8fa; }
+            #tab8 .bp-yr { background:#fffbe6; font-weight:bold; }
+            #tab8 .bp-divrow { background:#495057; color:#fff; font-weight:bold; text-align:center; font-size:12px; padding:4px 8px; position:sticky; left:0; }
+            #tab8 .bp-proc { background:#fafbfc; color:#495057; }
+            #tab8 .bp-proclbl { color:#495057; font-weight:normal; font-size:12px; background:#f0f2f5; }
+            #tab8 .bp-note { font-size:12px; color:#5a6b7d; margin-top:8px; line-height:1.6; }
+            #tab8 .bp-warn { color:#856404; background:#fff3cd; border:1px solid #ffe8a1; border-radius:6px; padding:7px 9px; font-weight:bold; }
+            #tab8 .bp-del { background:#dc3545; color:#fff; border:none; border-radius:3px; padding:2px 8px; font-size:11px; cursor:pointer; }
+            #tab8 .bp-imp { color:#fff; border:none; border-radius:5px; padding:7px 11px; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap; }
+            #tab8 .bp-clr { background:#adb5bd; color:#fff; border:none; border-radius:5px; padding:5px 9px; font-size:12px; cursor:pointer; }
+            #tab8 select.ai-param-input { width:auto; min-width:150px; }
+        </style>
+
+        <div style="margin-bottom:12px; background:linear-gradient(90deg,#f3ecff,#fff); padding:12px 15px; border-radius:8px; border:1px solid #d8c8f0;">
+            <strong style="color:#5a3d99; font-size:17px;">📐 116 年度預算編列</strong>
+            <span style="font-size:13px; color:#6c757d; margin-left:8px;">件數 → 箱數 → 主線車輛 → 加派車 → 回收車 → 其他項目 → 對比 115 年</span>
+            <div class="bp-row" style="margin-top:10px;">
+                <button style="background:#fd7e14; color:white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.saveBudgetPlanParams()">💾 儲存資料</button>
+                <button style="background:#6f42c1; color:white; width:160px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.generateBudgetPlan()">🧮 產出建議預算</button>
+                <button id="btnDownloadBudgetPlan" style="background:#20c997; color:white; width:160px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" disabled onclick="window.downloadBudgetPlan()">📥 下載建議預算</button>
+            </div>
+            <div id="bpSizeIndicator" style="margin-top:10px; font-size:12px; color:#5a6b7d;"></div>
+        </div>
+
+        <details class="bp-sec" open>
+            <summary>① 基礎設定：計價方式、車輛容量、單價與係數</summary>
+            <div class="bp-body">
+                <div class="bp-row">
+                    <div class="ai-param-group"><label class="ai-param-label" title="A版：大小車平均單價×台數。B版：依實際路線逐條單價加總">主線計價方式</label>
+                        <select id="bp_mainlineMode" class="ai-param-input" data-bp="basic" data-f="mainlineMode">
+                            <option value="A">A版：平均單價</option>
+                            <option value="B">B版：8月單價</option>
+                        </select></div>
+                    <div class="ai-param-group"><label class="ai-param-label" title="其他/違規罰款/離島/轉運 四項的基準取法">其他項目基準</label>
+                        <select id="bp_otherBase" class="ai-param-input" data-bp="basic" data-f="otherBase">
+                            <option value="A">A版：115逐月實績(未發生月份用預算)</option>
+                            <option value="B">B版：115年8月實績推估</option>
+                        </select></div>
+                </div>
+                <div class="bp-sep bp-row">
+                    <div class="bp-lbl">🚚 車輛容量與平均單價</div>
+                    <div class="ai-param-group"><label class="ai-param-label">大車可載箱數</label><input type="text" inputmode="decimal" id="bp_bigCap" class="ai-param-input bp-numfmt" data-bp="basic" data-f="bigCap" placeholder="必填"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">小車可載箱數</label><input type="text" inputmode="decimal" id="bp_smallCap" class="ai-param-input bp-numfmt" data-bp="basic" data-f="smallCap" placeholder="必填"></div>
+                    <div style="width:0; border-left:1px dashed #ccc; align-self:stretch;"></div>
+                    <div class="ai-param-group"><label class="ai-param-label" title="A版主線費用使用">大車平均單價</label><input type="text" inputmode="decimal" id="bp_avgBig" class="ai-param-input bp-numfmt" data-bp="basic" data-f="avgBig"></div>
+                    <div class="ai-param-group"><label class="ai-param-label" title="A版主線費用使用">小車平均單價</label><input type="text" inputmode="decimal" id="bp_avgSmall" class="ai-param-input bp-numfmt" data-bp="basic" data-f="avgSmall"></div>
+                </div>
+                <div class="bp-sep bp-row">
+                    <div class="bp-lbl">⚙️ 計價係數</div>
+                    <div class="ai-param-group"><label class="ai-param-label">加派車每趟箱數</label><input type="text" inputmode="decimal" id="bp_boxPerTrip" class="ai-param-input bp-numfmt" data-bp="basic" data-f="coef.boxPerTrip"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">加派車單趟費用</label><input type="text" inputmode="decimal" id="bp_tripCost" class="ai-param-input bp-numfmt" data-bp="basic" data-f="coef.tripCost"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">回收車每趟件數</label><input type="text" inputmode="decimal" id="bp_recvPerTrip" class="ai-param-input bp-numfmt" data-bp="basic" data-f="coef.recvPerTrip"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">回收車單趟費用</label><input type="text" inputmode="decimal" id="bp_recvTripCost" class="ai-param-input bp-numfmt" data-bp="basic" data-f="coef.recvTripCost"></div>
+                </div>
+                <div class="bp-sep bp-row">
+                    <div class="bp-lbl">📈 其他項目成長率</div>
+                    <div class="ai-param-group"><label class="ai-param-label">其他 %</label><input type="text" inputmode="decimal" id="bp_g_其他" class="ai-param-input bp-numfmt" data-bp="basic" data-decimals="2" data-f="growth.其他"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">違規罰款 %</label><input type="text" inputmode="decimal" id="bp_g_違規罰款" class="ai-param-input bp-numfmt" data-bp="basic" data-decimals="2" data-f="growth.違規罰款"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">離島 %</label><input type="text" inputmode="decimal" id="bp_g_離島" class="ai-param-input bp-numfmt" data-bp="basic" data-decimals="2" data-f="growth.離島"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">轉運 %</label><input type="text" inputmode="decimal" id="bp_g_轉運" class="ai-param-input bp-numfmt" data-bp="basic" data-decimals="2" data-f="growth.轉運"></div>
+                </div>
+                <div class="bp-note">📌 加派車含「爆量費用＋爆量自揹費用」，與現行月預算動支表的科目分類一致。</div>
+            </div>
+        </details>
+
+        <details class="bp-sec" open>
+            <summary>② 配送件數與箱件比（箱數需求來源）</summary>
+            <div class="bp-body">
+                <div class="bp-row" style="margin-bottom:10px;">
+                    <input type="file" id="bpFileQty" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportQty(event)">
+                    <input type="file" id="bpFileQtyDaily" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportQtyDaily(event)">
+                    <div class="ai-param-group"><label class="ai-param-label" title="匯入的表格若沒有項目名稱欄，數值會填到這個項目">匯入目標項目</label>
+                        <select id="bp_importTarget" class="ai-param-input"><option value="EC">EC</option><option value="一般商品">一般商品</option><option value="團預購">團預購</option><option value="手揀">手揀</option><option value="POP">POP</option></select></div>
+                    <button class="bp-imp" style="background:#17a2b8;" onclick="document.getElementById('bpFileQty').click()">📥 匯入月別件數</button>
+                    <button class="bp-imp" style="background:#0d8a9c;" onclick="document.getElementById('bpFileQtyDaily').click()">📥 匯入日別件數</button>
+                    <button class="bp-clr" onclick="window.bpClearDaily('qty')">清空日別件數</button>
+                    <div style="width:0; border-left:1px dashed #ccc; align-self:stretch;"></div>
+                    <div class="ai-param-group"><label class="ai-param-label">新增配送項目</label><input type="text" id="bp_newItem" class="ai-param-input" placeholder="項目名稱" style="width:120px;"></div>
+                    <button class="bp-imp" style="background:#28a745;" onclick="window.bpAddItem()">➕ 新增項目</button>
+                </div>
+                <div class="bp-scroll"><div id="bpQtyGrid"></div></div>
+                <div class="bp-note">📌 <b>資料單位</b>選「件」→ 箱數 = 件數 ÷ 箱件比；選「箱」→ 該欄數值直接就是箱數，箱件比自動鎖住不需填。各項獨立、最後加總為箱數需求。<br>
+                    📥 <b>月別件數</b>格式：表頭列含「1月…12月」，A欄放項目名稱（留空則填入上方所選的目標項目）。<br>
+                    📥 <b>日別件數</b>格式：<b>表頭列放日期、A欄放項目名稱</b>（橫式）。系統也接受日期在 A 欄的直式，會自動判別方向。<br>
+                    　　匯入後會自動彙總回寫月別件數（僅在該月天數填齊時才回寫），並額外提供「日別逐日加派車」對照試算。</div>
+            </div>
+        </details>
+
+        <details class="bp-sec" open>
+            <summary>③ 主線車輛與單價（承載量、裝載率、主線費用）</summary>
+            <div class="bp-body">
+                <div class="bp-row" style="margin-bottom:10px;">
+                    <input type="file" id="bpFileRoutes" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportRoutes(event)">
+                    <input type="file" id="bpFileRouteDaily" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportRouteDaily(event)">
+                    <input type="file" id="bpFileFleetDaily" accept=".xlsx,.xls,.csv" style="display:none;" onchange="window.bpImportFleetDaily(event)">
+                    <button class="bp-imp" style="background:#6f42c1;" onclick="document.getElementById('bpFileRoutes').click()">📥 匯入路線單價清單</button>
+                    <button class="bp-imp" style="background:#5a35a3;" onclick="document.getElementById('bpFileRouteDaily').click()">📥 匯入日別行駛路線</button>
+                    <button class="bp-clr" onclick="window.bpClearDaily('route')">清空日別路線</button>
+                    <div style="width:0; border-left:1px dashed #ccc; align-self:stretch;"></div>
+                    <button class="bp-imp" style="background:#17a2b8;" onclick="document.getElementById('bpFileFleetDaily').click()">📥 匯入日別大小車台數</button>
+                    <button class="bp-clr" onclick="window.bpClearDaily('fleet')">清空日別台數</button>
+                </div>
+                <div id="bpRouteSummary"></div>
+                <div class="bp-scroll" style="margin-top:10px;"><div id="bpFleetGrid"></div></div>
+                <div class="bp-note">📥 <b>路線單價清單</b>格式：表頭含「路線／車型與單價」三欄（車型填「大」或「小」）。<br>
+                    📥 <b>日別行駛路線</b>格式：<b>表頭列放日期，各日的路線代號往下排</b>（橫式）。有這份資料的日子，台數與 B版主線費用都直接由該日路線加總得出，最精確。<br>
+                    📥 <b>日別大小車台數</b>格式：<b>表頭列放日期，A欄放「大車台數」「小車台數」兩列</b>（橫式）。<br>
+                    　　以上兩者也接受日期在 A 欄的直式，系統會自動判別方向。</div>
+            </div>
+        </details>
+
+        <details class="bp-sec" open>
+            <summary>④ 回收車（預算驗收件數與主線帶回件數）</summary>
+            <div class="bp-body">
+                <div class="bp-row" style="margin-bottom:10px;">
+                    <div class="bp-lbl">回收車 =（預算驗收件數 − 主線帶回件數）÷ 每趟件數 × 單趟費用</div>
+                    <button class="bp-imp" style="background:#17a2b8;" onclick="document.getElementById('bpFileQty').click()">📥 匯入（同月別件數匯入器）</button>
+                </div>
+                <div class="bp-scroll"><div id="bpRecvGrid"></div></div>
+                <div class="bp-note">📌 匯入時，A欄請放「驗收件數」或「主線帶回件數」當列名，表頭列放「1月…12月」。</div>
+            </div>
+        </details>
+
+        <div id="budgetPlanMeta" style="font-size:13px; color:#5a3d99; font-weight:bold; margin:14px 0 10px; line-height:1.8;"></div>
+
+        <div class="bp-sec" style="border-color:#d8c8f0;">
+            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">📊 116 年度建議預算（含試算過程）</div>
+            <div class="bp-body"><div class="bp-scroll" style="max-height:none;"><table id="bpResultTable" class="bp-grid"></table></div></div>
+        </div>
+
+        <div class="bp-sec" style="border-color:#d8c8f0;">
+            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">🔍 116 vs 115 預算／實績對比</div>
+            <div class="bp-body"><div class="bp-scroll" style="max-height:none;"><table id="bpCompareTable" class="bp-grid"></table></div><div id="bpCompareNote"></div></div>
+        </div>
+
+        <div class="bp-sec" style="border-color:#d8c8f0;">
+            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">📈 敏感度分析（件數 ±5% / ±10%）</div>
+            <div class="bp-body"><div class="bp-scroll" style="max-height:none;"><table id="bpSensTable" class="bp-grid"></table></div><div id="bpSensNote"></div></div>
+        </div>
+    </div>
+
+    <div id="noteEditModal" class="modal" style="z-index:5000;">
+        <div class="modal-content" style="max-width:420px; text-align:left;">
+            <h3 style="margin-top:0; color:#333;">📝 請輸入備註說明：</h3>
+            <textarea id="noteEditTextarea" rows="4" style="width:100%; box-sizing:border-box; font-size:15px; padding:8px; border:1px solid #ccc; border-radius:6px; resize:vertical;"></textarea>
+            <div style="display:flex; gap:10px; margin-top:14px;">
+                <button class="btn-success" style="flex:1; justify-content:center; background:#6c757d;" onclick="window.closeNoteEditModal(false)">取消</button>
+                <button class="btn-success" style="flex:1; justify-content:center;" onclick="window.closeNoteEditModal(true)">確定</button>
+            </div>
+        </div>
+    </div>
+
     <div id="budgetAlertModal" class="modal" style="z-index:3000;">
         <div class="modal-content" style="border-top: 5px solid #dc3545; max-width: 400px; text-align:center;">
             <h3 style="color:#dc3545; margin-top:0;">⚠️ 預算動支超標提醒</h3>
@@ -971,6 +1151,21 @@
                             }
                         }
                         let cleanState = JSON.parse(JSON.stringify(window.state));
+
+                        // 🛡️ 防護：Firestore 單一文件硬上限 1 MiB，超過會「永久失敗」而非「暫時性逾時」，
+                        //         重試無效，必須清資料才能解決。事先量測大小，超過就直接明確告知，
+                        //         不要讓使用者誤以為是網路問題而白白等待自動重試。
+                        let stateSize = new Blob([JSON.stringify(cleanState)]).size;
+                        const FIRESTORE_LIMIT = 1048576;
+                        if (stateSize >= FIRESTORE_LIMIT) {
+                            window._consecutiveFailCount = 0; // 這不是網路問題，不該觸發斷路器
+                            showToast(`❌ 資料量已達 ${(stateSize/1024).toFixed(0)}KB，超過雲端單筆文件上限(1024KB)，本次無法寫入雲端（本機資料仍安全保留）。請到「年度預算編列」清除不需要的日別明細後再試。`, 12000);
+                            return;
+                        }
+                        if (showMsg && stateSize >= FIRESTORE_LIMIT * 0.85) {
+                            showToast(`⚠️ 目前資料量 ${(stateSize/1024).toFixed(0)}KB，已接近雲端單筆文件上限(1024KB)，建議適時清除不需要的日別明細，避免日後寫入失敗。`, 10000);
+                        }
+
                         let writeStartTime = window.state.lastModified;
                         await window._withTimeout(setDoc(docRef, cleanState), 20000, '寫入雲端資料', () => {
                             // 🩹 修復：這筆寫入「慢但最終成功」，補記錄同步狀態，避免程式一直誤判成沒同步過。
@@ -980,6 +1175,17 @@
                         window.lastSyncTime = window.state.lastModified; window._consecutiveFailCount = 0; if (showMsg) showToast('☁️ 資料已成功同步至雲端！');
                     } catch(e) {
                         console.error("Firestore Error:", e);
+                        // 🛡️ 防護：文件過大或欄位格式不合法這類「無論重試多少次都不會成功」的錯誤，
+                        //         不該套用「安靜重試、失敗2次才提醒」的網路逾時邏輯，否則使用者會一直
+                        //         誤以為是網路問題而空等，資料其實永遠上不去。
+                        let msg = String(e && e.message || e || '');
+                        let isSizeErr = /longer than|exceeds the maximum|1048576|maximum size|too large/i.test(msg);
+                        let isFatalErr = isSizeErr || (e && (e.code === 'invalid-argument' || e.code === 'resource-exhausted'));
+                        if (isFatalErr) {
+                            window._consecutiveFailCount = 0;
+                            try { showToast(`❌ 雲端寫入失敗：${isSizeErr ? '資料量超過雲端文件上限，重試無法解決，請到「年度預算編列」清除日別明細後再存' : '資料格式錯誤(' + (e.code || msg.slice(0,60)) + ')，請聯繫系統管理員'}`, 12000); } catch(e2) {}
+                            return;
+                        }
                         // 🩹 修復：以前只要失敗一次就立刻跳警告，但背景常常自己重試一次就成功了，
                         //         反而讓使用者一直看到「失敗」而擔心。這裡改成連續失敗達 2 次以上才提醒，
                         //         第一次先安靜在背景重試，真的持續失敗才需要使用者注意。
@@ -1039,12 +1245,31 @@
             document.getElementById('dailyTable').addEventListener('focusout', e => { if (window.userRole === 'ro_all') return; if(e.target.classList.contains('data-cell') && e.target.value.trim()!=='' && e.target.dataset.item !== '件數達成率') { let p = parseVal(e.target.value); if(!isNaN(p)) e.target.value = formatVal(p, e.target.dataset.type); } });
             document.getElementById('dailyTable').addEventListener('contextmenu', e => {
                 if (window.userRole === 'ro_all') return;
-                if(e.target.classList.contains('data-cell')) {
-                    e.preventDefault(); let d = e.target.dataset.date, i = e.target.dataset.item; if(!getComments()[d]) getComments()[d] = {};
-                    let currentNote = getComments()[d][i] || ''; let newNote = prompt(`✏️ 請輸入備註說明：`, currentNote);
-                    if(newNote !== null) { if(newNote.trim() === '') delete getComments()[d][i]; else getComments()[d][i] = newNote.trim(); state.lastModified = Date.now(); window.saveData(false); renderTab1(); }
-                }
+                if(e.target.classList.contains('data-cell')) { e.preventDefault(); window.openDailyCellNote(e.target); }
             });
+            // 📱 手機長按支援：iOS Safari 的觸控長按不會可靠觸發 contextmenu 事件（Android 才會），
+            //     這裡額外用 touchstart/touchend 計時，模擬「長按 550ms = 右鍵開備註」的行為，
+            //     讓 iPhone 也能跟 Android 一樣用長按新增備註。短按(<550ms)仍走原本的點格輸入流程。
+            (function() {
+                let pressTimer = null, pressTarget = null, moved = false;
+                let dt = document.getElementById('dailyTable');
+                dt.addEventListener('touchstart', e => {
+                    if (window.userRole === 'ro_all') return;
+                    let t = e.target; if (!t.classList || !t.classList.contains('data-cell')) return;
+                    moved = false; pressTarget = t;
+                    clearTimeout(pressTimer);
+                    pressTimer = setTimeout(() => {
+                        if (!moved && pressTarget) {
+                            pressTarget.blur(); // 若已彈出手機鍵盤先收起，避免跟備註視窗互相干擾
+                            if (navigator.vibrate) { try { navigator.vibrate(10); } catch (e2) {} }
+                            window.openDailyCellNote(pressTarget);
+                        }
+                    }, 550);
+                }, { passive: true });
+                dt.addEventListener('touchmove', () => { moved = true; }, { passive: true });
+                dt.addEventListener('touchend', () => { clearTimeout(pressTimer); pressTarget = null; }, { passive: true });
+                dt.addEventListener('touchcancel', () => { clearTimeout(pressTimer); pressTarget = null; }, { passive: true });
+            })();
 
             document.getElementById('excelFile').addEventListener('change', handleExcelImport);
             document.getElementById('dailyExcelFile').addEventListener('change', handleDailyExcelImport);
@@ -1191,6 +1416,38 @@
         window.openCloudConfigModal = () => { if(window.userRole === 'ro_all') return showToast('⚠️ 唯讀模式無法修改系統連線設定'); document.getElementById('cloudModal').style.display='block'; let cfg = localStorage.getItem('user_firebase_config'); if(cfg) document.getElementById('configInput').value = JSON.stringify(JSON.parse(cfg), null, 2); };
 
         function showToast(msg, duration = 3000) { let t = document.getElementById("toast-container"); t.innerText = msg; t.className = "show"; setTimeout(() => t.className = "", duration); }
+
+        // 📝 自訂備註輸入視窗（取代 window.prompt）
+        // 原因：iOS Safari 在「加入主畫面」的獨立模式下，window.prompt()/alert()/confirm() 會被 WebKit
+        // 靜默擋掉、完全不顯示，這是蘋果的已知限制，不是程式錯誤——所以同一份程式碼在 Android 上正常，
+        // iPhone 卻完全沒反應。改用自製的 HTML Modal 後，兩邊平台行為才會一致。
+        window._noteEditResolve = null;
+        window.openNoteEditModal = (currentValue) => {
+            return new Promise(resolve => {
+                window._noteEditResolve = resolve;
+                let ta = document.getElementById('noteEditTextarea');
+                ta.value = currentValue || '';
+                document.getElementById('noteEditModal').style.display = 'block';
+                setTimeout(() => { ta.focus(); ta.select(); }, 50);
+            });
+        };
+        window.closeNoteEditModal = (confirmed) => {
+            let ta = document.getElementById('noteEditTextarea');
+            let val = confirmed ? ta.value : null;
+            document.getElementById('noteEditModal').style.display = 'none';
+            if (window._noteEditResolve) { let r = window._noteEditResolve; window._noteEditResolve = null; r(val); }
+        };
+        // 日別表格「儲存格備註」的開啟入口，滑鼠右鍵(桌機/Android長按)與手機長按共用同一段邏輯
+        window.openDailyCellNote = async (target) => {
+            let d = target.dataset.date, i = target.dataset.item;
+            if (!getComments()[d]) getComments()[d] = {};
+            let currentNote = getComments()[d][i] || '';
+            let newNote = await window.openNoteEditModal(currentNote);
+            if (newNote !== null) {
+                if (newNote.trim() === '') delete getComments()[d][i]; else getComments()[d][i] = newNote.trim();
+                state.lastModified = Date.now(); window.saveData(false); renderTab1();
+            }
+        };
         function formatVal(v, type) { let n = Number(v); return isNaN(n) || v==null || v==='' ? '' : (type === 'rate' ? n.toFixed(1)+'%' : (type === 'unit-cost' ? n.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) : n.toLocaleString('en-US', {maximumFractionDigits:0}))); }
         function parseVal(v) { return Number(String(v||'').replace(/[,%]/g, '')); }
         function getItemType(item) { return GROUPS.find(g=>g.type==='rate').items.includes(item) || item.includes('達成率') || item.includes('裝載率') ? 'rate' : (item.includes('趟次')||item.includes('條數')||item.includes('件數')||(item.includes('新開店')&&!item.includes('費用')) ? 'count' : 'cost'); }
@@ -1212,7 +1469,7 @@
 
         // --- RENDER FUNCTIONS ---
         function renderAll() { 
-            [renderTab1, renderTab2, renderTab3, renderTab4, renderTab5, renderTab6, renderTab7][currentActiveTab-1](); 
+            [renderTab1, renderTab2, renderTab3, renderTab4, renderTab5, renderTab6, renderTab7, renderTab8][currentActiveTab-1](); 
             let reportModal = document.getElementById('dailyReportModal');
             if (reportModal && reportModal.style.display === 'block') { let picker = document.getElementById('reportDateSelect'); let data = window.getDailyReportData(picker.value); document.getElementById('dailyReportText').innerHTML = data.map(d => d.text ? `<span style="${d.color ? `color:${d.color};` : ''}">${d.text}</span>` : '').join('<br>'); }
         }
@@ -2113,6 +2370,955 @@
             showToast('📥 整月AI預估明細已下載！可與日別登錄表下載檔於月底進行比對。');
         };
 
+        // ============================================================================
+        // 📐 116 年度預算編列引擎 v2  （2026/08 全新改版，舊版邏輯已全部移除）
+        // ----------------------------------------------------------------------------
+        // 計算鏈：件數 ÷ 箱件比 → 箱數需求 → 主線車輛/承載量/裝載率 → 主線費用(A/B版)
+        //         → 超出承載量 → 加派車 → 驗收件數 − 主線帶回 → 回收車 → 其他項目×成長率
+        //         → 116 vs 115 預算/實績對比
+        // 原則：115 年已過完的月份一律採實際加總，絕不外推；只有進行中的當月依日曆天數比例外推。
+        // ============================================================================
+        const BP_YEAR = YEAR + 1;                       // 116 年度 = 2027
+        const BP_DEFAULT_ITEMS = ['EC', '一般商品', '團預購', '手揀', 'POP'];
+        // 各項目的資料單位：'件'需用箱件比換算成箱、'箱'則直接就是箱數不再換算
+        const BP_DEFAULT_UNITS = { 'EC': '件', '一般商品': '箱', '團預購': '箱', '手揀': '箱', 'POP': '箱' };
+        const BP_OTHER_CATS = ['其他', '違規罰款', '離島', '轉運'];
+        const BP_CATS = ['主線', '加派車', '回收車', '其他', '違規罰款', '離島', '轉運'];
+        const BP_MONTH_DAYS = (y, m) => new Date(y, m, 0).getDate();
+        // 預設帶入：115 年度 EC 預算件數（待公司提供 116 實際預算後可直接覆蓋或匯入）
+        const BP_EC_DEFAULT = { 1:969409, 2:738955, 3:965224, 4:936225, 5:968595, 6:945488, 7:956195, 8:951158, 9:958463, 10:1003935, 11:1115588, 12:1082326 };
+        // 預設帶入：115 年度驗收件數預算
+        const BP_RECV_DEFAULT = { 1:639810, 2:487710, 3:637048, 4:617909, 5:639273, 6:624022, 7:631089, 8:627764, 9:632585, 10:662597, 11:736288, 12:714335 };
+
+        function bpDefaults() {
+            let d = {
+                version: 2, items: [...BP_DEFAULT_ITEMS], units: {}, ratios: {}, qty: {}, qtyDaily: {},
+                bigCap: '', smallCap: '', avgBig: 5902, avgSmall: 4327,
+                fleetMonthly: {}, fleetDaily: {}, routes: [], routeDaily: {},
+                recv: {}, carryBack: {}, growth: { '其他':0, '違規罰款':0, '離島':0, '轉運':0 },
+                coef: { boxPerTrip: 70, tripCost: 2000, recvPerTrip: 400, recvTripCost: 2000 },
+                mainlineMode: 'A', otherBase: 'A'
+            };
+            d.items.forEach(it => { d.units[it] = BP_DEFAULT_UNITS[it] || '件'; d.ratios[it] = ''; d.qty[it] = {}; });
+            for (let m = 1; m <= 12; m++) {
+                d.qty['EC'][m] = BP_EC_DEFAULT[m];
+                d.recv[m] = BP_RECV_DEFAULT[m]; d.carryBack[m] = 0;
+                d.fleetMonthly[m] = { big: 15, small: 46 };
+            }
+            return d;
+        }
+
+        // 取得目前倉別的 116 規劃資料（缺漏欄位自動補齊，不覆蓋既有輸入）
+        function bpGet() {
+            let wh = window.currentWarehouse;
+            if (!state.warehouses[wh]) return bpDefaults();
+            if (!state.warehouses[wh].plan116 || state.warehouses[wh].plan116.version !== 2) {
+                state.warehouses[wh].plan116 = bpDefaults();
+            }
+            let p = state.warehouses[wh].plan116, d = bpDefaults();
+            if (!Array.isArray(p.items) || !p.items.length) p.items = [...BP_DEFAULT_ITEMS];
+            ['units','ratios','qty','qtyDaily','fleetMonthly','fleetDaily','routeDaily','recv','carryBack','growth','coef'].forEach(k => { if (!p[k] || typeof p[k] !== 'object') p[k] = d[k]; });
+            if (!Array.isArray(p.routes)) p.routes = [];
+            p.items.forEach(it => {
+                if (p.units[it] !== '件' && p.units[it] !== '箱') p.units[it] = BP_DEFAULT_UNITS[it] || '件';
+                if (p.ratios[it] === undefined) p.ratios[it] = ''; if (!p.qty[it]) p.qty[it] = {};
+            });
+            BP_OTHER_CATS.forEach(c => { if (p.growth[c] === undefined) p.growth[c] = 0; });
+            Object.keys(d.coef).forEach(k => { if (p.coef[k] === undefined || p.coef[k] === '') p.coef[k] = d.coef[k]; });
+            for (let m = 1; m <= 12; m++) if (!p.fleetMonthly[m]) p.fleetMonthly[m] = { big: 0, small: 0 };
+            if (!p.mainlineMode) p.mainlineMode = 'A';
+            if (!p.otherBase) p.otherBase = 'A';
+            if (p.avgBig === undefined) p.avgBig = 5902;
+            if (p.avgSmall === undefined) p.avgSmall = 4327;
+            return p;
+        }
+
+        function bpTouch() { state.lastModified = Date.now(); }
+        function bpDateStr(y, m, d) { return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+        function bpNum(v) { let n = Number(v); return isFinite(n) ? n : 0; }
+
+        function bpRouteMap(p) {
+            if (p.__routeMapCache && p.__routeMapVer === p.routes.length + '|' + (p.routes[0]?.code || '')) return p.__routeMapCache;
+            let map = {}; p.routes.forEach(r => { map[String(r.code).trim().toUpperCase()] = r; });
+            p.__routeMapCache = map; p.__routeMapVer = p.routes.length + '|' + (p.routes[0]?.code || '');
+            return map;
+        }
+
+        // 某一天的車輛組成：日別路線清單 > 日別台數 > 月別台數
+        function bpFleetForDate(p, dateStr, m) {
+            let rd = p.routeDaily?.[dateStr];
+            if (rd) {
+                let codes = String(rd).split(/[,、\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
+                let map = bpRouteMap(p), big = 0, small = 0, price = 0, unknown = 0;
+                codes.forEach(c => { let r = map[c]; if (r) { if (r.type === '大') big++; else small++; price += bpNum(r.price); } else unknown++; });
+                return { big, small, priceB: price, src: 'route', unknown };
+            }
+            let fd = p.fleetDaily?.[dateStr];
+            if (fd) return { big: bpNum(fd.big), small: bpNum(fd.small), priceB: null, src: 'day', unknown: 0 };
+            let fm = p.fleetMonthly?.[m] || {};
+            return { big: bpNum(fm.big), small: bpNum(fm.small), priceB: null, src: 'month', unknown: 0 };
+        }
+
+        // B版(8月單價)在「沒有日別路線清單」時的推算：以清單為基礎依台數調整，由低單價起算
+        function bpPickSum(sortedPrices, n) {
+            if (!sortedPrices.length || n <= 0) return 0;
+            if (n <= sortedPrices.length) return sortedPrices.slice(0, n).reduce((a, b) => a + b, 0);
+            let total = sortedPrices.reduce((a, b) => a + b, 0);
+            return total + (n - sortedPrices.length) * (total / sortedPrices.length);
+        }
+        function bpMainlineBDay(p, fleet) {
+            if (fleet.priceB !== null) return fleet.priceB;
+            if (!p.routes.length) return 0;
+            let big = p.routes.filter(r => r.type === '大').map(r => bpNum(r.price)).sort((a, b) => a - b);
+            let small = p.routes.filter(r => r.type !== '大').map(r => bpNum(r.price)).sort((a, b) => a - b);
+            return bpPickSum(big, fleet.big) + bpPickSum(small, fleet.small);
+        }
+
+        // 115 年某月某科目實績：已過完的月份採實際加總（不外推）；進行中的當月依日曆天數比例外推
+        function bp115ActualCat(wh, m, cat) {
+            let days = getDays(m), dailyData = state.warehouses[wh]?.daily || {};
+            let today = new Date(), tY = today.getFullYear(), tM = today.getMonth() + 1, tD = today.getDate();
+            if (YEAR > tY || (YEAR === tY && m > tM)) return { val: 0, mode: 'none' };
+            let isCur = (YEAR === tY && m === tM), sum = 0, elapsed = 0;
+            days.forEach((d, idx) => {
+                (BUDGET_MAPPING[cat] || []).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); });
+                if (!isCur || (idx + 1) <= tD) elapsed++;
+            });
+            if (!isCur) return { val: sum, mode: sum > 0 ? 'actual' : 'empty' };
+            return { val: elapsed > 0 ? sum / elapsed * days.length : sum, mode: 'partial' };
+        }
+
+        // 其他項目基準：A版=115年逐月實際(未發生/無資料的月份以115核定預算補值)；B版=115年8月實績按天數比例
+        function bpOtherBase(wh, m, cat, mode) {
+            let budget = bpNum(state.warehouses[wh]?.budget?.[m]?.[cat]);
+            if (mode === 'B') {
+                let aug = bp115ActualCat(wh, 8, cat), augDays = getDays(8).length;
+                if (aug.val > 0) return { val: aug.val / augDays * BP_MONTH_DAYS(BP_YEAR, m), src: '8月實績' };
+                return { val: budget, src: '預算補值' };
+            }
+            let a = bp115ActualCat(wh, m, cat);
+            if (a.mode === 'actual') return { val: a.val, src: '實績' };
+            if (a.mode === 'partial' && a.val > 0) return { val: a.val, src: '當月外推' };
+            return { val: budget, src: '預算補值' };
+        }
+
+        // ---------------------------------------------------------------- 主計算
+        function bpBuild(p, wh, scale) {
+            scale = scale || 1;
+            let bigCap = bpNum(p.bigCap), smallCap = bpNum(p.smallCap);
+            let coef = { bpt: bpNum(p.coef.boxPerTrip) || 70, tc: bpNum(p.coef.tripCost) || 2000, rpt: bpNum(p.coef.recvPerTrip) || 400, rtc: bpNum(p.coef.recvTripCost) || 2000 };
+            let flags = { ratioMissing: [], capMissing: false, routeMissing: false, unknownCodes: 0, baseFilled: [], carryBackZero: false };
+            let months = [], hasDailyQtyAny = false;
+
+            p.items.forEach(it => {
+                if (p.units[it] === '箱') return; // 已是箱數，不需箱件比
+                let yearQty = 0; for (let m = 1; m <= 12; m++) yearQty += bpNum(p.qty[it]?.[m]);
+                if (yearQty > 0 && !(bpNum(p.ratios[it]) > 0)) flags.ratioMissing.push(it);
+            });
+            if (!(bigCap > 0) || !(smallCap > 0)) flags.capMissing = true;
+            if (!p.routes.length) flags.routeMissing = true;
+
+            for (let m = 1; m <= 12; m++) {
+                let dim = BP_MONTH_DAYS(BP_YEAR, m), row = { m, dim, boxByItem: {}, qtyByItem: {} };
+                let boxTotal = 0, qtyTotal = 0, boxDirect = 0;
+                p.items.forEach(it => {
+                    let q = bpNum(p.qty[it]?.[m]) * scale, isBox = p.units[it] === '箱';
+                    row.qtyByItem[it] = q;
+                    let b;
+                    if (isBox) { b = q; boxDirect += q; }              // 已是箱數，直接採用
+                    else { let r = bpNum(p.ratios[it]); b = r > 0 ? q / r : 0; qtyTotal += q; }
+                    row.boxByItem[it] = b; boxTotal += b;
+                });
+                row.qtyTotal = qtyTotal; row.boxDirect = boxDirect; row.boxTotal = boxTotal;
+
+                let big = 0, small = 0, cap = 0, costA = 0, costB = 0, routeDays = 0, dayCapList = [];
+                for (let d = 1; d <= dim; d++) {
+                    let ds = bpDateStr(BP_YEAR, m, d), f = bpFleetForDate(p, ds, m);
+                    big += f.big; small += f.small;
+                    let dcap = f.big * bigCap + f.small * smallCap;
+                    cap += dcap; dayCapList.push({ ds, cap: dcap });
+                    costA += f.big * bpNum(p.avgBig) + f.small * bpNum(p.avgSmall);
+                    costB += bpMainlineBDay(p, f);
+                    if (f.src === 'route') { routeDays++; flags.unknownCodes += f.unknown || 0; }
+                }
+                row.bigTrips = big; row.smallTrips = small; row.capacity = cap; row.routeDays = routeDays;
+                row.mainA = Math.round(costA); row.mainB = Math.round(costB);
+                row.loadRate = cap > 0 ? boxTotal / cap * 100 : 0;
+
+                // 加派車（月別淨額）
+                row.overBoxes = Math.max(0, boxTotal - cap);
+                row.overTrips = Math.ceil(row.overBoxes / coef.bpt);
+
+                // 加派車（日別逐日試算）：僅在該月有日別件數資料時計算，供對照
+                let dailyOver = 0, dailyDays = 0;
+                for (let d = 1; d <= dim; d++) {
+                    let ds = bpDateStr(BP_YEAR, m, d), dayBox = 0, hasAny = false;
+                    p.items.forEach(it => {
+                        let dv = p.qtyDaily?.[it]?.[ds];
+                        if (dv === undefined || dv === null || dv === '') return;
+                        hasAny = true;
+                        if (p.units[it] === '箱') { dayBox += bpNum(dv) * scale; return; }
+                        let r = bpNum(p.ratios[it]); if (r > 0) dayBox += bpNum(dv) * scale / r;
+                    });
+                    if (hasAny) { dailyDays++; let dc = dayCapList[d - 1].cap; dailyOver += Math.max(0, dayBox - dc); }
+                }
+                row.dailyMode = dailyDays > 0; if (row.dailyMode) hasDailyQtyAny = true;
+                row.overTripsDaily = row.dailyMode ? Math.ceil(dailyOver / coef.bpt) : null;
+                row.overBoxesDaily = row.dailyMode ? dailyOver : null;
+
+                // 回收車
+                let recv = bpNum(p.recv[m]) * scale, cb = bpNum(p.carryBack[m]);
+                row.recvQty = recv; row.carryBack = cb;
+                row.recvRemain = Math.max(0, recv - cb);
+                row.recvTrips = Math.ceil(row.recvRemain / coef.rpt);
+                if (recv > 0 && cb <= 0) flags.carryBackZero = true;
+
+                // 七大科目
+                row.suggested = {};
+                row.suggested['主線'] = p.mainlineMode === 'B' ? row.mainB : row.mainA;
+                row.suggested['加派車'] = row.overTrips * coef.tc;
+                row.suggested['回收車'] = row.recvTrips * coef.rtc;
+                row.otherSrc = {};
+                BP_OTHER_CATS.forEach(cat => {
+                    let b = bpOtherBase(wh, m, cat, p.otherBase), g = bpNum(p.growth[cat]);
+                    row.otherSrc[cat] = b.src; row.suggested[cat] = Math.round(b.val * (1 + g / 100));
+                    if (b.src === '預算補值' && !flags.baseFilled.includes(m)) flags.baseFilled.push(m);
+                });
+                row.total = BP_CATS.reduce((a, c) => a + row.suggested[c], 0);
+                months.push(row);
+            }
+            let grand = months.reduce((a, r) => a + r.total, 0);
+            let byCat = {}; BP_CATS.forEach(c => byCat[c] = months.reduce((a, r) => a + r.suggested[c], 0));
+            return { months, grand, byCat, flags, hasDailyQtyAny, coef };
+        }
+
+        window.__bpCache = window.__bpCache || {};
+
+        window.generateBudgetPlan = () => {
+            let wh = window.currentWarehouse, p = bpGet();
+            let res = bpBuild(p, wh, 1);
+            // 敏感度：件數與驗收件數同步縮放
+            let sens = [0.9, 0.95, 1, 1.05, 1.1].map(s => ({ s, grand: bpBuild(p, wh, s).grand }));
+            // 115 對比
+            let cmp = {};
+            BP_CATS.forEach(cat => {
+                let b115 = 0, a115 = 0, partial = false, none = false;
+                for (let m = 1; m <= 12; m++) {
+                    b115 += bpNum(state.warehouses[wh]?.budget?.[m]?.[cat]);
+                    let a = bp115ActualCat(wh, m, cat); a115 += a.val;
+                    if (a.mode === 'partial') partial = true;
+                    if (a.mode === 'none' || a.mode === 'empty') none = true;
+                }
+                cmp[cat] = { budget115: Math.round(b115), actual115: Math.round(a115), partial, none };
+            });
+            window.__bpCache[wh] = { ...res, sens, cmp, generatedAt: Date.now(), snapshot: JSON.parse(JSON.stringify({
+                items: p.items, units: p.units, ratios: p.ratios, bigCap: p.bigCap, smallCap: p.smallCap, avgBig: p.avgBig, avgSmall: p.avgSmall,
+                coef: p.coef, growth: p.growth, mainlineMode: p.mainlineMode, otherBase: p.otherBase,
+                routeCount: p.routes.length, routeDailyDays: Object.keys(p.routeDaily || {}).length, fleetDailyDays: Object.keys(p.fleetDaily || {}).length,
+                qty: p.qty, recv: p.recv, carryBack: p.carryBack, fleetMonthly: p.fleetMonthly
+            })) };
+            bpRenderResult();
+            showToast('🧮 116 年度建議預算已產出！');
+        };
+
+        // ---------------------------------------------------------------- 輸入區渲染
+        function bpFmt(n, dp) { let x = Number(n); if (!isFinite(x)) x = 0; return (Math.round(x * Math.pow(10, dp || 0)) / Math.pow(10, dp || 0)).toLocaleString(); }
+        // 輸入框顯示用千分位格式：預設不顯示小數(僅供閱讀，不影響底層精確數值與計算)，
+        // 箱件比/成長率等本來就需要小數的欄位另外傳入 decimals 位數。空值維持空白。
+        function bpFmtInput(v, decimals) {
+            if (v === '' || v === null || v === undefined) return '';
+            let n = Number(v); if (!isFinite(n)) return '';
+            let d = (decimals === undefined || decimals === null) ? 0 : decimals;
+            return n.toLocaleString('en-US', { maximumFractionDigits: d });
+        }
+        function bpRateColor(r) { if (r >= 95) return '#dc3545'; if (r >= 85) return '#fd7e14'; if (r > 0 && r < 70) return '#6c757d'; return '#28a745'; }
+
+        function bpRenderInputs() {
+            let p = bpGet();
+            // 基礎設定（參數類：統一置中、加千分位）
+            let setV = (id, v, dp) => { let el = document.getElementById(id); if (el) el.value = bpFmtInput(v, dp); };
+            setV('bp_bigCap', p.bigCap); setV('bp_smallCap', p.smallCap);
+            setV('bp_avgBig', p.avgBig); setV('bp_avgSmall', p.avgSmall);
+            setV('bp_boxPerTrip', p.coef.boxPerTrip); setV('bp_tripCost', p.coef.tripCost);
+            setV('bp_recvPerTrip', p.coef.recvPerTrip); setV('bp_recvTripCost', p.coef.recvTripCost);
+            BP_OTHER_CATS.forEach(c => setV('bp_g_' + c, p.growth[c], 2));
+            let ml = document.getElementById('bp_mainlineMode'); if (ml) ml.value = p.mainlineMode;
+            let ob = document.getElementById('bp_otherBase'); if (ob) ob.value = p.otherBase;
+
+            // 件數/箱數 + 資料單位 + 箱件比
+            // 對齊規則：「資料單位」「箱件比」屬參數類 → 置中(bp-in-ctr)；月別數值與全年合計屬數據類 → 靠右(bp-in / bp-sum)，且兩者字級/高度統一，不會一大一小。
+            let mh = Array.from({ length: 12 }, (_, i) => `<th class="bp-th" style="width:82px;">${i + 1}月</th>`).join('');
+            let h = `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">配送項目</th><th class="bp-th" style="width:82px;">資料單位</th><th class="bp-th" style="width:82px;">箱件比<br><span style="font-weight:normal;">(件/箱)</span></th>${mh}<th class="bp-th" style="width:82px;">全年合計</th><th class="bp-th" style="width:70px;">操作</th></tr></thead><tbody>`;
+            // 每個項目一列：單位為「箱」者不需箱件比，數值直接就是箱數
+            p.items.forEach(it => {
+                let yr = 0; for (let m = 1; m <= 12; m++) yr += bpNum(p.qty[it]?.[m]);
+                let isBox = p.units[it] === '箱';
+                let ratioBad = !isBox && yr > 0 && !(bpNum(p.ratios[it]) > 0);
+                h += `<tr><td class="bp-sticky bp-item">${it}</td>`;
+                h += `<td><select class="bp-in-ctr bp-unitsel" data-bp="unit" data-item="${it}"><option value="件"${isBox ? '' : ' selected'}>件</option><option value="箱"${isBox ? ' selected' : ''}>箱</option></select></td>`;
+                h += isBox
+                    ? `<td class="bp-nodiv" title="此項資料已是箱數，不需換算">—</td>`
+                    : `<td><input class="bp-in-ctr bp-numfmt ${ratioBad ? 'bp-bad' : ''}" type="text" inputmode="decimal" data-bp="ratio" data-decimals="2" data-item="${it}" value="${bpFmtInput(p.ratios[it], 2)}"></td>`;
+                for (let m = 1; m <= 12; m++) h += `<td><input class="bp-in bp-numfmt" type="text" inputmode="decimal" data-bp="qty" data-item="${it}" data-m="${m}" value="${bpFmtInput(p.qty[it]?.[m])}"></td>`;
+                h += `<td class="bp-sum">${bpFmt(yr)}</td><td>${BP_DEFAULT_ITEMS.includes(it) ? '<span style="color:#bbb;font-size:11px;">預設</span>' : `<button class="bp-del" onclick="window.bpRemoveItem('${it}')">刪除</button>`}</td></tr>`;
+            });
+            // 合計列：件與箱分開統計，避免不同單位相加
+            let sumBy = (pred, m) => { let t = 0; p.items.forEach(it => { if (pred(it)) t += bpNum(p.qty[it]?.[m]); }); return t; };
+            let isPc = it => p.units[it] !== '箱', isBx = it => p.units[it] === '箱';
+            let hasPc = p.items.some(isPc), hasBx = p.items.some(isBx);
+            if (hasPc) {
+                let yr = 0;
+                h += `<tr class="bp-total"><td class="bp-sticky">合計件數 (需換算)</td><td class="bp-ctrtxt">件</td><td class="bp-ctrtxt">—</td>`;
+                for (let m = 1; m <= 12; m++) { let v = sumBy(isPc, m); yr += v; h += `<td>${bpFmt(v)}</td>`; }
+                h += `<td>${bpFmt(yr)}</td><td></td></tr>`;
+            }
+            if (hasBx) {
+                let yr = 0;
+                h += `<tr class="bp-total"><td class="bp-sticky">直接輸入箱數</td><td class="bp-ctrtxt">箱</td><td class="bp-ctrtxt">—</td>`;
+                for (let m = 1; m <= 12; m++) { let v = sumBy(isBx, m); yr += v; h += `<td>${bpFmt(v)}</td>`; }
+                h += `<td>${bpFmt(yr)}</td><td></td></tr>`;
+            }
+            // 箱數需求 = 件數項目換算後 + 箱數項目直接加總
+            let boxOf = m => { let b = 0; p.items.forEach(it => { let q = bpNum(p.qty[it]?.[m]); if (p.units[it] === '箱') b += q; else { let r = bpNum(p.ratios[it]); if (r > 0) b += q / r; } }); return b; };
+            h += `<tr class="bp-total" style="background:#eef7ff;"><td class="bp-sticky">箱數需求</td><td class="bp-ctrtxt">箱</td><td class="bp-ctrtxt">—</td>`;
+            let bYr = 0;
+            for (let m = 1; m <= 12; m++) { let b = boxOf(m); bYr += b; h += `<td>${bpFmt(b)}</td>`; }
+            h += `<td>${bpFmt(bYr)}</td><td></td></tr></tbody></table>`;
+            let qc = document.getElementById('bpQtyGrid'); if (qc) qc.innerHTML = h;
+
+            // 車輛
+            let f = `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">車輛(月別預設)</th>${mh}<th class="bp-th" style="width:82px;">全年車趟</th></tr></thead><tbody>`;
+            [['big', '大車台數/日'], ['small', '小車台數/日']].forEach(([k, lb]) => {
+                f += `<tr><td class="bp-sticky bp-item">${lb}</td>`;
+                let yr = 0;
+                for (let m = 1; m <= 12; m++) { let v = p.fleetMonthly[m]?.[k] ?? ''; yr += bpNum(v) * BP_MONTH_DAYS(BP_YEAR, m); f += `<td><input class="bp-in bp-numfmt" type="text" inputmode="decimal" data-bp="fleet" data-k="${k}" data-m="${m}" value="${bpFmtInput(v)}"></td>`; }
+                f += `<td class="bp-sum">${bpFmt(yr)}</td></tr>`;
+            });
+            f += `<tr class="bp-total"><td class="bp-sticky">每日承載箱數</td>`;
+            for (let m = 1; m <= 12; m++) { let fm = p.fleetMonthly[m] || {}; f += `<td>${bpFmt(bpNum(fm.big) * bpNum(p.bigCap) + bpNum(fm.small) * bpNum(p.smallCap))}</td>`; }
+            f += `<td>—</td></tr></tbody></table>`;
+            let dayOverride = Object.keys(p.fleetDaily || {}).length, routeDays = Object.keys(p.routeDaily || {}).length;
+            let fleetOnlyCount = Object.keys(p.fleetDaily || {}).filter(ds => !p.routeDaily[ds]).length;
+            f += `<div class="bp-note">📌 優先順序：<b>日別路線清單</b>（已匯入 <b>${routeDays}</b> 天）→ <b>日別台數</b>（已匯入 <b>${dayOverride}</b> 天${fleetOnlyCount < dayOverride ? `，其中 <b>${dayOverride - fleetOnlyCount}</b> 天因同時有日別路線清單、實際不採用` : ''}）→ 上方月別預設值。有日別路線的日子，台數與 B版主線費用都直接由該日路線加總得出。`;
+            if (routeDays) f += ` <a href="javascript:void(0)" onclick="window.bpToggleDailyDetail('route')">展開/收合 日別路線明細</a>`;
+            if (fleetOnlyCount) f += ` ｜ <a href="javascript:void(0)" onclick="window.bpToggleDailyDetail('fleet')">展開/收合 日別台數明細（僅列未被路線清單覆蓋的 ${fleetOnlyCount} 天）</a>`;
+            f += `</div>`;
+
+            // 日別路線明細（可展開查看每天匯入了什麼，避免「看不到、不知道有沒有匯入」）
+            if (routeDays) {
+                let map = bpRouteMap(p);
+                let dates = Object.keys(p.routeDaily).sort();
+                f += `<div id="bpDailyRouteDetail" style="display:none; max-height:260px; overflow:auto; margin-top:8px; border:1px solid #e6ebf1; border-radius:6px;"><table class="bp-grid"><thead><tr><th class="bp-th">日期</th><th class="bp-th">大車數</th><th class="bp-th">小車數</th><th class="bp-th" style="text-align:left;">當日路線代號</th></tr></thead><tbody>`;
+                dates.forEach(ds => {
+                    let codes = String(p.routeDaily[ds]).split(',').filter(Boolean);
+                    let big = 0, small = 0, unknown = 0;
+                    codes.forEach(c => { let r = map[c]; if (r) { if (r.type === '大') big++; else small++; } else unknown++; });
+                    f += `<tr><td class="bp-item">${ds}</td><td class="bp-sum">${big}</td><td class="bp-sum">${small}</td><td style="text-align:left; white-space:normal;">${codes.join('、')}${unknown ? ` <span style="color:#dc3545;">(含${unknown}個未知代號)</span>` : ''}</td></tr>`;
+                });
+                f += `</tbody></table></div>`;
+            }
+            // 日別台數明細：只顯示「沒有日別路線清單」的那些日子——因為有路線清單的日子，
+            // 台數是由路線加總算出來的，fleetDaily 那筆會被忽略、根本沒被採用，重複顯示只會誤導。
+            let fleetOnlyDates = Object.keys(p.fleetDaily || {}).filter(ds => !p.routeDaily[ds]).sort();
+            if (fleetOnlyDates.length) {
+                f += `<div id="bpDailyFleetDetail" style="display:none; max-height:260px; overflow:auto; margin-top:8px; border:1px solid #e6ebf1; border-radius:6px;"><table class="bp-grid"><thead><tr><th class="bp-th">日期</th><th class="bp-th">大車台數</th><th class="bp-th">小車台數</th></tr></thead><tbody>`;
+                fleetOnlyDates.forEach(ds => { let v = p.fleetDaily[ds] || {}; f += `<tr><td class="bp-item">${ds}</td><td class="bp-sum">${bpFmt(bpNum(v.big))}</td><td class="bp-sum">${bpFmt(bpNum(v.small))}</td></tr>`; });
+                f += `</tbody></table></div>`;
+            }
+            let fc = document.getElementById('bpFleetGrid'); if (fc) fc.innerHTML = f;
+
+            // 路線清單摘要
+            let big = p.routes.filter(r => r.type === '大'), small = p.routes.filter(r => r.type !== '大');
+            let avgB = big.length ? big.reduce((a, r) => a + bpNum(r.price), 0) / big.length : 0;
+            let avgS = small.length ? small.reduce((a, r) => a + bpNum(r.price), 0) / small.length : 0;
+            let dayTotal = p.routes.reduce((a, r) => a + bpNum(r.price), 0);
+            let rc = document.getElementById('bpRouteSummary');
+            if (rc) rc.innerHTML = p.routes.length
+                ? `<div class="bp-note">🚚 已匯入 <b>${p.routes.length}</b> 條路線：大車 <b>${big.length}</b> 條（均價 ${bpFmt(avgB)}）／小車 <b>${small.length}</b> 條（均價 ${bpFmt(avgS)}）　全清單單日合計 <b>${bpFmt(dayTotal)}</b> 元　<a href="javascript:void(0)" onclick="window.bpToggleRouteList()">展開/收合明細</a></div><div id="bpRouteList" style="display:none; max-height:220px; overflow:auto; margin-top:6px;"><table class="bp-grid"><thead><tr><th class="bp-th">路線</th><th class="bp-th">車型</th><th class="bp-th">單價</th></tr></thead><tbody>${p.routes.map(r => `<tr><td>${r.code}</td><td>${r.type}</td><td class="bp-sum">${bpFmt(r.price)}</td></tr>`).join('')}</tbody></table></div>`
+                : `<div class="bp-note bp-warn">⚠️ 尚未匯入主線單價清單，B版（8月單價）無法計算。請匯入含「路線／車型／單價」的 Excel。</div>`;
+
+            // 回收
+            let rv = `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">回收項目</th>${mh}<th class="bp-th" style="width:82px;">全年合計</th></tr></thead><tbody>`;
+            [['recv', '預算驗收件數'], ['carryBack', '主線帶回件數']].forEach(([k, lb]) => {
+                rv += `<tr><td class="bp-sticky bp-item">${lb}</td>`; let yr = 0;
+                for (let m = 1; m <= 12; m++) { let v = p[k][m] ?? ''; yr += bpNum(v); rv += `<td><input class="bp-in bp-numfmt" type="text" inputmode="decimal" data-bp="${k}" data-m="${m}" value="${bpFmtInput(v)}"></td>`; }
+                rv += `<td class="bp-sum">${bpFmt(yr)}</td></tr>`;
+            });
+            rv += `<tr class="bp-total"><td class="bp-sticky">需回收車載運</td>`;
+            let remYr = 0;
+            for (let m = 1; m <= 12; m++) { let r = Math.max(0, bpNum(p.recv[m]) - bpNum(p.carryBack[m])); remYr += r; rv += `<td>${bpFmt(r)}</td>`; }
+            rv += `<td>${bpFmt(remYr)}</td></tr></tbody></table>`;
+            let rvc = document.getElementById('bpRecvGrid'); if (rvc) rvc.innerHTML = rv;
+        }
+
+        window.bpToggleRouteList = () => { let el = document.getElementById('bpRouteList'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
+        window.bpToggleDailyDetail = (kind) => { let el = document.getElementById(kind === 'route' ? 'bpDailyRouteDetail' : 'bpDailyFleetDetail'); if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
+
+        window.bpAddItem = () => {
+            let el = document.getElementById('bp_newItem'), name = (el?.value || '').trim();
+            if (!name) { showToast('⚠️ 請輸入要新增的配送項目名稱'); return; }
+            let p = bpGet();
+            if (p.items.includes(name)) { showToast('⚠️ 這個項目已經存在了'); return; }
+            p.items.push(name); p.units[name] = '件'; p.ratios[name] = ''; p.qty[name] = {};
+            el.value = ''; bpTouch(); bpRenderInputs(); showToast(`✅ 已新增配送項目「${name}」，請填入箱件比與各月件數`);
+        };
+        window.bpRemoveItem = (name) => {
+            let p = bpGet();
+            if (BP_DEFAULT_ITEMS.includes(name)) { showToast('⚠️ 預設項目不可刪除'); return; }
+            p.items = p.items.filter(x => x !== name); delete p.units[name]; delete p.ratios[name]; delete p.qty[name]; if (p.qtyDaily) delete p.qtyDaily[name];
+            bpTouch(); bpRenderInputs(); showToast(`🗑️ 已刪除項目「${name}」`);
+        };
+
+        // 輸入即寫入 state（事件委派）
+        window.bpOnInput = (e) => {
+            let t = e.target; if (!t || !t.dataset || !t.dataset.bp) return;
+            let p = bpGet(), kind = t.dataset.bp, m = t.dataset.m, raw = t.value;
+            // 千分位輸入框存的是「1,234」這種字串，需先去逗號才能轉數字；其餘(select等)原樣處理
+            let isNumFmt = t.classList && t.classList.contains('bp-numfmt');
+            let v;
+            if (isNumFmt) { let clean = String(raw).replace(/,/g, '').trim(); v = clean === '' ? '' : Number(clean); if (!isFinite(v)) v = ''; }
+            else v = raw === '' ? '' : Number(raw);
+            if (kind === 'unit') { p.units[t.dataset.item] = t.value; bpTouch(); bpRenderInputs(); return; }
+            else if (kind === 'ratio') p.ratios[t.dataset.item] = v;
+            else if (kind === 'qty') { if (!p.qty[t.dataset.item]) p.qty[t.dataset.item] = {}; p.qty[t.dataset.item][m] = v; }
+            else if (kind === 'fleet') { if (!p.fleetMonthly[m]) p.fleetMonthly[m] = {}; p.fleetMonthly[m][t.dataset.k] = v; }
+            else if (kind === 'recv' || kind === 'carryBack') p[kind][m] = v;
+            else if (kind === 'basic') {
+                let f = t.dataset.f;
+                if (f === 'bigCap' || f === 'smallCap' || f === 'avgBig' || f === 'avgSmall') p[f] = v;
+                else if (f.startsWith('coef.')) p.coef[f.split('.')[1]] = v;
+                else if (f.startsWith('growth.')) p.growth[f.split('.')[1]] = v;
+                else if (f === 'mainlineMode' || f === 'otherBase') p[f] = t.value;
+            }
+            bpTouch();
+            // 編輯完成(change/blur)才補上千分位顯示，輸入過程中(input)不重排，避免游標跳動
+            // 預設不顯示小數；箱件比/成長率等欄位透過 data-decimals 保留所需小數位數
+            if (isNumFmt && e.type === 'change') t.value = bpFmtInput(v, t.dataset.decimals ? Number(t.dataset.decimals) : 0);
+        };
+
+        window.saveBudgetPlanParams = () => {
+            bpGet(); bpTouch();
+            if (typeof window.saveData === 'function') window.saveData(true);
+            showToast('💾 116 年度預算編列資料已儲存！');
+            bpRenderSizeIndicator();
+        };
+
+        // 📊 雲端資料量指示器：讓使用者不用等到寫入失敗，就能主動掌握目前離 1MB 上限還有多少空間
+        function bpRenderSizeIndicator() {
+            let el = document.getElementById('bpSizeIndicator'); if (!el) return;
+            let bytes = 0;
+            try { bytes = new Blob([JSON.stringify(window.state)]).size; } catch (e) { return; }
+            const LIMIT = 1048576, kb = bytes / 1024, pct = bytes / LIMIT * 100;
+            let color = pct >= 85 ? '#dc3545' : (pct >= 60 ? '#fd7e14' : '#28a745');
+            let advice = pct >= 85 ? '　⚠️ 已接近上限，建議清除不需要的日別明細（見上方②③區塊的「清空日別＊＊」按鈕）'
+                : (pct >= 60 ? '　建議留意，若之後累積更多年度／倉別／日別資料，可考慮階段性清除' : '');
+            el.innerHTML = `☁️ 目前整體雲端資料量：<b style="color:${color}">${bpFmt(kb, 1)} KB</b>　／　單一文件上限 1,024 KB　（<b style="color:${color}">${pct.toFixed(1)}%</b>）${advice}`;
+        }
+
+        // ---------------------------------------------------------------- 結果渲染
+        function bpRenderResult() {
+            let wh = window.currentWarehouse, c = window.__bpCache[wh];
+            let meta = document.getElementById('budgetPlanMeta'), t1 = document.getElementById('bpResultTable'), t2 = document.getElementById('bpCompareTable'), t3 = document.getElementById('bpSensTable');
+            let dl = document.getElementById('btnDownloadBudgetPlan');
+            if (!c) { if (meta) meta.innerHTML = ''; [t1, t2, t3].forEach(t => { if (t) t.innerHTML = ''; }); if (dl) dl.disabled = true; return; }
+            if (!meta || !t1 || !t2 || !t3) return; // 面板還沒掛上就不強行渲染，避免拋錯中斷
+            let f = c.flags, warn = [];
+            if (f.ratioMissing.length) warn.push(`⚠️ 這些項目的資料單位是「件」卻沒填箱件比，箱數需求無法計算：<b>${f.ratioMissing.join('、')}</b>（若該項資料本來就是箱數，請把單位改成「箱」）`);
+            if (f.capMissing) warn.push('⚠️ 未填「大車／小車可載箱數」，承載量與裝載率無法計算，加派車會全部為 0');
+            if (f.routeMissing && c.snapshot.mainlineMode === 'B') warn.push('⚠️ 已選 B版(8月單價) 但尚未匯入路線單價清單，主線費用為 0');
+            if (f.unknownCodes) warn.push(`⚠️ 日別路線清單中有 <b>${f.unknownCodes}</b> 筆路線代號不在單價清單內，該筆未計費用`);
+            if (f.carryBackZero) warn.push('⚠️ 部分月份「主線帶回件數」為 0，回收車會把全部驗收量當成需專車載運，金額可能高估');
+            if (f.baseFilled.length) warn.push(`ℹ️ 其他項目基準：${f.baseFilled.join('、')}月 因 115 年尚未發生或無實績，已改用 115 核定預算補值`);
+
+            let modeTxt = c.snapshot.mainlineMode === 'B' ? 'B版（8月單價，逐條路線加總）' : 'A版（平均單價）';
+            let baseTxt = c.snapshot.otherBase === 'B' ? 'B版（115年8月實績按天數比例）' : 'A版（115年逐月實績，未發生月份以預算補值）';
+            let yrBox = c.months.reduce((a, r) => a + r.boxTotal, 0), yrCap = c.months.reduce((a, r) => a + r.capacity, 0);
+            let yrRate = yrCap > 0 ? yrBox / yrCap * 100 : 0;
+            meta.innerHTML = `📅 <b>${wh}倉 116年度(${BP_YEAR}) 建議預算：${bpFmt(c.grand)} 元</b>　｜　主線計價：<b>${modeTxt}</b>　｜　其他項目基準：<b>${baseTxt}</b><br>
+                📦 全年箱數需求 <b>${bpFmt(yrBox)}</b> 箱／主線承載量 <b>${bpFmt(yrCap)}</b> 箱　→　全年裝載率 <b style="color:${bpRateColor(yrRate)}">${yrRate.toFixed(1)}%</b>
+                　｜　A版主線 ${bpFmt(c.months.reduce((a, r) => a + r.mainA, 0))} ／ B版主線 ${bpFmt(c.months.reduce((a, r) => a + r.mainB, 0))}
+                ${c.hasDailyQtyAny ? '　｜　部分月份有日別件數，已同步試算日別加派車（見下表）' : ''}
+                　｜　產生時間：${new Date(c.generatedAt).toLocaleString('zh-TW')}
+                ${warn.length ? `<div style="margin-top:8px; color:#856404; background:#fff3cd; border:1px solid #ffe8a1; border-radius:6px; padding:8px 10px; font-weight:bold; line-height:1.7;">${warn.join('<br>')}</div>` : ''}`;
+
+            // 表1：建議預算 + 試算過程（橫向：月份在上、科目在左）
+            let nCol = c.months.length + 2;
+            let mh = c.months.map(r => `<th class="bp-th">${r.m}月</th>`).join('');
+            let h = `<thead><tr><th class="bp-th bp-sticky">預算科目</th>${mh}<th class="bp-th" style="background:#0056b3;">年度累計</th></tr></thead><tbody>`;
+            BP_CATS.forEach(cat => {
+                h += `<tr><td class="bp-sticky bp-item">${cat}</td>` +
+                    c.months.map(r => `<td class="bp-sum">${bpFmt(r.suggested[cat])}</td>`).join('') +
+                    `<td class="bp-sum bp-yr">${bpFmt(c.byCat[cat])}</td></tr>`;
+            });
+            h += `<tr class="bp-total"><td class="bp-sticky">月合計</td>` +
+                c.months.map(r => `<td>${bpFmt(r.total)}</td>`).join('') +
+                `<td class="bp-yr" style="color:#0056b3;">${bpFmt(c.grand)}</td></tr>`;
+
+            // 試算過程（同樣橫向排列，供逐項驗算）
+            h += `<tr><td class="bp-divrow" colspan="${nCol}">🔎 試算過程（驗算用）</td></tr>`;
+            let pUnits = bpGet().units || {};
+            let hasPcItems = (bpGet().items || []).some(it => pUnits[it] !== '箱');
+            let hasBxItems = (bpGet().items || []).some(it => pUnits[it] === '箱');
+            let procRows = [];
+            if (hasPcItems) procRows.push({ label: '合計件數 (需換算)', get: r => r.qtyTotal, tot: 'sum' });
+            if (hasBxItems) procRows.push({ label: '直接輸入箱數', get: r => r.boxDirect, tot: 'sum' });
+            procRows = procRows.concat([
+                { label: '箱數需求 (箱)', get: r => r.boxTotal, tot: 'sum' },
+                { label: '大車車趟', get: r => r.bigTrips, tot: 'sum' },
+                { label: '小車車趟', get: r => r.smallTrips, tot: 'sum' },
+                { label: '主線承載量 (箱)', get: r => r.capacity, tot: 'sum' },
+                { label: '裝載率', get: r => r.loadRate, tot: 'rate', pct: true },
+                { label: '超出承載箱數', get: r => r.overBoxes, tot: 'sum' },
+                { label: '加派趟數 (月別淨額)', get: r => r.overTrips, tot: 'sum' },
+                { label: '加派趟數 (日別逐日)', get: r => r.overTripsDaily, tot: 'sum', dash: true, hint: true },
+                { label: '預算驗收件數', get: r => r.recvQty, tot: 'sum' },
+                { label: '主線帶回件數', get: r => r.carryBack, tot: 'sum' },
+                { label: '需回收車載運', get: r => r.recvRemain, tot: 'sum' },
+                { label: '回收趟數', get: r => r.recvTrips, tot: 'sum' },
+                { label: 'A版主線 (平均單價)', get: r => r.mainA, tot: 'sum', money: true },
+                { label: 'B版主線 (8月單價)', get: r => r.mainB, tot: 'sum', money: true }
+            ]);
+            procRows.forEach(pr => {
+                let cells = c.months.map(r => {
+                    let v = pr.get(r);
+                    if (v === null || v === undefined) return `<td class="bp-sum bp-proc">—</td>`;
+                    if (pr.pct) return `<td class="bp-sum bp-proc" style="font-weight:bold; color:${bpRateColor(v)}">${v.toFixed(1)}%</td>`;
+                    return `<td class="bp-sum bp-proc"${pr.hint ? ' style="color:#6f42c1;"' : ''}>${bpFmt(v)}</td>`;
+                }).join('');
+                let tot;
+                if (pr.tot === 'rate') tot = `<span style="color:${bpRateColor(yrRate)}">${yrRate.toFixed(1)}%</span>`;
+                else {
+                    let sum = c.months.reduce((a, r) => a + (pr.get(r) || 0), 0);
+                    let allNull = pr.dash && c.months.every(r => pr.get(r) === null);
+                    tot = allNull ? '—' : bpFmt(sum);
+                }
+                h += `<tr><td class="bp-sticky bp-proclbl">${pr.label}</td>${cells}<td class="bp-sum bp-yr bp-proc">${tot}</td></tr>`;
+            });
+            h += `</tbody>`;
+            t1.innerHTML = h;
+
+            // 表2：116 vs 115 對比
+            let pct = (a, b) => b > 0 ? ((a / b - 1) * 100).toFixed(1) + '%' : '—';
+            let clr = (a, b) => b > 0 ? (a > b ? '#dc3545' : '#28a745') : '#666';
+            let h2 = `<thead><tr><th class="bp-th bp-sticky">科目</th><th class="bp-th">116建議預算</th><th class="bp-th">115核定預算</th><th class="bp-th">差異金額</th><th class="bp-th">差異%</th><th class="bp-th">115實績</th><th class="bp-th">前年比%</th></tr></thead><tbody>`;
+            let s116 = 0, s115b = 0, s115a = 0;
+            BP_CATS.forEach(cat => {
+                let v = c.byCat[cat], b = c.cmp[cat].budget115, a = c.cmp[cat].actual115;
+                s116 += v; s115b += b; s115a += a;
+                h2 += `<tr><td class="bp-sticky bp-item">${cat}</td><td class="bp-sum" style="font-weight:bold;">${bpFmt(v)}</td><td class="bp-sum">${bpFmt(b)}</td>` +
+                    `<td class="bp-sum" style="color:${clr(v, b)}">${(v - b >= 0 ? '+' : '') + bpFmt(v - b)}</td><td class="bp-sum" style="color:${clr(v, b)}">${pct(v, b)}</td>` +
+                    `<td class="bp-sum">${bpFmt(a)}</td><td class="bp-sum" style="color:${clr(v, a)}">${pct(v, a)}</td></tr>`;
+            });
+            h2 += `<tr class="bp-total"><td class="bp-sticky">合計</td><td>${bpFmt(s116)}</td><td>${bpFmt(s115b)}</td><td style="color:${clr(s116, s115b)}">${(s116 - s115b >= 0 ? '+' : '') + bpFmt(s116 - s115b)}</td><td style="color:${clr(s116, s115b)}">${pct(s116, s115b)}</td><td>${bpFmt(s115a)}</td><td style="color:${clr(s116, s115a)}">${pct(s116, s115a)}</td></tr></tbody>`;
+            t2.innerHTML = h2;
+            let anyPartial = BP_CATS.some(cat => c.cmp[cat].partial), anyNone = BP_CATS.some(cat => c.cmp[cat].none);
+            let cn = document.getElementById('bpCompareNote');
+            if (cn) cn.innerHTML = `<div class="bp-note ${anyNone ? 'bp-warn' : ''}">📌 115年實績涵蓋範圍：已過完的月份採<b>實際加總</b>（不外推）${anyPartial ? '；進行中的當月依日曆天數<b>比例外推</b>' : ''}${anyNone ? '；<b>尚未發生的月份計為 0</b>，因此「前年比%」會偏高，請勿直接對外引用全年數字' : ''}。</div>`;
+
+            // 表3：敏感度
+            let base = c.sens.find(x => x.s === 1).grand;
+            let h3 = `<thead><tr><th class="bp-th bp-sticky">件數情境</th>` + c.sens.map(x => `<th class="bp-th">${x.s === 1 ? '基準' : (x.s > 1 ? '+' : '') + Math.round((x.s - 1) * 100) + '%'}</th>`).join('') + `</tr></thead><tbody>`;
+            h3 += `<tr><td class="bp-sticky bp-item">全年預算</td>` + c.sens.map(x => `<td class="bp-sum" style="font-weight:${x.s === 1 ? 'bold' : 'normal'};">${bpFmt(x.grand)}</td>`).join('') + `</tr>`;
+            h3 += `<tr><td class="bp-sticky bp-item">對基準差異</td>` + c.sens.map(x => `<td class="bp-sum" style="color:${x.grand > base ? '#dc3545' : (x.grand < base ? '#28a745' : '#666')}">${x.s === 1 ? '—' : (x.grand - base >= 0 ? '+' : '') + bpFmt(x.grand - base)}</td>`).join('') + `</tr></tbody>`;
+            t3.innerHTML = h3;
+            let sn = document.getElementById('bpSensNote');
+            if (sn) sn.innerHTML = `<div class="bp-note">📌 敏感度同步縮放「各項配送件數」與「預算驗收件數」，主線費用因車隊固定不隨件數變動，所以差異全部來自加派車與回收車。</div>`;
+            if (dl) dl.disabled = false;
+        }
+
+        // ---------------------------------------------------------------- 下載
+        window.downloadBudgetPlan = () => {
+            let wh = window.currentWarehouse, c = window.__bpCache[wh];
+            if (!c) { showToast('⚠️ 請先點擊「產出建議預算」！'); return; }
+            let wb = XLSX.utils.book_new();
+            let styleSheet = (ws, headRow) => {
+                for (let k in ws) { if (k[0] === '!') continue; let cell = ws[k], ref = XLSX.utils.decode_cell(k);
+                    cell.s = { alignment: { horizontal: ref.c === 0 ? 'left' : 'right', vertical: 'center' }, border: { top:{style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} } };
+                    if (ref.r === headRow) { cell.s.fill = { fgColor: { rgb: '6F42C1' } }; cell.s.font = { bold: true, color: { rgb: 'FFFFFF' } }; cell.s.alignment.horizontal = 'center'; } }
+            };
+            // 1 建議預算（橫向：月份在上、科目在左）
+            let head1 = ['預算科目', ...c.months.map(r => `${r.m}月`), '年度累計'];
+            let aoa1 = [[`${wh}倉 116年度(${BP_YEAR})建議預算　主線計價:${c.snapshot.mainlineMode === 'B' ? 'B版(8月單價)' : 'A版(平均單價)'}　其他項目基準:${c.snapshot.otherBase === 'B' ? 'B版(115年8月實績)' : 'A版(115年逐月實績)'}`], head1];
+            BP_CATS.forEach(cat => aoa1.push([cat, ...c.months.map(r => r.suggested[cat]), c.byCat[cat]]));
+            aoa1.push(['月合計', ...c.months.map(r => r.total), c.grand]);
+            let ws1 = XLSX.utils.aoa_to_sheet(aoa1);
+            ws1['!cols'] = [{ wch: 16 }, ...c.months.map(() => ({ wch: 13 })), { wch: 15 }];
+            ws1['!merges'] = [{ s: { r:0, c:0 }, e: { r:0, c:head1.length - 1 } }];
+            styleSheet(ws1, 1); XLSX.utils.book_append_sheet(wb, ws1, '建議預算');
+
+            // 2 試算過程（橫向：月份在上、項目在左）
+            let p = bpGet();
+            let head2 = ['試算項目', ...c.months.map(r => `${r.m}月`), '年度累計'];
+            let aoa2 = [['試算過程明細（可逐項驗算）'], head2];
+            let pushRow = (label, fn, totFn) => {
+                let vals = c.months.map(fn);
+                aoa2.push([label, ...vals, totFn ? totFn() : vals.reduce((a, b) => a + (Number(b) || 0), 0)]);
+            };
+            pushRow('當月天數', r => r.dim);
+            p.items.forEach(i => pushRow(`${i} 投入量(${p.units[i] === '箱' ? '箱' : '件'})`, r => Math.round(r.qtyByItem[i] || 0)));
+            if (p.items.some(i => p.units[i] !== '箱')) pushRow('合計件數(需換算)', r => Math.round(r.qtyTotal));
+            if (p.items.some(i => p.units[i] === '箱')) pushRow('直接輸入箱數', r => Math.round(r.boxDirect));
+            p.items.forEach(i => pushRow(i + ' 換算後箱數', r => Math.round(r.boxByItem[i] || 0)));
+            pushRow('箱數需求', r => Math.round(r.boxTotal));
+            pushRow('大車車趟', r => r.bigTrips);
+            pushRow('小車車趟', r => r.smallTrips);
+            pushRow('主線承載量(箱)', r => Math.round(r.capacity));
+            pushRow('裝載率%', r => Number(r.loadRate.toFixed(1)), () => { let tb = c.months.reduce((a, r) => a + r.boxTotal, 0), tc = c.months.reduce((a, r) => a + r.capacity, 0); return tc > 0 ? Number((tb / tc * 100).toFixed(1)) : 0; });
+            pushRow('超出承載箱數', r => Math.round(r.overBoxes));
+            pushRow('加派趟數(月別淨額)', r => r.overTrips);
+            pushRow('加派趟數(日別逐日)', r => r.overTripsDaily === null ? '' : r.overTripsDaily);
+            pushRow('加派車費用', r => r.suggested['加派車']);
+            pushRow('預算驗收件數', r => Math.round(r.recvQty));
+            pushRow('主線帶回件數', r => Math.round(r.carryBack));
+            pushRow('需回收車載運', r => Math.round(r.recvRemain));
+            pushRow('回收趟數', r => r.recvTrips);
+            pushRow('回收車費用', r => r.suggested['回收車']);
+            pushRow('A版主線(平均單價)', r => r.mainA);
+            pushRow('B版主線(8月單價)', r => r.mainB);
+            pushRow('採用主線費用', r => r.suggested['主線']);
+            let ws2 = XLSX.utils.aoa_to_sheet(aoa2);
+            ws2['!cols'] = head2.map((_, i) => ({ wch: i === 0 ? 20 : 13 }));
+            ws2['!merges'] = [{ s: { r:0, c:0 }, e: { r:0, c:head2.length - 1 } }];
+            styleSheet(ws2, 1); XLSX.utils.book_append_sheet(wb, ws2, '試算過程');
+
+            // 3 對比分析
+            let head3 = ['科目', '116建議預算', '115核定預算', '差異金額', '差異%', '115實績', '前年比%'];
+            let aoa3 = [['116 vs 115 預算/實績對比（115年未發生月份實績以0計，請注意判讀）'], head3];
+            let s116 = 0, s115b = 0, s115a = 0;
+            BP_CATS.forEach(cat => { let v = c.byCat[cat], b = c.cmp[cat].budget115, a = c.cmp[cat].actual115; s116 += v; s115b += b; s115a += a;
+                aoa3.push([cat, v, b, v - b, b > 0 ? Number(((v / b - 1) * 100).toFixed(1)) : '', a, a > 0 ? Number(((v / a - 1) * 100).toFixed(1)) : '']); });
+            aoa3.push(['合計', s116, s115b, s116 - s115b, s115b > 0 ? Number(((s116 / s115b - 1) * 100).toFixed(1)) : '', s115a, s115a > 0 ? Number(((s116 / s115a - 1) * 100).toFixed(1)) : '']);
+            aoa3.push([]); aoa3.push(['敏感度（件數與驗收件數同步縮放）']);
+            aoa3.push(['情境', ...c.sens.map(x => x.s === 1 ? '基準' : (x.s > 1 ? '+' : '') + Math.round((x.s - 1) * 100) + '%')]);
+            aoa3.push(['全年預算', ...c.sens.map(x => x.grand)]);
+            let ws3 = XLSX.utils.aoa_to_sheet(aoa3);
+            ws3['!cols'] = head3.map((_, i) => ({ wch: i === 0 ? 14 : 16 }));
+            ws3['!merges'] = [{ s: { r:0, c:0 }, e: { r:0, c:head3.length - 1 } }];
+            styleSheet(ws3, 1); XLSX.utils.book_append_sheet(wb, ws3, '對比分析');
+
+            // 4 參數快照
+            let s = c.snapshot;
+            let aoa4 = [['參數快照（本次試算所使用的全部假設，供日後追溯）'], ['產生時間', new Date(c.generatedAt).toLocaleString('zh-TW')], ['倉別', wh], ['年度', BP_YEAR], [],
+                ['主線計價方式', s.mainlineMode === 'B' ? 'B版(8月單價，逐條路線加總)' : 'A版(平均單價)'],
+                ['其他項目基準', s.otherBase === 'B' ? 'B版(115年8月實績按天數比例)' : 'A版(115年逐月實績，未發生月份以預算補值)'],
+                ['大車平均單價', s.avgBig], ['小車平均單價', s.avgSmall],
+                ['大車可載箱數', s.bigCap], ['小車可載箱數', s.smallCap],
+                ['加派車每趟箱數', s.coef.boxPerTrip], ['加派車單趟費用', s.coef.tripCost],
+                ['回收車每趟件數', s.coef.recvPerTrip], ['回收車單趟費用', s.coef.recvTripCost],
+                ['路線清單條數', s.routeCount], ['已匯入日別路線天數', s.routeDailyDays], ['已匯入日別台數天數', s.fleetDailyDays], [],
+                ['配送項目', '資料單位', '箱件比(件/箱)', ...Array.from({ length: 12 }, (_, i) => `${i + 1}月投入量`)]];
+            s.items.forEach(it => aoa4.push([it, (s.units?.[it] === '箱' ? '箱(直接採用)' : '件(需換算)'), (s.units?.[it] === '箱' ? '—' : (s.ratios[it] === '' ? '(未填)' : s.ratios[it])), ...Array.from({ length: 12 }, (_, i) => bpNum(s.qty[it]?.[i + 1]))]));
+            aoa4.push([]); aoa4.push(['月別', ...Array.from({ length: 12 }, (_, i) => `${i + 1}月`)]);
+            aoa4.push(['大車台數/日', ...Array.from({ length: 12 }, (_, i) => bpNum(s.fleetMonthly[i + 1]?.big))]);
+            aoa4.push(['小車台數/日', ...Array.from({ length: 12 }, (_, i) => bpNum(s.fleetMonthly[i + 1]?.small))]);
+            aoa4.push(['預算驗收件數', ...Array.from({ length: 12 }, (_, i) => bpNum(s.recv[i + 1]))]);
+            aoa4.push(['主線帶回件數', ...Array.from({ length: 12 }, (_, i) => bpNum(s.carryBack[i + 1]))]);
+            aoa4.push([]); aoa4.push(['其他項目成長率%', ...BP_OTHER_CATS.map(x => x)]); aoa4.push(['', ...BP_OTHER_CATS.map(x => bpNum(s.growth[x]))]);
+            let ws4 = XLSX.utils.aoa_to_sheet(aoa4);
+            ws4['!cols'] = [{ wch: 20 }, { wch: 14 }, ...Array.from({ length: 13 }, () => ({ wch: 14 }))];
+            XLSX.utils.book_append_sheet(wb, ws4, '參數快照');
+
+            XLSX.writeFile(wb, `116年度預算編列_${wh}倉_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast('📥 116 年度預算編列表已下載（含試算過程、對比分析、參數快照）');
+        };
+
+        // ---------------------------------------------------------------- 匯入
+        function bpParseDate(cell) {
+            if (cell === null || cell === undefined || cell === '') return null;
+            if (cell instanceof Date) return bpDateStr(cell.getFullYear(), cell.getMonth() + 1, cell.getDate());
+            if (typeof cell === 'number' && cell > 20000 && cell < 90000) {
+                let dt = new Date(Date.UTC(1899, 11, 30) + cell * 86400000);
+                return bpDateStr(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+            }
+            let s = String(cell).trim().replace(/[\/\.]/g, '-');
+            let mm = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (mm) return bpDateStr(Number(mm[1]), Number(mm[2]), Number(mm[3]));
+            let m2 = s.match(/^(\d{1,2})-(\d{1,2})$/);
+            if (m2) return bpDateStr(BP_YEAR, Number(m2[1]), Number(m2[2]));
+            return null;
+        }
+        function bpReadSheet(file, cb) {
+            let rd = new FileReader();
+            rd.onload = ev => {
+                try {
+                    let wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true });
+                    let ws = wb.Sheets[wb.SheetNames[0]];
+                    cb(XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }));
+                } catch (err) { showToast('❌ 檔案讀取失敗：' + err.message); }
+            };
+            rd.readAsArrayBuffer(file);
+        }
+        // 判斷日別檔的方向：A欄是日期 → 直式(日期在左)；否則找日期表頭列 → 橫式(日期在上)
+        // 先看 A 欄可避免誤判：件數值(如 31271)落在 Excel 日期序號範圍內，若先掃列會被當成日期。
+        function bpDetectOrientation(aoa) {
+            let colA = 0;
+            for (let i = 0; i < aoa.length; i++) if (bpParseDate((aoa[i] || [])[0])) colA++;
+            if (colA >= 2) return { mode: 'vertical' };
+            for (let i = 0; i < Math.min(aoa.length, 25); i++) {
+                let row = aoa[i] || [], mp = {}, cnt = 0;
+                for (let ci = 1; ci < row.length; ci++) { let ds = bpParseDate(row[ci]); if (ds) { mp[ci] = ds; cnt++; } }
+                if (cnt >= 2) return { mode: 'horizontal', hRow: i, dmap: mp };
+            }
+            return { mode: 'none' };
+        }
+
+        // 找出「月份表頭列」：一列裡面出現 6 個以上的 1~12月
+        function bpFindMonthHeader(aoa) {
+            for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+                let map = {}, hit = 0;
+                (aoa[i] || []).forEach((cell, ci) => {
+                    let s = String(cell).trim(), mm = s.match(/^(\d{1,2})\s*月?$/);
+                    if (mm) { let n = Number(mm[1]); if (n >= 1 && n <= 12 && !map[n]) { map[n] = ci; hit++; } }
+                });
+                if (hit >= 6) return { row: i, map };
+            }
+            return null;
+        }
+
+        window.bpImportQty = (e) => {
+            let file = e.target.files[0]; if (!file) return; e.target.value = '';
+            let target = document.getElementById('bp_importTarget')?.value || 'EC';
+            bpReadSheet(file, aoa => {
+                let hdr = bpFindMonthHeader(aoa);
+                if (!hdr) { showToast('❌ 找不到月份表頭。請確認表格第一列有「1月…12月」（或 1…12）'); return; }
+                let p = bpGet(), touched = [], rows = 0;
+                for (let i = hdr.row + 1; i < aoa.length; i++) {
+                    let row = aoa[i] || [], first = String(row[0] ?? '').trim();
+                    let key = null;
+                    if (p.items.includes(first)) key = first;
+                    else if (first === '驗收件數' || first === '預算驗收件數') key = '__recv';
+                    else if (first === '主線帶回件數' || first === '帶回件數') key = '__carry';
+                    else if (first === '') key = target;
+                    else continue;
+                    let any = false;
+                    for (let m = 1; m <= 12; m++) {
+                        let ci = hdr.map[m]; if (ci === undefined) continue;
+                        let v = row[ci]; if (v === '' || v === null || v === undefined) continue;
+                        let n = Number(String(v).replace(/,/g, '')); if (!isFinite(n)) continue;
+                        if (key === '__recv') p.recv[m] = n;
+                        else if (key === '__carry') p.carryBack[m] = n;
+                        else { if (!p.qty[key]) p.qty[key] = {}; p.qty[key][m] = n; }
+                        any = true;
+                    }
+                    if (any) { rows++; touched.push(key === '__recv' ? '驗收件數' : key === '__carry' ? '主線帶回件數' : key); }
+                    if (key === target && first === '') break; // 圖一型式：只有一列數值
+                }
+                if (!rows) { showToast('❌ 沒有讀到任何數值，請確認表格格式'); return; }
+                bpTouch(); bpRenderInputs();
+                showToast(`✅ 已匯入 ${rows} 列：${[...new Set(touched)].join('、')}`);
+            });
+        };
+
+        window.bpImportRoutes = (e) => {
+            let file = e.target.files[0]; if (!file) return; e.target.value = '';
+            bpReadSheet(file, aoa => {
+                let hRow = -1, cCode = -1, cType = -1, cPrice = -1;
+                for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+                    (aoa[i] || []).forEach((cell, ci) => {
+                        let s = String(cell).trim();
+                        if (/^路線/.test(s)) { hRow = i; cCode = ci; }
+                        if (/^車型|^車種/.test(s)) cType = ci;
+                        if (/^單價|^價格|^費用/.test(s)) cPrice = ci;
+                    });
+                    if (hRow === i && cCode >= 0 && cPrice >= 0) break;
+                }
+                if (hRow < 0 || cCode < 0 || cPrice < 0) { showToast('❌ 找不到「路線／車型／單價」欄位標題'); return; }
+                let p = bpGet(), routes = [], seen = {};
+                for (let i = hRow + 1; i < aoa.length; i++) {
+                    let row = aoa[i] || [], code = String(row[cCode] ?? '').trim().toUpperCase();
+                    if (!code) continue;
+                    let price = Number(String(row[cPrice] ?? '').replace(/,/g, '')); if (!isFinite(price) || price <= 0) continue;
+                    let type = cType >= 0 ? (String(row[cType] ?? '').includes('大') ? '大' : '小') : '小';
+                    if (seen[code]) continue; seen[code] = 1;
+                    routes.push({ code, type, price });
+                }
+                if (!routes.length) { showToast('❌ 沒有讀到任何路線資料'); return; }
+                p.routes = routes; delete p.__routeMapCache;
+                bpTouch(); bpRenderInputs();
+                let nb = routes.filter(r => r.type === '大').length;
+                showToast(`✅ 已匯入 ${routes.length} 條路線單價（大車 ${nb} 條／小車 ${routes.length - nb} 條）`);
+            });
+        };
+
+        window.bpImportRouteDaily = (e) => {
+            let file = e.target.files[0]; if (!file) return; e.target.value = '';
+            bpReadSheet(file, aoa => {
+                let p = bpGet(), o = bpDetectOrientation(aoa), acc = {}, cells = 0, dir = '';
+                if (o.mode === 'vertical') {
+                    dir = '日期在左(直式)';
+                    aoa.forEach(row => {
+                        row = row || [];
+                        let ds = bpParseDate(row[0]); if (!ds) return;
+                        let codes = [];
+                        for (let ci = 1; ci < row.length; ci++) {
+                            let t = String(row[ci] ?? '').trim().toUpperCase();
+                            if (t && !/^合計|^小計|^總計/.test(t)) codes.push(...t.split(/[,、\s]+/).filter(Boolean));
+                        }
+                        if (!codes.length) return;
+                        if (!acc[ds]) acc[ds] = []; acc[ds].push(...codes); cells += codes.length;
+                    });
+                } else if (o.mode === 'horizontal') {
+                    dir = '日期在上(橫式)';
+                    // 排除統計列（如「當日條數」合計列），否則統計數字會被誤讀成路線代號
+                    let skipRow = {};
+                    for (let i = o.hRow + 1; i < aoa.length; i++) {
+                        let lb = String((aoa[i] || [])[0] ?? '').trim();
+                        if (/合計|小計|總計|條數|計$|^※/.test(lb)) skipRow[i] = 1;
+                    }
+                    Object.keys(o.dmap).forEach(ci => {
+                        let ds = o.dmap[ci], codes = [];
+                        for (let i = o.hRow + 1; i < aoa.length; i++) {
+                            if (skipRow[i]) continue;
+                            let t = String((aoa[i] || [])[ci] ?? '').trim().toUpperCase();
+                            if (t) codes.push(...t.split(/[,、\s]+/).filter(Boolean));
+                        }
+                        if (!codes.length) return;
+                        if (!acc[ds]) acc[ds] = []; acc[ds].push(...codes); cells += codes.length;
+                    });
+                } else { showToast('❌ 找不到日期。橫式請把日期放表頭列、各日路線代號往下排；直式請 A欄=日期、其後各欄放路線代號'); return; }
+
+                let dates = Object.keys(acc);
+                if (!dates.length) { showToast(`❌ 讀到格式為「${dir}」但沒有任何路線代號`); return; }
+                let map = bpRouteMap(p), unknown = new Set(), offYear = 0;
+                dates.forEach(ds => {
+                    let uniq = [...new Set(acc[ds])];
+                    uniq.forEach(cd => { if (!map[cd]) unknown.add(cd); });
+                    p.routeDaily[ds] = uniq.join(',');
+                    if (Number(ds.slice(0, 4)) !== BP_YEAR) offYear++;
+                });
+                bpTouch(); bpRenderInputs();
+                showToast(`✅ 已匯入 ${dates.length} 天的日別路線、共 ${cells} 個代號（格式：${dir}）${unknown.size ? `　⚠️ 有 ${unknown.size} 個代號不在單價清單：${[...unknown].slice(0, 8).join('、')}` : ''}${offYear ? `　⚠️ 有 ${offYear} 天不是 ${BP_YEAR} 年度，編列時不會採用` : ''}`, 10000);
+            });
+        };
+
+        window.bpImportFleetDaily = (e) => {
+            let file = e.target.files[0]; if (!file) return; e.target.value = '';
+            bpReadSheet(file, aoa => {
+                let p = bpGet(), o = bpDetectOrientation(aoa), acc = {}, dir = '';
+                if (o.mode === 'vertical') {
+                    dir = '日期在左(直式)';
+                    aoa.forEach(row => {
+                        row = row || [];
+                        let ds = bpParseDate(row[0]); if (!ds) return;
+                        let rb = String(row[1] ?? '').replace(/,/g, '').trim(), rs = String(row[2] ?? '').replace(/,/g, '').trim();
+                        if (rb === '' && rs === '') return; // 整列沒填就跳過，不可當成「當日 0 台」
+                        let b = Number(rb), s2 = Number(rs);
+                        acc[ds] = { big: (rb !== '' && isFinite(b)) ? b : 0, small: (rs !== '' && isFinite(s2)) ? s2 : 0 };
+                    });
+                } else if (o.mode === 'horizontal') {
+                    dir = '日期在上(橫式)';
+                    let rowBig = -1, rowSmall = -1;
+                    for (let i = o.hRow + 1; i < aoa.length; i++) {
+                        let t = String((aoa[i] || [])[0] ?? '').trim();
+                        if (rowBig < 0 && /大/.test(t)) rowBig = i;
+                        else if (rowSmall < 0 && /小/.test(t)) rowSmall = i;
+                    }
+                    if (rowBig < 0 && rowSmall < 0) { showToast('❌ 找不到「大車台數」「小車台數」列。請在 A 欄放這兩個列名'); return; }
+                    Object.keys(o.dmap).forEach(ci => {
+                        let ds = o.dmap[ci];
+                        let rb = rowBig >= 0 ? String((aoa[rowBig] || [])[ci] ?? '').replace(/,/g, '').trim() : '';
+                        let rs = rowSmall >= 0 ? String((aoa[rowSmall] || [])[ci] ?? '').replace(/,/g, '').trim() : '';
+                        if (rb === '' && rs === '') return;
+                        let b = Number(rb), s2 = Number(rs);
+                        acc[ds] = { big: (rb !== '' && isFinite(b)) ? b : 0, small: (rs !== '' && isFinite(s2)) ? s2 : 0 };
+                    });
+                } else { showToast('❌ 找不到日期。橫式請把日期放表頭列、A欄放「大車台數」「小車台數」；直式請 A欄=日期、B欄=大車、C欄=小車'); return; }
+
+                let dates = Object.keys(acc);
+                if (!dates.length) { showToast(`❌ 讀到格式為「${dir}」但沒有任何台數資料`); return; }
+                let offYear = 0;
+                dates.forEach(ds => { p.fleetDaily[ds] = acc[ds]; if (Number(ds.slice(0, 4)) !== BP_YEAR) offYear++; });
+                bpTouch(); bpRenderInputs();
+                showToast(`✅ 已匯入 ${dates.length} 天的日別大小車台數（格式：${dir}）${offYear ? `　⚠️ 有 ${offYear} 天不是 ${BP_YEAR} 年度，編列時不會採用` : ''}`, offYear ? 9000 : 4000);
+            });
+        };
+
+        window.bpImportQtyDaily = (e) => {
+            let file = e.target.files[0]; if (!file) return; e.target.value = '';
+            bpReadSheet(file, aoa => {
+                let p = bpGet(), o = bpDetectOrientation(aoa), recs = [], dir = '';
+                if (o.mode === 'vertical') {
+                    // 直式：A欄=日期，表頭列放項目名稱
+                    dir = '日期在左(直式)';
+                    let hRow = -1, colMap = {};
+                    for (let i = 0; i < Math.min(aoa.length, 25); i++) {
+                        let row = aoa[i] || [], hit = 0, cm = {};
+                        row.forEach((cell, ci) => { let t = String(cell).trim(); if (p.items.includes(t)) { cm[t] = ci; hit++; } });
+                        if (hit >= 1) { hRow = i; colMap = cm; break; }
+                    }
+                    if (hRow < 0) { showToast(`❌ 找不到項目欄位標題。請在表頭列放上項目名稱（${p.items.join('／')}）`); return; }
+                    for (let i = hRow + 1; i < aoa.length; i++) {
+                        let row = aoa[i] || [], ds = bpParseDate(row[0]); if (!ds) continue;
+                        Object.keys(colMap).forEach(it => {
+                            let v = row[colMap[it]]; if (v === '' || v === null || v === undefined) return;
+                            let num = Number(String(v).replace(/,/g, '')); if (!isFinite(num)) return;
+                            recs.push({ ds, it, num });
+                        });
+                    }
+                } else if (o.mode === 'horizontal') {
+                    // 橫式：日期在上，A欄=項目名稱
+                    dir = '日期在上(橫式)';
+                    for (let i = o.hRow + 1; i < aoa.length; i++) {
+                        let row = aoa[i] || [], name = String(row[0] ?? '').trim();
+                        if (!p.items.includes(name)) continue;
+                        Object.keys(o.dmap).forEach(ci => {
+                            let v = row[ci]; if (v === '' || v === null || v === undefined) return;
+                            let num = Number(String(v).replace(/,/g, '')); if (!isFinite(num)) return;
+                            recs.push({ ds: o.dmap[ci], it: name, num });
+                        });
+                    }
+                } else { showToast('❌ 找不到日期。橫式請把日期放在表頭列、項目名稱放 A 欄；直式請把日期放 A 欄'); return; }
+
+                if (!recs.length) { showToast(`❌ 讀到格式為「${dir || '未知'}」但沒有任何數值。請確認項目名稱與系統一致（${p.items.join('／')}）`, 8000); return; }
+                if (!p.qtyDaily) p.qtyDaily = {};
+                let monthAgg = {}, dayCount = {}, offYear = new Set(), dates = new Set();
+                recs.forEach(({ ds, it, num }) => {
+                    if (!p.qtyDaily[it]) p.qtyDaily[it] = {};
+                    p.qtyDaily[it][ds] = num;
+                    let m = Number(ds.slice(5, 7));
+                    if (Number(ds.slice(0, 4)) !== BP_YEAR) offYear.add(ds);
+                    dates.add(ds);
+                    if (!monthAgg[it]) monthAgg[it] = {}; if (!dayCount[it]) dayCount[it] = {};
+                    monthAgg[it][m] = (monthAgg[it][m] || 0) + num;
+                    dayCount[it][m] = (dayCount[it][m] || 0) + 1;
+                });
+                // 🛡️ 只有「整月天數都齊」才回寫月別合計，避免只填幾天就把整月件數蓋成小數字
+                let wrote = [], skipped = [];
+                Object.keys(monthAgg).forEach(it => Object.keys(monthAgg[it]).forEach(m => {
+                    let need = BP_MONTH_DAYS(BP_YEAR, Number(m)), got = dayCount[it][m] || 0;
+                    if (got >= need) { p.qty[it][m] = monthAgg[it][m]; wrote.push(`${it}${m}月`); }
+                    else skipped.push(`${it}${m}月(${got}/${need}天)`);
+                }));
+                bpTouch(); bpRenderInputs();
+                let msg = `✅ 已匯入 ${dates.size} 天日別件數（格式：${dir}）`;
+                if (offYear.size) msg += `　⚠️ 其中 ${offYear.size} 天不是 ${BP_YEAR} 年，日別加派車試算不會採用`;
+                if (wrote.length) msg += `　｜已回寫月別合計：${wrote.slice(0, 6).join('、')}${wrote.length > 6 ? ` 等${wrote.length}項` : ''}`;
+                if (skipped.length) msg += `　｜⚠️ 天數不齊、保留原月別數字：${skipped.slice(0, 6).join('、')}${skipped.length > 6 ? ` 等${skipped.length}項` : ''}`;
+                showToast(msg, 10000);
+            });
+        };
+
+        window.bpClearDaily = (kind) => {
+            let p = bpGet();
+            if (kind === 'route') { p.routeDaily = {}; showToast('🗑️ 已清空日別路線清單'); }
+            else if (kind === 'fleet') { p.fleetDaily = {}; showToast('🗑️ 已清空日別車輛台數'); }
+            else if (kind === 'qty') { p.qtyDaily = {}; showToast('🗑️ 已清空日別件數（月別件數保留）'); }
+            bpTouch(); bpRenderInputs();
+        };
+
+        function renderTab8() {
+            bpRenderInputs();
+            bpRenderSizeIndicator();
+            let wh = window.currentWarehouse;
+            if (window.__bpCache[wh]) bpRenderResult();
+            else {
+                let meta = document.getElementById('budgetPlanMeta'); if (meta) meta.innerHTML = '';
+                ['bpResultTable', 'bpCompareTable', 'bpSensTable'].forEach(id => { let t = document.getElementById(id); if (t) t.innerHTML = ''; });
+                ['bpCompareNote', 'bpSensNote'].forEach(id => { let t = document.getElementById(id); if (t) t.innerHTML = ''; });
+                let dl = document.getElementById('btnDownloadBudgetPlan'); if (dl) dl.disabled = true;
+            }
+        }
+
         function exportCurrentPage() {
             let activeTab = document.querySelector('.tab-btn.active')?.innerText.trim(); if(!activeTab) return showToast("⚠️ 無法定位表格！");
             let ids = [];
@@ -2121,7 +3327,7 @@
             else if(activeTab.includes('月預算')) window.currentRenderedWhOrder_tab3.forEach((wh, i) => ids.push(`monthlyCountTable_${i}`, `monthlyLoadRateTable_${i}`, `monthlyTable_${i}`));
             else if(activeTab.includes('上收')) window.currentRenderedWhOrder_tab4.forEach((wh, i) => ids.push(`pickupTable_${i}`));
             else if(activeTab.includes('指標')) window.currentRenderedWhOrder_tab5.forEach((wh, i) => ids.push(`metricsTable_${i}`));
-            else if(activeTab.includes('預估實績')) { window.exportEstActual(); return; } else if(activeTab.includes('結帳')) ids=['checkoutTable'];
+            else if(activeTab.includes('預估實績')) { window.exportEstActual(); return; } else if(activeTab.includes('結帳')) ids=['checkoutTable']; else if(activeTab.includes('預算編列')) { window.downloadBudgetPlan(); return; }
 
             if(!ids.length || !document.getElementById(ids[0])) return showToast("⚠️ 無法定位表格！");
             
@@ -3593,7 +4799,8 @@ setInterval(() => {
     if(bDaxi) bDaxi.style.setProperty('display', (isAll || role === 'rw_daxi') ? 'inline-flex' : 'none', 'important');
     if(bGangshan) bGangshan.style.setProperty('display', (isAll || role === 'rw_gangshan') ? 'inline-flex' : 'none', 'important');
 }, 500);
-</script><<script id="perfect-dual-engine">
+</script>
+<script id="perfect-dual-engine">
 (function() {
     console.log("🛡️ 啟動【11507_終極進化版】：解鎖結帳區全域貼上、岡山專屬廠商切換、離島專用匯入通道！");
     
