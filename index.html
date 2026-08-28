@@ -620,8 +620,18 @@
                     <button class="bp-imp rw-only" style="background:#17a2b8;" onclick="document.getElementById('bpFileFleetDaily').click()">📥 匯入日別大小車台數</button>
                     <button class="bp-clr rw-only" onclick="window.bpClearDaily('fleet')">清空日別台數</button>
                 </div>
+                <div class="bp-row" style="margin-bottom:10px; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <div class="bp-lbl" style="margin-bottom:4px;">📆 星期週期設定（沒有日別路線／日別台數的日子，依星期幾自動套用下列固定台數；例如週日固定 58 台、週一二固定 56 台）</div>
+                        <div class="bp-scroll" style="max-height:none;"><div id="bpWeekdayGrid"></div></div>
+                        <div class="bp-row" style="margin-top:6px;">
+                            <button class="bp-imp rw-only" style="background:#e67e22;" onclick="window.bpApplyWeekdayPattern()">📆 套用星期週期到全年</button>
+                            <button class="bp-clr rw-only" onclick="window.bpClearWeekdayPattern()">清空星期週期設定</button>
+                        </div>
+                    </div>
+                </div>
                 <div id="bpRouteSummary"></div>
-                <div class="bp-scroll" style="margin-top:10px;"><div id="bpFleetGrid"></div></div>
+                <div class="bp-scroll" style="margin-top:10px; max-height:none; overflow:visible;"><div id="bpFleetGrid"></div></div>
                 <div class="bp-note">📥 <b>路線單價清單</b>格式：表頭含「路線／車型與單價」三欄（車型填「大」或「小」）。<br>
                     📥 <b>日別行駛路線</b>格式：<b>表頭列放日期，各日的路線代號往下排</b>（橫式）。有這份資料的日子，台數與 B版主線費用都直接由該日路線加總得出，最精確。<br>
                     📥 <b>日別大小車台數</b>格式：<b>表頭列放日期，A欄放「大車台數」「小車台數」兩列</b>（橫式）。<br>
@@ -650,7 +660,15 @@
 
         <div class="bp-sec" style="border-color:#d8c8f0;">
             <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">🔍 116 vs 115 預算／實績對比</div>
-            <div class="bp-body"><div class="bp-scroll" style="max-height:none;"><table id="bpCompareTable" class="bp-grid"></table></div><div id="bpCompareNote"></div></div>
+            <div class="bp-body">
+                <div id="bpCompareTitleA" style="font-weight:bold; color:#5a3d99; margin-bottom:4px;"></div>
+                <div class="bp-scroll" style="max-height:none;"><table id="bpCompareTable" class="bp-grid"></table></div>
+                <div id="bpCompareTitleB" style="font-weight:bold; color:#5a3d99; margin:16px 0 4px;"></div>
+                <div class="bp-scroll" style="max-height:none;"><table id="bpCompareTableB" class="bp-grid"></table></div>
+                <div id="bpCompareDiffTitle" style="font-weight:bold; color:#5a3d99; margin:16px 0 4px;"></div>
+                <div class="bp-scroll" style="max-height:none;"><table id="bpCompareDiffTable" class="bp-grid"></table></div>
+                <div id="bpCompareNote"></div>
+            </div>
         </div>
 
         <div class="bp-sec" style="border-color:#d8c8f0;">
@@ -2419,7 +2437,7 @@
             let d = {
                 version: 2, items: [...BP_DEFAULT_ITEMS], units: {}, ratios: {}, qty: {}, qtyDaily: {},
                 bigCap: '', smallCap: '', avgBig: seeded ? 5902 : '', avgSmall: seeded ? 4327 : '',
-                fleetMonthly: {}, fleetDaily: {}, routes: [], routeDaily: {},
+                fleetMonthly: {}, fleetDaily: {}, fleetWeekday: {}, routes: [], routeDaily: {},
                 recv: {}, carryBack: {}, growth: { '其他':0, '違規罰款':0, '離島':0, '轉運':0 },
                 coef: seeded ? { boxPerTrip: 70, tripCost: 2000, recvPerTrip: 400, recvTripCost: 2000 }
                              : { boxPerTrip: '', tripCost: '', recvPerTrip: '', recvTripCost: '' },
@@ -2474,7 +2492,7 @@
             let p = state.warehouses[wh].plan116, d = bpDefaults(wh);
             bpCleanSeededLeftovers(wh, p);
             if (!Array.isArray(p.items) || !p.items.length) p.items = [...BP_DEFAULT_ITEMS];
-            ['units','ratios','qty','qtyDaily','fleetMonthly','fleetDaily','routeDaily','recv','carryBack','growth','coef'].forEach(k => { if (!p[k] || typeof p[k] !== 'object') p[k] = d[k]; });
+            ['units','ratios','qty','qtyDaily','fleetMonthly','fleetDaily','fleetWeekday','routeDaily','recv','carryBack','growth','coef'].forEach(k => { if (!p[k] || typeof p[k] !== 'object') p[k] = d[k]; });
             if (!Array.isArray(p.routes)) p.routes = [];
             p.items.forEach(it => {
                 if (p.units[it] !== '件' && p.units[it] !== '箱') p.units[it] = BP_DEFAULT_UNITS[it] || '件';
@@ -2503,18 +2521,54 @@
             return map;
         }
 
-        // 某一天的車輛組成：日別路線清單 > 日別台數 > 月別台數
+        // 匯入的日別資料，日期欄位若含完整西元年（例如 Excel 存的是「2026-08-01」這種實際日曆年份），
+        // 存進 routeDaily／fleetDaily 的 key 就會是「2026-08-01」；但逐日試算是用「BP_YEAR-MM-DD」
+        // （例如「116-08-01」）去查表——兩者年份字串完全對不上，會導致明明有匯入日別資料，逐日試算卻永遠查不到、
+        // 只好每天都退回月別預設值。這裡加一層「只比對月-日、不比對年」的備援對照表，
+        // 讓匯入資料不論是哪一年份的日期，只要月、日一致，都能被逐日試算正確抓到。
+        function bpDailyByMD(obj, p, cacheKey) {
+            if (!obj) return {};
+            let keys = Object.keys(obj), verKey = keys.length + '|' + (keys[0] || '');
+            if (p['__' + cacheKey] && p['__' + cacheKey + 'Ver'] === verKey) return p['__' + cacheKey];
+            let map = {};
+            keys.forEach(k => { let mm = String(k).match(/(\d{1,2})-(\d{1,2})$/); if (mm) map[`${mm[1].padStart(2, '0')}-${mm[2].padStart(2, '0')}`] = obj[k]; });
+            p['__' + cacheKey] = map; p['__' + cacheKey + 'Ver'] = verKey;
+            return map;
+        }
+
+        // 依日期字串（...-MM-DD）算出實際星期幾（0=日～6=六），供「星期週期設定」比對用。
+        // 注意：BP_YEAR 存的已經是西元年（YEAR+1，例如 2027），不是民國年，
+        // 所以這裡直接使用、不可再加 1911，否則會算到完全錯誤的年份而得到錯誤的星期。
+        function bpWeekdayOf(dateStr) {
+            let mm = String(dateStr).match(/(\d{1,2})-(\d{1,2})$/);
+            if (!mm) return null;
+            return new Date(BP_YEAR, Number(mm[1]) - 1, Number(mm[2])).getDay();
+        }
+
+        // 某一天的車輛組成：日別路線清單 > 日別台數 > 星期週期設定 > 月別預設
         function bpFleetForDate(p, dateStr, m) {
-            let rd = p.routeDaily?.[dateStr];
+            let md = String(dateStr).slice(-5);
+            let rd = p.routeDaily?.[dateStr]; if (rd === undefined) rd = bpDailyByMD(p.routeDaily, p, 'routeMD')[md];
             if (rd) {
                 let codes = String(rd).split(/[,、\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean);
                 let map = bpRouteMap(p), big = 0, small = 0, price = 0, unknown = 0;
                 codes.forEach(c => { let r = map[c]; if (r) { if (r.type === '大') big++; else small++; price += bpNum(r.price); } else unknown++; });
                 return { big, small, priceB: price, src: 'route', unknown };
             }
-            let fd = p.fleetDaily?.[dateStr];
+            let fd = p.fleetDaily?.[dateStr]; if (fd === undefined) fd = bpDailyByMD(p.fleetDaily, p, 'fleetMD')[md];
             if (fd) return { big: bpNum(fd.big), small: bpNum(fd.small), priceB: null, src: 'day', unknown: 0 };
             let fm = p.fleetMonthly?.[m] || {};
+            let dow = bpWeekdayOf(dateStr), wd = dow !== null ? p.fleetWeekday?.[dow] : null;
+            let blank = x => x === '' || x === undefined || x === null;
+            if (wd && !(blank(wd.big) && blank(wd.small))) {
+                // 只填其中一種車型時，另一種沿用月別預設值——避免使用者只設定小車台數，
+                // 卻讓當天的大車被當成 0 台而少算主線費用。
+                return {
+                    big: blank(wd.big) ? bpNum(fm.big) : bpNum(wd.big),
+                    small: blank(wd.small) ? bpNum(fm.small) : bpNum(wd.small),
+                    priceB: null, src: 'weekday', unknown: 0
+                };
+            }
             return { big: bpNum(fm.big), small: bpNum(fm.small), priceB: null, src: 'month', unknown: 0 };
         }
 
@@ -2533,18 +2587,108 @@
             return bpPickSum(big, fleet.big) + bpPickSum(small, fleet.small);
         }
 
-        // 115 年某月某科目實績：已過完的月份採實際加總（不外推）；進行中的當月依日曆天數比例外推
+        // 某月的「實際」車輛/裝載/主線費用彙總：
+        // A版＝固定車數出車：整月都用「月別預設」台數 × 平均單價 × 天數，完全不理會日別匯入資料。
+        // B版＝機動車數出車：逐日依「日別路線清單 ＞ 日別台數 ＞ 星期週期 ＞ 月別預設」取得當日實際台數與當日實際
+        //       路線單價，每天分開算再加總成月合計；哪一天有不同的路線／台數，當天（進而當月）金額就會不同。
+        function bpFleetMonthSummary(p, m) {
+            let dim = BP_MONTH_DAYS(BP_YEAR, m);
+            let bigCap = bpNum(p.bigCap), smallCap = bpNum(p.smallCap);
+            let fmDefault = p.fleetMonthly[m] || {}, defBig = bpNum(fmDefault.big), defSmall = bpNum(fmDefault.small);
+            // A版：固定車數，不逐日展開，直接用月別預設 × 天數
+            let mainA = dim * (defBig * bpNum(p.avgBig) + defSmall * bpNum(p.avgSmall));
+            let capFixed = dim * (defBig * bigCap + defSmall * smallCap);
+            // B版：逐日採用實際車輛數與當日實際路線單價
+            let big = 0, small = 0, cap = 0, mainB = 0, overrideDays = 0;
+            let bigMin = Infinity, bigMax = -Infinity, smallMin = Infinity, smallMax = -Infinity;
+            for (let d = 1; d <= dim; d++) {
+                let ds = bpDateStr(BP_YEAR, m, d), f = bpFleetForDate(p, ds, m);
+                big += f.big; small += f.small;
+                cap += f.big * bigCap + f.small * smallCap;
+                mainB += bpMainlineBDay(p, f);
+                if (f.src !== 'month') overrideDays++;
+                if (f.big < bigMin) bigMin = f.big; if (f.big > bigMax) bigMax = f.big;
+                if (f.small < smallMin) smallMin = f.small; if (f.small > smallMax) smallMax = f.small;
+            }
+            return {
+                dim, defBig, defSmall, capFixed, big, small, cap, mainA: Math.round(mainA), mainB: Math.round(mainB), overrideDays,
+                bigAvg: dim ? big / dim : 0, smallAvg: dim ? small / dim : 0, capAvg: dim ? cap / dim : 0,
+                uniform: overrideDays === 0, bigMin, bigMax, smallMin, smallMax
+            };
+        }
+
+        // 某月「實際有回報資料」的天數：當天只要有填任何一項費用科目就算一天。
+        // 這點很關鍵——使用者常會把當月剩下的日子先填上預估值到月底，此時整月都算已回報，
+        // 就不可以再用「日曆已過天數」去外推，否則會把整月金額錯誤放大（整月天數 ÷ 已過天數）倍。
+        function bp115ReportedDays(wh, m) {
+            let days = getDays(m), dailyData = state.warehouses[wh]?.daily || {};
+            let allCostItems = Object.values(BUDGET_MAPPING).flat(), n = 0;
+            days.forEach(d => {
+                let row = dailyData[d.dateStr];
+                if (row && allCostItems.some(it => { let v = row[it]; return v !== undefined && v !== null && v !== ''; })) n++;
+            });
+            return { reported: n, dim: days.length };
+        }
+
+        // 115 年某月某科目實績：已回報天數涵蓋整月 → 直接採實際加總（不外推）；
+        // 只有真的還有日子沒填時，才依「已回報天數」比例外推（不是用日曆已過天數）。
         function bp115ActualCat(wh, m, cat) {
             let days = getDays(m), dailyData = state.warehouses[wh]?.daily || {};
-            let today = new Date(), tY = today.getFullYear(), tM = today.getMonth() + 1, tD = today.getDate();
+            let today = new Date(), tY = today.getFullYear(), tM = today.getMonth() + 1;
             if (YEAR > tY || (YEAR === tY && m > tM)) return { val: 0, mode: 'none' };
-            let isCur = (YEAR === tY && m === tM), sum = 0, elapsed = 0;
-            days.forEach((d, idx) => {
-                (BUDGET_MAPPING[cat] || []).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); });
-                if (!isCur || (idx + 1) <= tD) elapsed++;
+            let sum = 0;
+            days.forEach(d => { (BUDGET_MAPPING[cat] || []).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); }); });
+            let rd = bp115ReportedDays(wh, m);
+            if (rd.reported >= rd.dim || rd.reported === 0) return { val: sum, mode: sum > 0 ? 'actual' : 'empty' };
+            return { val: sum / rd.reported * rd.dim, mode: 'partial' };
+        }
+
+        // 115 年某月某科目的原始狀態（不做任何補值），供「兩版全年實績推估」各自決定怎麼補未發生的月份：
+        //   actual  = 已回報天數涵蓋整月，有金額（含使用者已把月底預估值填好的當月）
+        //   empty   = 已回報天數涵蓋整月，但金額為 0（真的沒發生，不是缺資料）
+        //   partial = 還有日子沒填，只回報到一部分（sum/reported 才是正確日均）
+        //   future  = 尚未到的月份，完全沒有資料
+        function bp115Raw(wh, m, cat) {
+            let days = getDays(m), dailyData = state.warehouses[wh]?.daily || {};
+            let today = new Date(), tY = today.getFullYear(), tM = today.getMonth() + 1;
+            if (YEAR > tY || (YEAR === tY && m > tM)) return { m, mode: 'future', sum: 0, reported: 0, dim: days.length };
+            let sum = 0;
+            days.forEach(d => { (BUDGET_MAPPING[cat] || []).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); }); });
+            let rd = bp115ReportedDays(wh, m), reported = rd.reported, dim = rd.dim;
+            if (reported >= dim || reported === 0) return { m, mode: sum > 0 ? 'actual' : 'empty', sum, reported, dim };
+            return { m, mode: 'partial', sum, reported, dim };
+        }
+
+        // 115 年全年實績的兩種推估版本（差異只在「尚未發生的月份」怎麼補值）：
+        //   甲版（延續當月實績）：未發生月份 = 基準月的日均 × 該月天數。基準月優先取還沒填完的當月，
+        //                        若當月已填滿則用最後一個有實績的月份。等同「把 8 月的水準一路帶到 12 月」。
+        //   乙版（改用核定預算）：未發生月份 = 該月 115 年核定預算金額，等同「未發生的部分就照原預算估」。
+        // 已回報的月份兩版完全相同，不做版本差異。
+        function bp115YearActual(wh, cat) {
+            let rows = [], baseDaily = null, baseMonth = null;
+            for (let m = 1; m <= 12; m++) rows.push(bp115Raw(wh, m, cat));
+            // 基準月：優先取「還沒填完的當月」（用已回報天數算日均）；若當月已填滿，就用最後一個有實績的月份（用整月天數算日均）
+            let cur = rows.find(r => r.mode === 'partial' && r.reported > 0);
+            if (cur) { baseDaily = cur.sum / cur.reported; baseMonth = cur.m; }
+            else { let last = [...rows].reverse().find(r => r.mode === 'actual' && r.dim > 0); if (last) { baseDaily = last.sum / last.dim; baseMonth = last.m; } }
+            let byA = {}, byB = {}, totA = 0, totB = 0, futureMonths = [], hasPartial = false;
+            let common = 0, fillA = 0, fillB = 0;   // common=兩版共用的已回報月份小計；fillA/fillB=未發生月份各自的補值小計
+            rows.forEach(r => {
+                if (r.mode === 'partial') hasPartial = true;
+                if (r.mode === 'future') {
+                    futureMonths.push(r.m);
+                    let vA = baseDaily !== null ? baseDaily * r.dim : 0;
+                    let vB = bpNum(state.warehouses[wh]?.budget?.[r.m]?.[cat]);
+                    byA[r.m] = vA; byB[r.m] = vB; totA += vA; totB += vB; fillA += vA; fillB += vB;
+                } else {
+                    // 已填滿的月份(含實際為0)與只填一部分的月份：兩版採相同處理
+                    let v = r.mode === 'partial' ? (r.reported > 0 ? r.sum / r.reported * r.dim : r.sum) : r.sum;
+                    byA[r.m] = v; byB[r.m] = v; totA += v; totB += v; common += v;
+                }
             });
-            if (!isCur) return { val: sum, mode: sum > 0 ? 'actual' : 'empty' };
-            return { val: elapsed > 0 ? sum / elapsed * days.length : sum, mode: 'partial' };
+            return { rows, byA, byB, totalA: Math.round(totA), totalB: Math.round(totB),
+                common: Math.round(common), fillA: Math.round(fillA), fillB: Math.round(fillB),
+                baseDaily, baseMonth, futureMonths, hasPartial };
         }
 
         // 其他項目基準：A版=115年逐月實際(未發生/無資料的月份以115核定預算補值)；B版=115年8月實績按天數比例
@@ -2596,17 +2740,23 @@
                 });
                 row.qtyTotal = qtyTotal; row.boxDirect = boxDirect; row.boxTotal = boxTotal;
 
-                let big = 0, small = 0, cap = 0, costA = 0, costB = 0, routeDays = 0, dayCapList = [];
+                // A版＝固定車數出車：不管有沒有匯入日別資料，永遠用「月別預設」的大／小車台數（同一數字用一整個月），
+                //       乘以平均單價，再乘以當月天數（28／30／31天）——單純的「固定車數 × 平均單價 × 天數」估算。
+                // B版＝機動車數出車：逐日採用「日別路線清單 ＞ 日別台數 ＞ 星期週期 ＞ 月別預設」的實際車輛數與
+                //       當日實際路線單價，每天算一次再加總成月合計，車輛數與單價都會隨匯入資料每天不同、每月自然不同。
+                let fmDefault = p.fleetMonthly[m] || {}, defBig = bpNum(fmDefault.big), defSmall = bpNum(fmDefault.small);
+                let costA = dim * (defBig * bpNum(p.avgBig) + defSmall * bpNum(p.avgSmall));
+                let big = 0, small = 0, cap = 0, costB = 0, routeDays = 0, dayCapList = [];
                 for (let d = 1; d <= dim; d++) {
                     let ds = bpDateStr(BP_YEAR, m, d), f = bpFleetForDate(p, ds, m);
                     big += f.big; small += f.small;
                     let dcap = f.big * bigCap + f.small * smallCap;
                     cap += dcap; dayCapList.push({ ds, cap: dcap });
-                    costA += f.big * bpNum(p.avgBig) + f.small * bpNum(p.avgSmall);
                     costB += bpMainlineBDay(p, f);
                     if (f.src === 'route') { routeDays++; flags.unknownCodes += f.unknown || 0; }
                 }
                 row.bigTrips = big; row.smallTrips = small; row.capacity = cap; row.routeDays = routeDays;
+                row.bigTripsFixed = defBig * dim; row.smallTripsFixed = defSmall * dim;
                 row.mainA = Math.round(costA); row.mainB = Math.round(costB);
                 row.loadRate = cap > 0 ? boxTotal / cap * 100 : 0;
 
@@ -2664,19 +2814,19 @@
             let res = bpBuild(p, wh, 1);
             // 敏感度：件數與驗收件數同步縮放
             let sens = [0.9, 0.95, 1, 1.05, 1.1].map(s => ({ s, grand: bpBuild(p, wh, s).grand }));
-            // 115 對比
-            let cmp = {};
+            // 115 對比：實績同時算「甲版(未發生月份延續當月實績)」與「乙版(未發生月份改用核定預算)」兩種推估
+            let cmp = {}, cmpMeta = { baseMonth: null, futureMonths: [], hasPartial: false };
             BP_CATS.forEach(cat => {
-                let b115 = 0, a115 = 0, partial = false, none = false;
-                for (let m = 1; m <= 12; m++) {
-                    b115 += bpNum(state.warehouses[wh]?.budget?.[m]?.[cat]);
-                    let a = bp115ActualCat(wh, m, cat); a115 += a.val;
-                    if (a.mode === 'partial') partial = true;
-                    if (a.mode === 'none' || a.mode === 'empty') none = true;
-                }
-                cmp[cat] = { budget115: Math.round(b115), actual115: Math.round(a115), partial, none };
+                let b115 = 0;
+                for (let m = 1; m <= 12; m++) b115 += bpNum(state.warehouses[wh]?.budget?.[m]?.[cat]);
+                let ya = bp115YearActual(wh, cat);
+                cmp[cat] = { budget115: Math.round(b115), actualA: ya.totalA, actualB: ya.totalB, actual115: ya.totalA,
+                    common: ya.common, fillA: ya.fillA, fillB: ya.fillB, byA: ya.byA, byB: ya.byB };
+                if (ya.baseMonth && !cmpMeta.baseMonth) cmpMeta.baseMonth = ya.baseMonth;
+                if (ya.futureMonths.length > cmpMeta.futureMonths.length) cmpMeta.futureMonths = ya.futureMonths;
+                if (ya.hasPartial) cmpMeta.hasPartial = true;
             });
-            window.__bpCache[wh] = { ...res, sens, cmp, generatedAt: Date.now(), snapshot: JSON.parse(JSON.stringify({
+            window.__bpCache[wh] = { ...res, sens, cmp, cmpMeta, generatedAt: Date.now(), snapshot: JSON.parse(JSON.stringify({
                 items: p.items, units: p.units, ratios: p.ratios, bigCap: p.bigCap, smallCap: p.smallCap, avgBig: p.avgBig, avgSmall: p.avgSmall,
                 coef: p.coef, growth: p.growth, mainlineMode: p.mainlineMode, otherBase: p.otherBase,
                 routeCount: p.routes.length, routeDailyDays: Object.keys(p.routeDaily || {}).length, fleetDailyDays: Object.keys(p.fleetDaily || {}).length,
@@ -2751,20 +2901,59 @@
             h += `<td>${bpFmt(bYr)}</td><td></td></tr></tbody></table>`;
             let qc = document.getElementById('bpQtyGrid'); if (qc) qc.innerHTML = h;
 
-            // 車輛
-            let f = `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">車輛(月別預設)</th>${mh}<th class="bp-th" style="width:82px;">全年車趟</th></tr></thead><tbody>`;
+            // 星期週期設定表：日(0)一(1)二(2)三(3)四(4)五(5)六(6)，每個星期幾各自設定固定的大／小車台數。
+            // 優先順序排在「日別路線／日別台數」之後、「月別預設」之前，用來一次補齊沒有實際日別匯入的日子／月份。
+            let WD_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+            let wg = `<table class="bp-grid" style="table-layout:fixed; width:auto;"><thead><tr><th class="bp-th bp-sticky" style="width:90px;">星期</th>${WD_LABELS.map(l => `<th class="bp-th" style="width:64px;">週${l}</th>`).join('')}</tr></thead><tbody>`;
+            wg += `<tr><td class="bp-sticky bp-item">大車台數</td>`;
+            for (let dow = 0; dow <= 6; dow++) { let v = p.fleetWeekday[dow]?.big ?? ''; wg += `<td><input class="bp-in-ctr bp-numfmt" type="text" inputmode="decimal" data-bp="wd" data-dow="${dow}" data-k="big" value="${bpFmtInput(v)}"></td>`; }
+            wg += `</tr><tr><td class="bp-sticky bp-item">小車台數</td>`;
+            for (let dow = 0; dow <= 6; dow++) { let v = p.fleetWeekday[dow]?.small ?? ''; wg += `<td><input class="bp-in-ctr bp-numfmt" type="text" inputmode="decimal" data-bp="wd" data-dow="${dow}" data-k="small" value="${bpFmtInput(v)}"></td>`; }
+            wg += `</tr></tbody></table>`;
+            let wgc = document.getElementById('bpWeekdayGrid'); if (wgc) wgc.innerHTML = wg;
+
+            // 車輛：先算出每個月的彙總（A版=固定車數；B版=逐日套用 日別路線＞日別台數＞星期週期＞月別預設）
+            let fleetSum = {}; for (let m = 1; m <= 12; m++) fleetSum[m] = bpFleetMonthSummary(p, m);
+            let dayOverride = Object.keys(p.fleetDaily || {}).length, routeDays = Object.keys(p.routeDaily || {}).length;
+            let fleetOnlyCount = Object.keys(p.fleetDaily || {}).filter(ds => !p.routeDaily[ds]).length;
+            let f = '';
+            let mainAYr = 0, mainBYr = 0; for (let m = 1; m <= 12; m++) { mainAYr += fleetSum[m].mainA; mainBYr += fleetSum[m].mainB; }
+
+            // 🅰️ 平均單價版：固定車數出車——整月都用可編輯的月別台數，乘以平均單價、乘以當月天數。
+            f += `<div style="font-weight:bold; color:#5a3d99;">🅰️ 主線費用估算・平均單價版（固定車數出車：整月都用下方可編輯的大／小車台數，不理會日別匯入，× 平均單價 × 當月天數）</div>`;
+            f += `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">A版車輛(可編輯)</th>${mh}<th class="bp-th" style="width:82px;">全年車趟</th></tr></thead><tbody>`;
             [['big', '大車台數/日'], ['small', '小車台數/日']].forEach(([k, lb]) => {
                 f += `<tr><td class="bp-sticky bp-item">${lb}</td>`;
-                let yr = 0;
-                for (let m = 1; m <= 12; m++) { let v = p.fleetMonthly[m]?.[k] ?? ''; yr += bpNum(v) * BP_MONTH_DAYS(BP_YEAR, m); f += `<td><input class="bp-in bp-numfmt" type="text" inputmode="decimal" data-bp="fleet" data-k="${k}" data-m="${m}" value="${bpFmtInput(v)}"></td>`; }
+                for (let m = 1; m <= 12; m++) { let v = p.fleetMonthly[m]?.[k] ?? ''; f += `<td><input class="bp-in bp-numfmt" type="text" inputmode="decimal" data-bp="fleet" data-k="${k}" data-m="${m}" value="${bpFmtInput(v)}"></td>`; }
+                let yr = 0; for (let m = 1; m <= 12; m++) yr += fleetSum[m][k === 'big' ? 'defBig' : 'defSmall'] * fleetSum[m].dim;
                 f += `<td class="bp-sum">${bpFmt(yr)}</td></tr>`;
             });
             f += `<tr class="bp-total"><td class="bp-sticky">每日承載箱數</td>`;
-            for (let m = 1; m <= 12; m++) { let fm = p.fleetMonthly[m] || {}; f += `<td>${bpFmt(bpNum(fm.big) * bpNum(p.bigCap) + bpNum(fm.small) * bpNum(p.smallCap))}</td>`; }
+            for (let m = 1; m <= 12; m++) f += `<td>${bpFmt(fleetSum[m].defBig * bpNum(p.bigCap) + fleetSum[m].defSmall * bpNum(p.smallCap))}</td>`;
             f += `<td>—</td></tr></tbody></table>`;
-            let dayOverride = Object.keys(p.fleetDaily || {}).length, routeDays = Object.keys(p.routeDaily || {}).length;
-            let fleetOnlyCount = Object.keys(p.fleetDaily || {}).filter(ds => !p.routeDaily[ds]).length;
-            f += `<div class="bp-note">📌 優先順序：<b>日別路線清單</b>（已匯入 <b>${routeDays}</b> 天）→ <b>日別台數</b>（已匯入 <b>${dayOverride}</b> 天${fleetOnlyCount < dayOverride ? `，其中 <b>${dayOverride - fleetOnlyCount}</b> 天因同時有日別路線清單、實際不採用` : ''}）→ 上方月別預設值。有日別路線的日子，台數與 B版主線費用都直接由該日路線加總得出。`;
+            f += `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">A版主線費用</th>${mh}<th class="bp-th" style="width:82px;">全年合計</th></tr></thead><tbody><tr><td class="bp-sticky bp-item">金額（元）</td>`;
+            for (let m = 1; m <= 12; m++) f += `<td>${bpFmt(fleetSum[m].mainA)}</td>`;
+            f += `<td class="bp-sum">${bpFmt(mainAYr)}</td></tr></tbody></table>`;
+            f += `<div class="bp-note" style="margin-top:2px;">📌 A版車輛數就是上面表格裡直接輸入的固定值，<b>每月同一天數重複、不隨日別匯入資料變動</b>，所以每月金額只會因為「當月天數是 28／30／31 天」而不同，這是 A 版本來的設計（固定車數出車的粗估版本）。</div>`;
+
+            // 🅱️ 日別路線版：機動車數出車——逐日採用實際台數與當日實際路線單價，再加總成月。
+            f += `<div style="margin-top:14px; font-weight:bold; color:#5a3d99;">🅱️ 主線費用估算・日別路線版（機動車數出車：逐日採用實際匯入的大／小車台數 × 當日實際路線單價，再逐日加總成月）</div>`;
+            f += `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">B版車輛(日均)</th>${mh}<th class="bp-th" style="width:82px;">全年合計</th></tr></thead><tbody>`;
+            f += `<tr><td class="bp-sticky bp-item">大車台數/日</td>`;
+            let bBigYr = 0; for (let m = 1; m <= 12; m++) { bBigYr += fleetSum[m].big; f += `<td title="${fleetSum[m].overrideDays ? `本月大車當日範圍 ${bpFmt(fleetSum[m].bigMin)}~${bpFmt(fleetSum[m].bigMax)} 台，精確平均 ${bpFmt(fleetSum[m].bigAvg, 1)}` : '本月每天台數相同'}">${bpFmt(fleetSum[m].bigAvg)}${fleetSum[m].overrideDays ? ' 🔀' : ''}</td>`; }
+            f += `<td class="bp-sum">${bpFmt(bBigYr)}</td></tr>`;
+            f += `<tr><td class="bp-sticky bp-item">小車台數/日</td>`;
+            let bSmallYr = 0; for (let m = 1; m <= 12; m++) { bSmallYr += fleetSum[m].small; f += `<td title="${fleetSum[m].overrideDays ? `本月小車當日範圍 ${bpFmt(fleetSum[m].smallMin)}~${bpFmt(fleetSum[m].smallMax)} 台，精確平均 ${bpFmt(fleetSum[m].smallAvg, 1)}` : '本月每天台數相同'}">${bpFmt(fleetSum[m].smallAvg)}${fleetSum[m].overrideDays ? ' 🔀' : ''}</td>`; }
+            f += `<td class="bp-sum">${bpFmt(bSmallYr)}</td></tr>`;
+            f += `<tr class="bp-total"><td class="bp-sticky">每日承載箱數（平均）</td>`;
+            for (let m = 1; m <= 12; m++) f += `<td title="精確平均為 ${bpFmt(fleetSum[m].capAvg, 1)}">${bpFmt(fleetSum[m].capAvg)}</td>`;
+            f += `<td>—</td></tr></tbody></table>`;
+            f += `<table class="bp-grid" style="table-layout:fixed;"><thead><tr><th class="bp-th bp-sticky">B版主線費用</th>${mh}<th class="bp-th" style="width:82px;">全年合計</th></tr></thead><tbody><tr><td class="bp-sticky bp-item">金額（元）</td>`;
+            for (let m = 1; m <= 12; m++) f += `<td>${bpFmt(fleetSum[m].mainB)}</td>`;
+            f += `<td class="bp-sum">${bpFmt(mainBYr)}</td></tr></tbody></table>`;
+            f += `<div class="bp-note" style="margin-top:2px;">📌 B版車輛數是<b>逐日</b>依「日別路線清單 ＞ 日別台數 ＞ 星期週期設定 ＞ 月別預設」取得的實際台數（有 🔀 代表當月混有不同的日別數值，滑鼠移到儲存格看範圍與精確平均），金額也是逐日用當日實際路線單價加總，<b>不是用平均單價</b>；有日別路線清單的日子最精確，沒有的日子則依路線清單單價由低至高估算。</div>`;
+
+            f += `<div class="bp-note">📌 優先順序：<b>日別路線清單</b>（已匯入 <b>${routeDays}</b> 天）→ <b>日別台數</b>（已匯入 <b>${dayOverride}</b> 天${fleetOnlyCount < dayOverride ? `，其中 <b>${dayOverride - fleetOnlyCount}</b> 天因同時有日別路線清單、實際不採用` : ''}）→ <b>星期週期設定</b>（依日期實際的星期幾套用）→ <b>🅰️ 表格裡的可編輯固定值</b>（連星期週期都沒設定時的最終保底）。`;
             if (routeDays) f += ` <a href="javascript:void(0)" onclick="window.bpToggleDailyDetail('route')">展開/收合 日別路線明細</a>`;
             if (fleetOnlyCount) f += ` ｜ <a href="javascript:void(0)" onclick="window.bpToggleDailyDetail('fleet')">展開/收合 日別台數明細（僅列未被路線清單覆蓋的 ${fleetOnlyCount} 天）</a>`;
             f += `</div>`;
@@ -2909,6 +3098,7 @@
             else if (kind === 'ratio') p.ratios[t.dataset.item] = v;
             else if (kind === 'qty') { if (!p.qty[t.dataset.item]) p.qty[t.dataset.item] = {}; p.qty[t.dataset.item][m] = v; }
             else if (kind === 'fleet') { if (!p.fleetMonthly[m]) p.fleetMonthly[m] = {}; p.fleetMonthly[m][t.dataset.k] = v; }
+            else if (kind === 'wd') { let dow = t.dataset.dow; if (!p.fleetWeekday[dow]) p.fleetWeekday[dow] = {}; p.fleetWeekday[dow][t.dataset.k] = v; }
             else if (kind === 'recv' || kind === 'carryBack') p[kind][m] = v;
             else if (kind === 'basic') {
                 let f = t.dataset.f;
@@ -3026,23 +3216,74 @@
             h += `</tbody>`;
             t1.innerHTML = h;
 
-            // 表2：116 vs 115 對比
+            // 表2：116 vs 115 對比——115實績分兩版推估，各出一張表，最後再出一張兩版差異對照表
             let pct = (a, b) => b > 0 ? ((a / b - 1) * 100).toFixed(1) + '%' : '—';
             let clr = (a, b) => b > 0 ? (a > b ? '#dc3545' : '#28a745') : '#666';
-            let h2 = `<thead><tr><th class="bp-th bp-sticky">科目</th><th class="bp-th">116建議預算</th><th class="bp-th">115核定預算</th><th class="bp-th">差異金額</th><th class="bp-th">差異%</th><th class="bp-th">115實績</th><th class="bp-th">前年比%</th></tr></thead><tbody>`;
-            let s116 = 0, s115b = 0, s115a = 0;
+            let cMeta2 = c.cmpMeta || { baseMonth: null, futureMonths: [], hasPartial: false };
+            let fmList = cMeta2.futureMonths.length ? cMeta2.futureMonths.map(m => m + '月').join('、') : '無';
+            // 舊快取沒有 actualA/actualB 欄位時，退用原本的 actual115，避免畫面整片空白
+            let getA = cat => { let x = c.cmp[cat]; return x.actualA !== undefined ? x.actualA : bpNum(x.actual115); };
+            let getB = cat => { let x = c.cmp[cat]; return x.actualB !== undefined ? x.actualB : bpNum(x.actual115); };
+
+            let buildCmpTable = (getActual, actualLabel) => {
+                let html = `<thead><tr><th class="bp-th bp-sticky">科目</th><th class="bp-th">116建議預算</th><th class="bp-th">115核定預算</th><th class="bp-th">差異金額</th><th class="bp-th">差異%</th><th class="bp-th">${actualLabel}</th><th class="bp-th">前年比%</th></tr></thead><tbody>`;
+                let t116 = 0, t115b = 0, t115a = 0;
+                BP_CATS.forEach(cat => {
+                    let v = c.byCat[cat], b = c.cmp[cat].budget115, a = getActual(cat);
+                    t116 += v; t115b += b; t115a += a;
+                    html += `<tr><td class="bp-sticky bp-item">${cat}</td><td class="bp-sum" style="font-weight:bold;">${bpFmt(v)}</td><td class="bp-sum">${bpFmt(b)}</td>` +
+                        `<td class="bp-sum" style="color:${clr(v, b)}">${(v - b >= 0 ? '+' : '') + bpFmt(v - b)}</td><td class="bp-sum" style="color:${clr(v, b)}">${pct(v, b)}</td>` +
+                        `<td class="bp-sum">${bpFmt(a)}</td><td class="bp-sum" style="color:${clr(v, a)}">${pct(v, a)}</td></tr>`;
+                });
+                html += `<tr class="bp-total"><td class="bp-sticky">合計</td><td>${bpFmt(t116)}</td><td>${bpFmt(t115b)}</td><td style="color:${clr(t116, t115b)}">${(t116 - t115b >= 0 ? '+' : '') + bpFmt(t116 - t115b)}</td><td style="color:${clr(t116, t115b)}">${pct(t116, t115b)}</td><td>${bpFmt(t115a)}</td><td style="color:${clr(t116, t115a)}">${pct(t116, t115a)}</td></tr></tbody>`;
+                return { html, t116, t115b, t115a };
+            };
+
+            let ttlA = document.getElementById('bpCompareTitleA');
+            if (ttlA) ttlA.innerHTML = `🅐 甲版・未發生月份「延續 ${cMeta2.baseMonth ? cMeta2.baseMonth + '月' : '當月'}實績」帶到 12 月　<span style="font-weight:normal; color:#666;">（${fmList} 以基準月日均 × 該月天數推估）</span>`;
+            let rA = buildCmpTable(getA, '115實績(甲版)');
+            t2.innerHTML = rA.html;
+
+            let ttlB = document.getElementById('bpCompareTitleB');
+            if (ttlB) ttlB.innerHTML = `🅑 乙版・未發生月份「改用 115 核定預算」當實績帶　<span style="font-weight:normal; color:#666;">（${fmList} 直接採該月核定預算金額）</span>`;
+            let rB = buildCmpTable(getB, '115實績(乙版)');
+            let t2b = document.getElementById('bpCompareTableB');
+            if (t2b) t2b.innerHTML = rB.html;
+
+            // 兩版差異對照：只有「未發生月份」的補值方式不同，所以差額就是兩種補值假設造成的落差
+            let ttlD = document.getElementById('bpCompareDiffTitle');
+            if (ttlD) ttlD.innerHTML = `🔀 兩版差異對照　<span style="font-weight:normal; color:#666;">（已回報的月份兩版完全相同，差額全部來自 ${fmList} 的補值方式）</span>`;
+            let fmShort = cMeta2.futureMonths.length ? `${cMeta2.futureMonths[0]}-${cMeta2.futureMonths[cMeta2.futureMonths.length - 1]}月` : '未發生月份';
+            let getC = cat => { let x = c.cmp[cat]; return x.common !== undefined ? x.common : null; };
+            let getFA = cat => { let x = c.cmp[cat]; return x.fillA !== undefined ? x.fillA : null; };
+            let getFB = cat => { let x = c.cmp[cat]; return x.fillB !== undefined ? x.fillB : null; };
+            let hD = `<thead><tr><th class="bp-th bp-sticky">科目</th><th class="bp-th">已回報月份<br>(兩版共用)</th><th class="bp-th">甲版 ${fmShort}<br>補值</th><th class="bp-th">乙版 ${fmShort}<br>補值</th><th class="bp-th">甲版全年</th><th class="bp-th">乙版全年</th><th class="bp-th">兩版差額<br>(乙−甲)</th><th class="bp-th">甲版<br>前年比%</th><th class="bp-th">乙版<br>前年比%</th></tr></thead><tbody>`;
             BP_CATS.forEach(cat => {
-                let v = c.byCat[cat], b = c.cmp[cat].budget115, a = c.cmp[cat].actual115;
-                s116 += v; s115b += b; s115a += a;
-                h2 += `<tr><td class="bp-sticky bp-item">${cat}</td><td class="bp-sum" style="font-weight:bold;">${bpFmt(v)}</td><td class="bp-sum">${bpFmt(b)}</td>` +
-                    `<td class="bp-sum" style="color:${clr(v, b)}">${(v - b >= 0 ? '+' : '') + bpFmt(v - b)}</td><td class="bp-sum" style="color:${clr(v, b)}">${pct(v, b)}</td>` +
-                    `<td class="bp-sum">${bpFmt(a)}</td><td class="bp-sum" style="color:${clr(v, a)}">${pct(v, a)}</td></tr>`;
+                let v = c.byCat[cat], a = getA(cat), b = getB(cat), d = b - a;
+                let cm = getC(cat), fa = getFA(cat), fb = getFB(cat);
+                let pa = a > 0 ? (v / a - 1) * 100 : null, pb = b > 0 ? (v / b - 1) * 100 : null;
+                hD += `<tr><td class="bp-sticky bp-item">${cat}</td><td class="bp-sum">${cm !== null ? bpFmt(cm) : '—'}</td>` +
+                    `<td class="bp-sum">${fa !== null ? bpFmt(fa) : '—'}</td><td class="bp-sum">${fb !== null ? bpFmt(fb) : '—'}</td>` +
+                    `<td class="bp-sum" style="font-weight:bold;">${bpFmt(a)}</td><td class="bp-sum" style="font-weight:bold;">${bpFmt(b)}</td>` +
+                    `<td class="bp-sum" style="color:${d > 0 ? '#dc3545' : (d < 0 ? '#28a745' : '#666')}">${d === 0 ? '—' : (d > 0 ? '+' : '') + bpFmt(d)}</td>` +
+                    `<td class="bp-sum">${pa !== null ? pa.toFixed(1) + '%' : '—'}</td><td class="bp-sum">${pb !== null ? pb.toFixed(1) + '%' : '—'}</td></tr>`;
             });
-            h2 += `<tr class="bp-total"><td class="bp-sticky">合計</td><td>${bpFmt(s116)}</td><td>${bpFmt(s115b)}</td><td style="color:${clr(s116, s115b)}">${(s116 - s115b >= 0 ? '+' : '') + bpFmt(s116 - s115b)}</td><td style="color:${clr(s116, s115b)}">${pct(s116, s115b)}</td><td>${bpFmt(s115a)}</td><td style="color:${clr(s116, s115a)}">${pct(s116, s115a)}</td></tr></tbody>`;
-            t2.innerHTML = h2;
-            let anyPartial = BP_CATS.some(cat => c.cmp[cat].partial), anyNone = BP_CATS.some(cat => c.cmp[cat].none);
+            let dTot = rB.t115a - rA.t115a;
+            let sC = BP_CATS.reduce((s, cat) => s + (getC(cat) || 0), 0);
+            let sFA = BP_CATS.reduce((s, cat) => s + (getFA(cat) || 0), 0);
+            let sFB = BP_CATS.reduce((s, cat) => s + (getFB(cat) || 0), 0);
+            let paT = rA.t115a > 0 ? (rA.t116 / rA.t115a - 1) * 100 : null, pbT = rB.t115a > 0 ? (rB.t116 / rB.t115a - 1) * 100 : null;
+            hD += `<tr class="bp-total"><td class="bp-sticky">合計</td><td>${bpFmt(sC)}</td><td>${bpFmt(sFA)}</td><td>${bpFmt(sFB)}</td>` +
+                `<td>${bpFmt(rA.t115a)}</td><td>${bpFmt(rB.t115a)}</td>` +
+                `<td style="color:${dTot > 0 ? '#dc3545' : (dTot < 0 ? '#28a745' : '#666')}">${dTot === 0 ? '—' : (dTot > 0 ? '+' : '') + bpFmt(dTot)}</td>` +
+                `<td>${paT !== null ? paT.toFixed(1) + '%' : '—'}</td><td>${pbT !== null ? pbT.toFixed(1) + '%' : '—'}</td></tr></tbody>`;
+            let t2d = document.getElementById('bpCompareDiffTable');
+            if (t2d) t2d.innerHTML = hD;
+
             let cn = document.getElementById('bpCompareNote');
-            if (cn) cn.innerHTML = `<div class="bp-note ${anyNone ? 'bp-warn' : ''}">📌 115年實績涵蓋範圍：已過完的月份採<b>實際加總</b>（不外推）${anyPartial ? '；進行中的當月依日曆天數<b>比例外推</b>' : ''}${anyNone ? '；<b>尚未發生的月份計為 0</b>，因此「前年比%」會偏高，請勿直接對外引用全年數字' : ''}。</div>`;
+            if (cn) cn.innerHTML = `<div class="bp-note">📌 兩版<b>共同</b>的部分：已回報的月份一律採<b>實際加總、不做任何外推</b>——包含您已經把月底預估值填到月底的當月，整月有資料就直接用該月合計${cMeta2.hasPartial ? `。<b>目前有月份還沒填滿</b>，那些月份才會按「已填金額 ÷ <b>已填天數</b> × 當月總天數」補足（不是用日曆已過天數，避免整月金額被錯誤放大）` : ''}。<br>
+                　　兩版<b>唯一差異</b>：尚未發生的月份（${fmList}）怎麼補值——<b>甲版</b>假設「後面幾個月照 ${cMeta2.baseMonth ? cMeta2.baseMonth + '月' : '當月'}的水準繼續走」，適合當作趨勢外推的參考；<b>乙版</b>假設「後面幾個月就照原本核定預算執行」，適合看「若照計畫執行完，全年會落在哪」。<br>
+                　　兩版都是<b>推估值、不是已實現的實績</b>，對外引用時請一併說明採用哪一版與其假設。</div>`;
 
             // 表3：敏感度
             let base = c.sens.find(x => x.s === 1).grand;
@@ -3110,13 +3351,35 @@
             ws2['!merges'] = [{ s: { r:0, c:0 }, e: { r:0, c:head2.length - 1 } }];
             styleSheet(ws2, 1); XLSX.utils.book_append_sheet(wb, ws2, '試算過程');
 
-            // 3 對比分析
+            // 3 對比分析：115實績兩版推估各出一段，最後再出兩版差異對照
+            let cMetaX = c.cmpMeta || { baseMonth: null, futureMonths: [] };
+            let cFmList = cMetaX.futureMonths && cMetaX.futureMonths.length ? cMetaX.futureMonths.map(m => m + '月').join('、') : '無';
+            let xGetA = cat => { let x = c.cmp[cat]; return x.actualA !== undefined ? x.actualA : bpNum(x.actual115); };
+            let xGetB = cat => { let x = c.cmp[cat]; return x.actualB !== undefined ? x.actualB : bpNum(x.actual115); };
             let head3 = ['科目', '116建議預算', '115核定預算', '差異金額', '差異%', '115實績', '前年比%'];
-            let aoa3 = [['116 vs 115 預算/實績對比（115年未發生月份實績以0計，請注意判讀）'], head3];
-            let s116 = 0, s115b = 0, s115a = 0;
-            BP_CATS.forEach(cat => { let v = c.byCat[cat], b = c.cmp[cat].budget115, a = c.cmp[cat].actual115; s116 += v; s115b += b; s115a += a;
-                aoa3.push([cat, v, b, v - b, b > 0 ? Number(((v / b - 1) * 100).toFixed(1)) : '', a, a > 0 ? Number(((v / a - 1) * 100).toFixed(1)) : '']); });
-            aoa3.push(['合計', s116, s115b, s116 - s115b, s115b > 0 ? Number(((s116 / s115b - 1) * 100).toFixed(1)) : '', s115a, s115a > 0 ? Number(((s116 / s115a - 1) * 100).toFixed(1)) : '']);
+            let aoa3 = [[`116 vs 115 預算/實績對比（115年未發生月份：${cFmList}，以下分兩版推估）`]];
+            let pushCmpBlock = (title, getActual) => {
+                aoa3.push([]); aoa3.push([title]); aoa3.push(head3);
+                let t116 = 0, t115b = 0, t115a = 0;
+                BP_CATS.forEach(cat => { let v = c.byCat[cat], b = c.cmp[cat].budget115, a = getActual(cat); t116 += v; t115b += b; t115a += a;
+                    aoa3.push([cat, v, b, v - b, b > 0 ? Number(((v / b - 1) * 100).toFixed(1)) : '', a, a > 0 ? Number(((v / a - 1) * 100).toFixed(1)) : '']); });
+                aoa3.push(['合計', t116, t115b, t116 - t115b, t115b > 0 ? Number(((t116 / t115b - 1) * 100).toFixed(1)) : '', t115a, t115a > 0 ? Number(((t116 / t115a - 1) * 100).toFixed(1)) : '']);
+                return { t116, t115a };
+            };
+            let xA = pushCmpBlock(`【甲版】未發生月份延續 ${cMetaX.baseMonth ? cMetaX.baseMonth + '月' : '當月'}實績帶到12月`, xGetA);
+            let xB = pushCmpBlock('【乙版】未發生月份改用115核定預算當實績帶', xGetB);
+            aoa3.push([]); aoa3.push(['【兩版差異對照】已回報月份兩版相同，差額全部來自未發生月份的補值方式']);
+            aoa3.push(['科目', '已回報月份(兩版共用)', `甲版${cFmList}補值`, `乙版${cFmList}補值`, '甲版全年', '乙版全年', '兩版差額(乙−甲)', '甲版前年比%', '乙版前年比%']);
+            let xsC = 0, xsFA = 0, xsFB = 0;
+            BP_CATS.forEach(cat => {
+                let v = c.byCat[cat], a = xGetA(cat), b = xGetB(cat), x = c.cmp[cat];
+                let cm = x.common !== undefined ? x.common : '', fa = x.fillA !== undefined ? x.fillA : '', fb = x.fillB !== undefined ? x.fillB : '';
+                xsC += bpNum(cm); xsFA += bpNum(fa); xsFB += bpNum(fb);
+                let pa = a > 0 ? (v / a - 1) * 100 : null, pb = b > 0 ? (v / b - 1) * 100 : null;
+                aoa3.push([cat, cm, fa, fb, a, b, b - a, pa !== null ? Number(pa.toFixed(1)) : '', pb !== null ? Number(pb.toFixed(1)) : '']);
+            });
+            let xpa = xA.t115a > 0 ? (xA.t116 / xA.t115a - 1) * 100 : null, xpb = xB.t115a > 0 ? (xB.t116 / xB.t115a - 1) * 100 : null;
+            aoa3.push(['合計', xsC, xsFA, xsFB, xA.t115a, xB.t115a, xB.t115a - xA.t115a, xpa !== null ? Number(xpa.toFixed(1)) : '', xpb !== null ? Number(xpb.toFixed(1)) : '']);
             aoa3.push([]); aoa3.push(['敏感度（件數與驗收件數同步縮放）']);
             aoa3.push(['情境', ...c.sens.map(x => x.s === 1 ? '基準' : (x.s > 1 ? '+' : '') + Math.round((x.s - 1) * 100) + '%')]);
             aoa3.push(['全年預算', ...c.sens.map(x => x.grand)]);
@@ -3441,6 +3704,31 @@
             bpTouch(); bpRenderInputs();
         };
 
+        // 星期週期設定：把畫面上「星期(日一二三四五六)」兩列輸入框的值寫進 state，並立即重算畫面。
+        // 套用後，全年只要「沒有匯入日別路線／日別台數」的日子，都會自動改用對應星期幾的固定台數，
+        // 不需要每個月分別手動輸入，也不必真的匯入 12 個月份的日別檔案。
+        window.bpApplyWeekdayPattern = () => {
+            if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法修改設定'); return; }
+            let p = bpGet(), grid = document.getElementById('bpWeekdayGrid');
+            if (!grid) return;
+            grid.querySelectorAll('input[data-bp="wd"]').forEach(inp => {
+                let dow = inp.dataset.dow, k = inp.dataset.k;
+                let clean = String(inp.value).replace(/,/g, '').trim(), v = clean === '' ? '' : Number(clean);
+                if (!isFinite(v)) v = '';
+                if (!p.fleetWeekday[dow]) p.fleetWeekday[dow] = {};
+                p.fleetWeekday[dow][k] = v;
+            });
+            let configured = 0;
+            for (let dow = 0; dow <= 6; dow++) { let w = p.fleetWeekday[dow]; if (w && (bpNum(w.big) > 0 || bpNum(w.small) > 0)) configured++; }
+            bpTouch(); bpRenderInputs();
+            showToast(configured ? `📆 已套用星期週期設定（${configured}/7 個星期幾已設定），全年沒有日別資料的日子將自動改用對應台數` : '⚠️ 尚未填入任何星期的台數，請至少填一個星期幾');
+        };
+        window.bpClearWeekdayPattern = () => {
+            if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法修改設定'); return; }
+            let p = bpGet(); p.fleetWeekday = {};
+            bpTouch(); bpRenderInputs(); showToast('🗑️ 已清空星期週期設定，之後沒有日別資料的日子會退回月別預設值');
+        };
+
         function renderTab8() {
             bpRenderWarehouseBox();
             bpRenderInputs();
@@ -3450,8 +3738,8 @@
             if (window.__bpCache[wh]) bpRenderResult();
             else {
                 let meta = document.getElementById('budgetPlanMeta'); if (meta) meta.innerHTML = '';
-                ['bpResultTable', 'bpCompareTable', 'bpSensTable'].forEach(id => { let t = document.getElementById(id); if (t) t.innerHTML = ''; });
-                ['bpCompareNote', 'bpSensNote'].forEach(id => { let t = document.getElementById(id); if (t) t.innerHTML = ''; });
+                ['bpResultTable', 'bpCompareTable', 'bpCompareTableB', 'bpCompareDiffTable', 'bpSensTable'].forEach(id => { let t = document.getElementById(id); if (t) t.innerHTML = ''; });
+                ['bpCompareTitleA', 'bpCompareTitleB', 'bpCompareDiffTitle', 'bpCompareNote', 'bpSensNote'].forEach(id => { let t = document.getElementById(id); if (t) t.innerHTML = ''; });
                 let dl = document.getElementById('btnDownloadBudgetPlan'); if (dl) dl.disabled = true;
             }
         }
