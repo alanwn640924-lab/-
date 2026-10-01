@@ -2,7 +2,26 @@
 <html lang="zh-TW"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>【運務協作平台】 (115年度) - 戰情儀表板 (穩定防護版)</title>
+    <title id="pageTitleTag">【運務協作平台】 (115年度) - 戰情儀表板 (穩定防護版)</title>
+    <script>
+    // 📅 年度判斷（必須放在整份頁面最前面，而且必須是「一般 script」）：
+    // 本頁同時有 <script type="module"> 與多個一般 <script>。module 裡宣告的 const，其他一般 script 完全看不到；
+    // 而且一般 script 比 module 更早執行。若年度只在 module 裡算，一般 script 一讀就會 ReferenceError
+    // ——曾因此讓全站 localStorage.setItem 攔截器拋錯，導致「無法存上雲端」與「離島匯入失敗」。
+    // 所以年度在這裡算一次、掛到 window，所有區塊一律讀 window 上的值，保證一致、也保證一定讀得到。
+    //
+    // 預覽下一年度：網址加 ?year=116（民國）或 ?year=2027（西元）即可強制切換，只在當次瀏覽生效、不會存起來。
+    (function () {
+        var real = new Date().getFullYear();
+        var raw = new URLSearchParams(location.search).get('year');
+        var n = parseInt(raw, 10);
+        var y = isFinite(n) ? (n < 1000 ? n + 1911 : n) : real;
+        window.REAL_YEAR = real;
+        window.YEAR = y;
+        window.ROC_YEAR = y - 1911;
+        window.IS_YEAR_PREVIEW = (y !== real);
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
@@ -246,7 +265,7 @@
 
     <div class="header-controls">
         <div class="header-title-row">
-            <h1>🚛 【運務協作平台】 (115年度) <span style="font-size: 16px; background:#e8f0fe; color:#0056b3; padding:4px 8px; border-radius:4px; font-weight:bold; border: 1px solid #b8daff;">🛡️ 三倉智慧權限版</span></h1>
+            <h1>🚛 【運務協作平台】 (<span id="yearLabelH1">115</span>年度) <span style="font-size: 16px; background:#e8f0fe; color:#0056b3; padding:4px 8px; border-radius:4px; font-weight:bold; border: 1px solid #b8daff;">🛡️ 三倉智慧權限版</span></h1>
             <span id="cloud-indicator" class="cloud-status" onclick="openCloudConfigModal()" title="點擊設定金鑰">系統載入中...</span>
         </div>
         <div class="actions">
@@ -531,8 +550,8 @@
         </style>
 
         <div style="margin-bottom:12px; background:linear-gradient(90deg,#f3ecff,#fff); padding:12px 15px; border-radius:8px; border:1px solid #d8c8f0;">
-            <strong style="color:#5a3d99; font-size:17px;">📐 116 年度預算編列</strong>
-            <span style="font-size:13px; color:#6c757d; margin-left:8px;">件數 → 箱數 → 主線車輛 → 加派車 → 回收車 → 其他項目 → 對比 115 年</span>
+            <strong style="color:#5a3d99; font-size:17px;">📐 <span id="bpYearNextLabel">116</span> 年度預算編列</strong>
+            <span style="font-size:13px; color:#6c757d; margin-left:8px;">件數 → 箱數 → 主線車輛 → 加派車 → 回收車 → 其他項目 → 對比 <span id="bpYearThisLabel1">115</span> 年</span>
             <div class="bp-row" style="margin-top:10px;">
                 <div id="bpWarehouseBox" style="display:flex; align-items:center; gap:6px; margin-right:6px;"></div>
                 <button id="bpBtnSave" class="rw-only" style="background:#fd7e14; color:white; width:150px; text-align:center; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="window.saveBudgetPlanParams()">💾 儲存資料</button>
@@ -553,8 +572,8 @@
                         </select></div>
                     <div class="ai-param-group"><label class="ai-param-label" title="其他/違規罰款/離島/轉運 四項的基準取法">其他項目基準</label>
                         <select id="bp_otherBase" class="ai-param-input" data-bp="basic" data-f="otherBase">
-                            <option value="A">A版：115逐月實績(未發生月份用預算)</option>
-                            <option value="B">B版：115年8月實績推估</option>
+                            <option value="A" id="bpOtherBaseOptA">A版：115逐月實績(未發生月份用預算)</option>
+                            <option value="B" id="bpOtherBaseOptB">B版：115年8月實績推估</option>
                         </select></div>
                 </div>
                 <div class="bp-sep bp-row">
@@ -660,12 +679,12 @@
         <div id="budgetPlanMeta" style="font-size:13px; color:#5a3d99; font-weight:bold; margin:14px 0 10px; line-height:1.8;"></div>
 
         <div class="bp-sec" style="border-color:#d8c8f0;">
-            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">📊 116 年度建議預算（含試算過程）</div>
+            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">📊 <span id="bpYearNextLabel2">116</span> 年度建議預算（含試算過程）</div>
             <div class="bp-body"><div class="bp-scroll" style="max-height:none;"><table id="bpResultTable" class="bp-grid"></table></div></div>
         </div>
 
         <div class="bp-sec" style="border-color:#d8c8f0;">
-            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">🔍 116 vs 115 預算／實績對比</div>
+            <div style="padding:10px 14px; font-weight:bold; color:#5a3d99; background:#f8f5ff; border-bottom:1px solid #d8c8f0;">🔍 <span id="bpYearNextLabel3">116</span> vs <span id="bpYearThisLabel2">115</span> 預算／實績對比</div>
             <div class="bp-body">
                 <div id="bpCompareTitleA" style="font-weight:bold; color:#5a3d99; margin-bottom:4px;"></div>
                 <div class="bp-scroll" style="max-height:none;"><table id="bpCompareTable" class="bp-grid"></table></div>
@@ -814,7 +833,40 @@
         };
 
         const MY_FIREBASE_CONFIG = { apiKey: "AIzaSyBMrnHb3cKZBcDwQIAvKyCBEHI0IClKUWg", authDomain: "dddd-47af3.firebaseapp.com", projectId: "dddd-47af3", storageBucket: "dddd-47af3.firebasestorage.app", messagingSenderId: "448271048988", appId: "1:448271048988:web:10ec28118287c8a509dad9", measurementId: "G-E7G8SDN0BM" }; 
-        Chart.register(ChartDataLabels); const YEAR = 2026, DOW_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+        Chart.register(ChartDataLabels);
+        // 年度自動判斷：不再寫死西元年份，改用系統當下的實際年份。
+        // 這樣到了116年1月1日（西元2027/1/1），系統會自動切換成116年度介面與116年度的雲端資料庫，
+        // 不需要每年手動進來改這個常數、也不需要走到系統換版流程。
+        // ROC_YEAR 是民國年（畫面上「115年度」「116年度」這類文字、以及雲端/本機儲存 key 都用這個）。
+        //
+        // 年度一律讀 <head> 最前面那段一般 script 算好掛在 window 上的值（含 ?year= 預覽參數），
+        // 不要在這裡重算：module 內外若各算各的，一般 script 會讀不到、或兩邊年度不一致。
+        const REAL_YEAR = window.REAL_YEAR;
+        const YEAR = window.YEAR;
+        const ROC_YEAR = window.ROC_YEAR;
+        const IS_YEAR_PREVIEW = window.IS_YEAR_PREVIEW;
+        const DOW_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+        // 把畫面上寫死的「115年度」「116年度」這類靜態文字，換成跟著 ROC_YEAR 動態變化的版本。
+        // 立刻執行一次：這段 script 在 HTML 後段，前面的 <title>/<h1>/預算頁籤等元素都已經在 DOM 裡了。
+        (function applyYearLabels() {
+            document.title = document.title.replace(/\d+年度/, ROC_YEAR + '年度');
+            let set = (id, text) => { let el = document.getElementById(id); if (el) el.textContent = text; };
+            set('yearLabelH1', String(ROC_YEAR));
+            if (IS_YEAR_PREVIEW) {
+                let bar = document.createElement('div');
+                bar.style.cssText = 'position:sticky; top:0; z-index:9999; background:#ff9800; color:#fff; font-weight:bold; text-align:center; padding:8px; font-size:14px;';
+                bar.textContent = `⚠️ 目前是用網址參數強制預覽「${ROC_YEAR}年度」（實際系統日期仍是${REAL_YEAR - 1911}年度），資料讀寫的也是${ROC_YEAR}年度那份雲端文件，不是正式的當年資料。移除網址上的 ?year=... 即可回到正常畫面。`;
+                document.body.prepend(bar);
+            }
+            set('bpYearNextLabel', String(ROC_YEAR + 1));
+            set('bpYearNextLabel2', String(ROC_YEAR + 1));
+            set('bpYearNextLabel3', String(ROC_YEAR + 1));
+            set('bpYearThisLabel1', String(ROC_YEAR));
+            set('bpYearThisLabel2', String(ROC_YEAR));
+            set('bpOtherBaseOptA', `A版：${ROC_YEAR}逐月實績(未發生月份用預算)`);
+            set('bpOtherBaseOptB', `B版：${ROC_YEAR}年8月實績推估`);
+        })();
         const GROUPS = [
             { id: "g0", name: "【件數統計】", type: "count", items: ["預算件數", "出貨件數", "件數達成率", "裝載率", "回收件數"] },
             { id: "g1", name: "【夜配】趟次與數量", type: "count", items: ["主線條數", "爆量趟次", "爆量自揹", "回收趟次", "回頭收趟次", "其他專車", "特殊點專車", "新開店", "離島", "轉運"] },
@@ -868,7 +920,7 @@
         }, 300);
 
         window.addEventListener('beforeunload', (e) => {
-            if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem('freightData_115', JSON.stringify(state)); }
+            if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(state)); }
             // 🩹 新功能：若使用者剛按過「儲存」且已確認成功寫入雲端，期間資料沒有再變動過，
             //         直接放行、不再跳出離開警告——符合「按儲存＝可以安心關檔」的直覺。
             if (window._confirmedSavedLastModified != null && window.state && window.state.lastModified === window._confirmedSavedLastModified) {
@@ -1035,7 +1087,11 @@
             let firebaseConfig = { "apiKey": "AIzaSyDDcNIfqbrJRD-4XedIZ7yF0Fbrz66Q9sM", "authDomain": "alanwn-d898d.firebaseapp.com", "projectId": "alanwn-d898d", "storageBucket": "alanwn-d898d.firebasestorage.app", "messagingSenderId": "1045676264273", "appId": "1:1045676264273:web:8eabc5d30cd4bcf902e170", "measurementId": "G-3D512HWLCJ" }; 
             let ind = document.getElementById("cloud-indicator"); if(ind){ ind.innerText = "☁️連線中"; ind.style.backgroundColor = "#ffc107"; ind.style.color = "#333"; }
             try {
-                const app = initializeApp(firebaseConfig); window.auth = getAuth(app); window.dbFirebase = getFirestore(app); window.appId = 'dadu-global-world-115';
+                const app = initializeApp(firebaseConfig); window.auth = getAuth(app); window.dbFirebase = getFirestore(app);
+                // 依民國年度分開存放：116年度起會是全新一份雲端文件（dadu-global-world-116），
+                // 跟115年度的資料完全分開，避免同一份文件累積多年資料把雲端容量塞爆。
+                // 換年後所有倉別設定/車隊係數/路線單價等都需要重新輸入一次，這是刻意的取捨。
+                window.appId = 'dadu-global-world-' + ROC_YEAR;
                 const isLocalFile = window.location.protocol === 'file:' || window.location.protocol === 'content:';
                 if (isLocalFile || navigator.userAgent.toLowerCase().includes("line")) { await setPersistence(window.auth, inMemoryPersistence); } else { try { await setPersistence(window.auth, browserLocalPersistence); } catch (pe) { await setPersistence(window.auth, inMemoryPersistence); } }
                 let authPromise = signInAnonymously(window.auth); const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 2500)); await Promise.race([authPromise, timeoutPromise]); onAuthStateChanged(window.auth, (u) => { window.user = u; });
@@ -1064,7 +1120,7 @@
                             window.state = cloudData;
                             // 🌟 防護點 1：如果是從雲端下載，有 vendorDB 才覆蓋，沒有的話保留本機的！
                             
-                            try { localStorage.setItem('freightData_115', JSON.stringify(window.state)); } catch(e){}
+                            try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
                             if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; 
                             window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); renderAll(); window.checkAndTriggerStartupEvents(); 
                         }
@@ -1081,7 +1137,7 @@
                             // 🌟 防護點 2：運行中收到雲端更新，有 vendorDB 才覆寫，沒有就跳過！
                             
                             
-                            try { localStorage.setItem('freightData_115', JSON.stringify(window.state)); } catch(e){}
+                            try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
                             if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } window.lastSyncTime = cloudData.lastModified || Date.now();
                             if (fInfo) { let p = window.parseVal(cVal); if (cVal === '' || isNaN(p)) { if (window.getDaily()[fInfo.d] && window.getDaily()[fInfo.d][fInfo.i] !== undefined) delete window.getDaily()[fInfo.d][fInfo.i]; } else { if (!window.getDaily()[fInfo.d]) window.getDaily()[fInfo.d] = {}; window.getDaily()[fInfo.d][fInfo.i] = p; } }
                             if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; renderAll();
@@ -1148,7 +1204,7 @@
                 // 🌟 防護點 4：保證每次按下儲存，廠商結帳資料一定跟著上雲端，不怕遺失！
 
 
-                localStorage.setItem('freightData_115', JSON.stringify(window.state));
+                localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state));
                 let ind = document.getElementById("cloud-indicator"); if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️寫入中"; setTimeout(() => ind.innerText = originalText, 800); }
                 if (window.isCloudSyncEnabled) {
                     try {
@@ -1244,7 +1300,7 @@
 
         document.addEventListener("DOMContentLoaded", async () => {
             if (!window.userRole) document.getElementById('loginOverlay').style.display = 'flex'; else { document.getElementById('loginOverlay').style.display = 'none'; window.unlockApp(); }
-            let savedData = localStorage.getItem('freightData_115'); 
+            let savedData = localStorage.getItem(`freightData_${window.ROC_YEAR}`); 
             if(savedData) {
                 try {
                     let parsed = JSON.parse(savedData);
@@ -2845,7 +2901,7 @@
                 qty: p.qty, recv: p.recv, carryBack: p.carryBack, fleetMonthly: p.fleetMonthly
             })) };
             bpRenderResult();
-            showToast('🧮 116 年度建議預算已產出！');
+            showToast(`🧮 ${BP_YEAR - 1911} 年度建議預算已產出！`);
         };
 
         // ---------------------------------------------------------------- 輸入區渲染
@@ -3063,10 +3119,10 @@
                 let d = document.createElement('div');
                 d.id = 'bpEmptyWhHint';
                 d.style.cssText = 'font-size:12px; color:#0c5460; background:#d1ecf1; border:1px solid #b8daff; border-radius:5px; padding:5px 10px; font-weight:bold; align-self:center;';
-                d.textContent = `📝 ${wh}倉尚未建立 116 年度基礎資料，請自行填入或匯入`;
+                d.textContent = `📝 ${wh}倉尚未建立 ${BP_YEAR - 1911} 年度基礎資料，請自行填入或匯入`;
                 el.parentNode.insertBefore(d, el.nextSibling);
             } else if (hasAny && hint) hint.remove();
-            else if (!hasAny && hint) hint.textContent = `📝 ${wh}倉尚未建立 116 年度基礎資料，請自行填入或匯入`;
+            else if (!hasAny && hint) hint.textContent = `📝 ${wh}倉尚未建立 ${BP_YEAR - 1911} 年度基礎資料，請自行填入或匯入`;
         }
         window.bpSwitchWarehouse = (wh) => {
             if (!bpAllowedWh().includes(wh)) { showToast('⚠️ 您的帳號沒有該倉別的權限'); bpRenderWarehouseBox(); return; }
@@ -3131,7 +3187,7 @@
             if (bpIsReadOnly()) { showToast('⚠️ 唯讀模式無法儲存預算編列資料'); return; }
             bpGet(); bpTouch();
             if (typeof window.saveData === 'function') window.saveData(true);
-            showToast('💾 116 年度預算編列資料已儲存！');
+            showToast(`💾 ${BP_YEAR - 1911} 年度預算編列資料已儲存！`);
             bpRenderSizeIndicator();
         };
 
@@ -3161,13 +3217,13 @@
             if (f.routeMissing && c.snapshot.mainlineMode === 'B') warn.push('⚠️ 已選 B版(8月單價) 但尚未匯入路線單價清單，主線費用為 0');
             if (f.unknownCodes) warn.push(`⚠️ 日別路線清單中有 <b>${f.unknownCodes}</b> 筆路線代號不在單價清單內，該筆未計費用`);
             if (f.carryBackZero) warn.push('⚠️ 部分月份「主線帶回件數」為 0，回收車會把全部驗收量當成需專車載運，金額可能高估');
-            if (f.baseFilled.length) warn.push(`ℹ️ 其他項目基準：${f.baseFilled.join('、')}月 因 115 年尚未發生或無實績，已改用 115 核定預算補值`);
+            if (f.baseFilled.length) warn.push(`ℹ️ 其他項目基準：${f.baseFilled.join('、')}月 因 ${ROC_YEAR} 年尚未發生或無實績，已改用 ${ROC_YEAR} 核定預算補值`);
 
             let modeTxt = c.snapshot.mainlineMode === 'B' ? 'B版（8月單價，逐條路線加總）' : 'A版（平均單價）';
-            let baseTxt = c.snapshot.otherBase === 'B' ? 'B版（115年8月實績按天數比例）' : 'A版（115年逐月實績，未發生月份以預算補值）';
+            let baseTxt = c.snapshot.otherBase === 'B' ? `B版（${ROC_YEAR}年8月實績按天數比例）` : `A版（${ROC_YEAR}年逐月實績，未發生月份以預算補值）`;
             let yrBox = c.months.reduce((a, r) => a + r.boxTotal, 0), yrCap = c.months.reduce((a, r) => a + r.capacity, 0);
             let yrRate = yrCap > 0 ? yrBox / yrCap * 100 : 0;
-            meta.innerHTML = `📅 <b>${wh}倉 116年度(${BP_YEAR}) 建議預算：${bpFmt(c.grand)} 元</b>　｜　主線計價：<b>${modeTxt}</b>　｜　其他項目基準：<b>${baseTxt}</b><br>
+            meta.innerHTML = `📅 <b>${wh}倉 ${BP_YEAR - 1911}年度(${BP_YEAR}) 建議預算：${bpFmt(c.grand)} 元</b>　｜　主線計價：<b>${modeTxt}</b>　｜　其他項目基準：<b>${baseTxt}</b><br>
                 📦 全年箱數需求 <b>${bpFmt(yrBox)}</b> 箱／主線承載量 <b>${bpFmt(yrCap)}</b> 箱　→　全年裝載率 <b style="color:${bpRateColor(yrRate)}">${yrRate.toFixed(1)}%</b>
                 　｜　A版主線 ${bpFmt(c.months.reduce((a, r) => a + r.mainA, 0))} ／ B版主線 ${bpFmt(c.months.reduce((a, r) => a + r.mainB, 0))}
                 ${c.hasDailyQtyAny ? '　｜　部分月份有日別件數，已同步試算日別加派車（見下表）' : ''}
@@ -3245,7 +3301,7 @@
             let getB = cat => { let x = c.cmp[cat]; return x.actualB !== undefined ? x.actualB : bpNum(x.actual115); };
 
             let buildCmpTable = (getActual, actualLabel) => {
-                let html = `<thead><tr><th class="bp-th bp-sticky">科目</th><th class="bp-th">116建議預算</th><th class="bp-th">115核定預算</th><th class="bp-th">差異金額</th><th class="bp-th">差異%</th><th class="bp-th">${actualLabel}</th><th class="bp-th">前年比%<br><span style="font-weight:normal; font-size:11px;">(100%=持平)</span></th></tr></thead><tbody>`;
+                let html = `<thead><tr><th class="bp-th bp-sticky">科目</th><th class="bp-th">${BP_YEAR - 1911}建議預算</th><th class="bp-th">${ROC_YEAR}核定預算</th><th class="bp-th">差異金額</th><th class="bp-th">差異%</th><th class="bp-th">${actualLabel}</th><th class="bp-th">前年比%<br><span style="font-weight:normal; font-size:11px;">(100%=持平)</span></th></tr></thead><tbody>`;
                 let t116 = 0, t115b = 0, t115a = 0;
                 BP_CATS.forEach(cat => {
                     let v = c.byCat[cat], b = c.cmp[cat].budget115, a = getActual(cat);
@@ -3260,12 +3316,12 @@
 
             let ttlA = document.getElementById('bpCompareTitleA');
             if (ttlA) ttlA.innerHTML = `🅐 甲版・未發生月份「延續 ${cMeta2.baseMonth ? cMeta2.baseMonth + '月' : '當月'}實績」帶到 12 月　<span style="font-weight:normal; color:#666;">（${fmList} 以基準月日均 × 該月天數推估）</span>`;
-            let rA = buildCmpTable(getA, '115實績(甲版)');
+            let rA = buildCmpTable(getA, `${ROC_YEAR}實績(甲版)`);
             t2.innerHTML = rA.html;
 
             let ttlB = document.getElementById('bpCompareTitleB');
-            if (ttlB) ttlB.innerHTML = `🅑 乙版・未發生月份「改用 115 核定預算」當實績帶　<span style="font-weight:normal; color:#666;">（${fmList} 直接採該月核定預算金額）</span>`;
-            let rB = buildCmpTable(getB, '115實績(乙版)');
+            if (ttlB) ttlB.innerHTML = `🅑 乙版・未發生月份「改用 ${ROC_YEAR} 核定預算」當實績帶　<span style="font-weight:normal; color:#666;">（${fmList} 直接採該月核定預算金額）</span>`;
+            let rB = buildCmpTable(getB, `${ROC_YEAR}實績(乙版)`);
             let t2b = document.getElementById('bpCompareTableB');
             if (t2b) t2b.innerHTML = rB.html;
 
@@ -3302,7 +3358,7 @@
             let cn = document.getElementById('bpCompareNote');
             if (cn) cn.innerHTML = `<div class="bp-note">📌 兩版<b>共同</b>的部分：已回報的月份一律採<b>實際加總、不做任何外推</b>——包含您已經把月底預估值填到月底的當月，整月有資料就直接用該月合計${cMeta2.hasPartial ? `。<b>目前有月份還沒填滿</b>，那些月份才會按「已填金額 ÷ <b>已填天數</b> × 當月總天數」補足（不是用日曆已過天數，避免整月金額被錯誤放大）` : ''}。<br>
                 　　兩版<b>唯一差異</b>：尚未發生的月份（${fmList}）怎麼補值——<b>甲版</b>固定用 <b>8月</b>的日均水準往後帶（基準月固定為8月，不會因為系統日期跑到9月、10月而跟著浮動，避免同一份邏輯每個月看到的基準都不一樣、造成混亂）；<b>乙版</b>假設「後面幾個月就照原本核定預算執行」，適合看「若照計畫執行完，全年會落在哪」。<br>
-                　　<b>「前年比%」是以 100% 為基準的比值</b>（116金額 ÷ 115實績 × 100），<b>不是成長率</b>——100% 代表跟去年打平，超過 100% 代表比去年多，低於 100% 代表比去年少（例如 225.6% 表示是去年的 2.256 倍，不是「成長 225.6%」）。<br>
+                　　<b>「前年比%」是以 100% 為基準的比值</b>（${BP_YEAR - 1911}金額 ÷ ${ROC_YEAR}實績 × 100），<b>不是成長率</b>——100% 代表跟去年打平，超過 100% 代表比去年多，低於 100% 代表比去年少（例如 225.6% 表示是去年的 2.256 倍，不是「成長 225.6%」）。<br>
                 　　兩版都是<b>推估值、不是已實現的實績</b>，對外引用時請一併說明採用哪一版與其假設。</div>`;
 
             // 表3：敏感度
@@ -3328,7 +3384,7 @@
             };
             // 1 建議預算（橫向：月份在上、科目在左）
             let head1 = ['預算科目', ...c.months.map(r => `${r.m}月`), '年度累計'];
-            let aoa1 = [[`${wh}倉 116年度(${BP_YEAR})建議預算　主線計價:${c.snapshot.mainlineMode === 'B' ? 'B版(8月單價)' : 'A版(平均單價)'}　其他項目基準:${c.snapshot.otherBase === 'B' ? 'B版(115年8月實績)' : 'A版(115年逐月實績)'}`], head1];
+            let aoa1 = [[`${wh}倉 ${BP_YEAR - 1911}年度(${BP_YEAR})建議預算　主線計價:${c.snapshot.mainlineMode === 'B' ? 'B版(8月單價)' : 'A版(平均單價)'}　其他項目基準:${c.snapshot.otherBase === 'B' ? `B版(${ROC_YEAR}年8月實績)` : `A版(${ROC_YEAR}年逐月實績)`}`], head1];
             BP_CATS.forEach(cat => aoa1.push([cat, ...c.months.map(r => r.suggested[cat]), c.byCat[cat]]));
             aoa1.push(['月合計', ...c.months.map(r => r.total), c.grand]);
             let ws1 = XLSX.utils.aoa_to_sheet(aoa1);
@@ -3377,8 +3433,8 @@
             let xGetA = cat => { let x = c.cmp[cat]; return x.actualA !== undefined ? x.actualA : bpNum(x.actual115); };
             let xGetB = cat => { let x = c.cmp[cat]; return x.actualB !== undefined ? x.actualB : bpNum(x.actual115); };
             // 「前年比%」欄一律用「以100%為基準」的比值（116÷115實績×100），不是成長率，跟畫面上的算法一致
-            let head3 = ['科目', '116建議預算', '115核定預算', '差異金額', '差異%', '115實績', '前年比%(100%=持平)'];
-            let aoa3 = [[`116 vs 115 預算/實績對比（115年未發生月份：${cFmList}，以下分兩版推估；前年比%以100%為基準，非成長率）`]];
+            let head3 = ['科目', `${BP_YEAR - 1911}建議預算`, `${ROC_YEAR}核定預算`, '差異金額', '差異%', `${ROC_YEAR}實績`, '前年比%(100%=持平)'];
+            let aoa3 = [[`${BP_YEAR - 1911} vs ${ROC_YEAR} 預算/實績對比（${ROC_YEAR}年未發生月份：${cFmList}，以下分兩版推估；前年比%以100%為基準，非成長率）`]];
             let pushCmpBlock = (title, getActual) => {
                 aoa3.push([]); aoa3.push([title]); aoa3.push(head3);
                 let t116 = 0, t115b = 0, t115a = 0;
@@ -3388,7 +3444,7 @@
                 return { t116, t115a };
             };
             let xA = pushCmpBlock(`【甲版】未發生月份延續 ${cMetaX.baseMonth ? cMetaX.baseMonth + '月' : '當月'}實績帶到12月`, xGetA);
-            let xB = pushCmpBlock('【乙版】未發生月份改用115核定預算當實績帶', xGetB);
+            let xB = pushCmpBlock(`【乙版】未發生月份改用${ROC_YEAR}核定預算當實績帶`, xGetB);
             aoa3.push([]); aoa3.push(['【兩版差異對照】已回報月份兩版相同，差額全部來自未發生月份的補值方式']);
             aoa3.push(['科目', '已回報月份(兩版共用)', `甲版${cFmList}補值`, `乙版${cFmList}補值`, '甲版全年', '乙版全年', '兩版差額(乙−甲)', '甲版前年比%(100%=持平)', '乙版前年比%(100%=持平)']);
             let xsC = 0, xsFA = 0, xsFB = 0;
@@ -3413,7 +3469,7 @@
             let s = c.snapshot;
             let aoa4 = [['參數快照（本次試算所使用的全部假設，供日後追溯）'], ['產生時間', new Date(c.generatedAt).toLocaleString('zh-TW')], ['倉別', wh], ['年度', BP_YEAR], [],
                 ['主線計價方式', s.mainlineMode === 'B' ? 'B版(8月單價，逐條路線加總)' : 'A版(平均單價)'],
-                ['其他項目基準', s.otherBase === 'B' ? 'B版(115年8月實績按天數比例)' : 'A版(115年逐月實績，未發生月份以預算補值)'],
+                ['其他項目基準', s.otherBase === 'B' ? `B版(${ROC_YEAR}年8月實績按天數比例)` : `A版(${ROC_YEAR}年逐月實績，未發生月份以預算補值)`],
                 ['大車平均單價', s.avgBig], ['小車平均單價', s.avgSmall],
                 ['大車可載箱數', s.bigCap], ['小車可載箱數', s.smallCap],
                 ['加派車每趟箱數', s.coef.boxPerTrip], ['加派車單趟費用', s.coef.tripCost],
@@ -3431,8 +3487,8 @@
             ws4['!cols'] = [{ wch: 20 }, { wch: 14 }, ...Array.from({ length: 13 }, () => ({ wch: 14 }))];
             XLSX.utils.book_append_sheet(wb, ws4, '參數快照');
 
-            XLSX.writeFile(wb, `116年度預算編列_${wh}倉_${new Date().toISOString().slice(0,10)}.xlsx`);
-            showToast('📥 116 年度預算編列表已下載（含試算過程、對比分析、參數快照）');
+            XLSX.writeFile(wb, `${BP_YEAR - 1911}年度預算編列_${wh}倉_${new Date().toISOString().slice(0,10)}.xlsx`);
+            showToast(`📥 ${BP_YEAR - 1911} 年度預算編列表已下載（含試算過程、對比分析、參數快照）`);
         };
 
         // ---------------------------------------------------------------- 匯入
@@ -4600,7 +4656,7 @@
     if (!window._origLocalStorageSetItem) {
         window._origLocalStorageSetItem = localStorage.setItem;
         localStorage.setItem = function(key, val) {
-            if (key === 'freightData_115' && window.customVendorCheckoutDB) {
+            if (key === `freightData_${window.ROC_YEAR}` && window.customVendorCheckoutDB) {
                 try { 
                     let obj = JSON.parse(val); 
                     obj.vendorDB = window.customVendorCheckoutDB; 
@@ -4643,7 +4699,7 @@
             const origRenderAll = window.renderAll;
             window.renderAll = function() {
                 try {
-                    let stored = JSON.parse(window._origLocalStorageSetItem ? localStorage.getItem('freightData_115') : '{}');
+                    let stored = JSON.parse(window._origLocalStorageSetItem ? localStorage.getItem(`freightData_${window.ROC_YEAR}`) : '{}');
                     if (stored && stored.vendorDB) {
                         window.customVendorCheckoutDB = stored.vendorDB;
                         window._origLocalStorageSetItem.call(localStorage, 'freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
@@ -5586,7 +5642,7 @@ setInterval(() => {
 
     setInterval(() => {
         try {
-            let ms = JSON.parse(localStorage.getItem('freightData_115') || '{}');
+            let ms = JSON.parse(localStorage.getItem(`freightData_${window.ROC_YEAR}`) || '{}');
             if (ms.customVendorDB) {
                 let cloudStr = JSON.stringify(ms.customVendorDB);
                 if (cloudStr !== lastCloudVendorStr && cloudStr !== '{}') {
@@ -5668,7 +5724,7 @@ setInterval(() => {
                 syncBtn.onclick = function(e) {
                     e.preventDefault();
                     if(!confirm('這會清除異常的「殭屍記憶」，並強制重新下載最新進度。\n確定要強制同步嗎？')) return;
-                    localStorage.removeItem('freightData_115'); 
+                    localStorage.removeItem(`freightData_${window.ROC_YEAR}`); 
                     alert('🧹 殭屍資料已清除！網頁即將重新整理。');
                     window.location.reload();
                 };
