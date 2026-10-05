@@ -22,6 +22,219 @@
         window.IS_YEAR_PREVIEW = (y !== real);
     })();
     </script>
+    <script>
+    // 🛡️ 本機暫存空間防護（一般 script，必須放在其他所有程式之前）：
+    // 本平台（alanwn640924-lab.github.io/-/）和「數位辦公室」（…/9453）是同一個網址空間，瀏覽器的本機暫存（localStorage）
+    // 兩邊共用同一個上限（Chrome 約 520 萬字元、iPhone 約 260 萬字元）。空間一滿，寫入就會直接拋錯——
+    // 曾因此讓「非主線 MIS 匯入」處理到第一天（9/26）就中斷、畫面沒有任何提示，連帶存雲端的流程也被跳過。
+    // 這裡改成：寫不進去的資料先留在這一頁的記憶體裡（同一頁後續讀取拿得到最新值），流程完全不中斷，雲端照常同步，
+    // 只是這台電腦的本機備份暫時沒更新。（改寫 Storage.prototype，後面各段程式不論用哪種寫法寫入都會經過這裡。）
+    (function () {
+        var ls;
+        try { ls = window.localStorage; if (!ls) return; } catch (e) { return; }
+        var protoSet = Storage.prototype.setItem, protoGet = Storage.prototype.getItem, protoRemove = Storage.prototype.removeItem;
+        var overlay = {}, warned = false, has = Object.prototype.hasOwnProperty;
+        window.__lsQuotaFull = false;
+        var isQuotaError = function (e) {
+            return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014 || /quota/i.test(String(e.message || '')));
+        };
+        var warnOnce = function () {
+            if (warned) return; warned = true;
+            var msg = '⚠️ 這台電腦瀏覽器的本機暫存空間已滿（與同網址的「數位辦公室」共用），本機備份暫時寫不進去；資料仍會照常直接存到雲端，不影響使用。';
+            console.warn(msg);
+            var show = function () {
+                var t = document.getElementById('toast-container');
+                if (!t) return false;
+                t.innerText = msg; t.className = 'show';
+                setTimeout(function () { t.className = ''; }, 10000);
+                return true;
+            };
+            if (!show()) document.addEventListener('DOMContentLoaded', show);
+        };
+        Storage.prototype.setItem = function (key, val) {
+            try {
+                protoSet.call(this, key, val);
+                if (this === ls) delete overlay[String(key)];
+            } catch (e) {
+                if (this !== ls || !isQuotaError(e)) throw e;
+                overlay[String(key)] = String(val);
+                window.__lsQuotaFull = true;
+                warnOnce();
+            }
+        };
+        Storage.prototype.getItem = function (key) {
+            if (this === ls && has.call(overlay, String(key))) return overlay[String(key)];
+            return protoGet.call(this, key);
+        };
+        Storage.prototype.removeItem = function (key) {
+            if (this === ls) delete overlay[String(key)];
+            return protoRemove.call(this, key);
+        };
+    })();
+
+    // 📒 廠商結帳資料（「運費結帳比對」下方的廠商結帳每日統計）共用存取工具：
+    // ① 本機只存一份（以前同一份資料在本機存了三份，是把暫存空間塞滿的主因之一）；
+    //    115 年沿用舊 key（萬一要退回舊版也讀得到），116 年起每年一個 key，新年度不會把上一年度整包帶進新年度的雲端文件。
+    // ② 每一筆（倉別/廠商/日期）記下最後修改時間 _t。雲端同步時逐筆比較、留下較新的那筆，
+    //    不再「整包蓋掉」——以前別台電腦只要剛好用舊資料存檔，就會把別人剛匯入的資料整批蓋回去。
+    window.VENDOR_DB_KEY = (window.ROC_YEAR === 115) ? 'freight_vendor_db' : ('freight_vendor_db_' + window.ROC_YEAR);
+    window.loadVendorDBLocal = function () {
+        try {
+            var s = localStorage.getItem(window.VENDOR_DB_KEY);
+            var o = s ? JSON.parse(s) : null;
+            return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+        } catch (e) { return {}; }
+    };
+    (function () {
+        var timer = null;
+        window.persistVendorDB = function (immediate) {
+            var run = function () {
+                timer = null;
+                try { localStorage.setItem(window.VENDOR_DB_KEY, JSON.stringify(window.customVendorCheckoutDB || {})); } catch (e) { console.warn('廠商結帳本機備份寫入失敗', e); }
+            };
+            if (immediate) { if (timer) clearTimeout(timer); run(); return; }
+            if (!timer) timer = setTimeout(run, 300);
+        };
+    })();
+    window.vendorRecord = function (wh, vendor, date, create) {
+        var isObj = function (x) { return !!x && typeof x === 'object' && !Array.isArray(x); };
+        var db = window.customVendorCheckoutDB;
+        if (!isObj(db)) { if (!create) return null; db = window.customVendorCheckoutDB = {}; }
+        if (!isObj(db[wh])) { if (!create) return null; db[wh] = {}; }
+        if (!isObj(db[wh][vendor])) { if (!create) return null; db[wh][vendor] = {}; }
+        if (!isObj(db[wh][vendor][date])) { if (!create) return null; db[wh][vendor][date] = {}; }
+        return db[wh][vendor][date];
+    };
+    // 讀本年度的值（匯入「先讀再累加」的流程一律用這個，絕不混入上一年度的值，避免重複累加）
+    window.getVendorVal = function (wh, vendor, date, cat) {
+        var rec = window.vendorRecord(wh, vendor, date, false);
+        var v = rec ? rec[cat] : undefined;
+        return (v === undefined || v === null) ? '' : v;
+    };
+    // 畫面顯示用：1 月份結帳區間會含前一年 12/26～12/31，這幾天若本年度還沒有資料，就顯示上一年度雲端文件的值（唯讀）
+    window.getVendorValDisplay = function (wh, vendor, date, cat) {
+        var rec = window.vendorRecord(wh, vendor, date, false);
+        if (!rec && String(date) < (window.YEAR + '-01-01')) {
+            var p = window.__prevYearState, pdb = p && p.customVendorDB;
+            rec = pdb && pdb[wh] && pdb[wh][vendor] && pdb[wh][vendor][date];
+            if (!rec || typeof rec !== 'object') rec = null;
+        }
+        var v = rec ? rec[cat] : undefined;
+        return (v === undefined || v === null) ? '' : v;
+    };
+    // 寫入：值真的有變才寫、才蓋時間戳；回傳 true 代表有變動（呼叫端再決定要不要存雲端）
+    window.setVendorVal = function (wh, vendor, date, cat, val) {
+        var del = (val === '' || val === null || val === undefined || (cat !== 'remark' && typeof val !== 'object' && isNaN(val)));
+        var rec = window.vendorRecord(wh, vendor, date, !del);
+        if (!rec) return false;
+        if (del) {
+            if (!Object.prototype.hasOwnProperty.call(rec, cat)) return false;
+            delete rec[cat];
+        } else {
+            if (typeof val !== 'object' && rec[cat] === val) return false;
+            rec[cat] = val;
+        }
+        rec._t = Date.now();
+        window.persistVendorDB();
+        return true;
+    };
+    // 雲端與本機逐筆合併。mode='cloud'：這份雲端資料要套用（同時間戳時以雲端為準，本機沒時間戳的舊殘留以雲端為準）；
+    // mode='local'：本機目前比較新，只吸收雲端上「有時間戳而且比本機新」的紀錄。
+    window.mergeVendorDB = function (localDB, cloudDB, mode) {
+        var isObj = function (x) { return !!x && typeof x === 'object' && !Array.isArray(x); };
+        var keys = function (a, b) { var s = {}; Object.keys(a).forEach(function (k) { s[k] = 1; }); Object.keys(b).forEach(function (k) { s[k] = 1; }); return Object.keys(s); };
+        var tOf = function (r) { return isObj(r) ? (Number(r._t) || 0) : 0; };
+        // 內容比對（欄位順序不同也視為相同：雲端回傳的欄位順序不一定跟本機一樣）
+        var canon = function (x) {
+            if (x === null || typeof x !== 'object') return JSON.stringify(x);
+            if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+            return '{' + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(x[k]); }).join(',') + '}';
+        };
+        var same = function (a, b) { try { return canon(a) === canon(b); } catch (e) { return false; } };
+        localDB = isObj(localDB) ? localDB : {}; cloudDB = isObj(cloudDB) ? cloudDB : {};
+        var cloudWins = (mode === 'cloud'), out = {}, changed = false, localNewer = false;
+        keys(localDB, cloudDB).forEach(function (wh) {
+            var lw = isObj(localDB[wh]) ? localDB[wh] : {}, cw = isObj(cloudDB[wh]) ? cloudDB[wh] : {};
+            keys(lw, cw).forEach(function (v) {
+                var lv = isObj(lw[v]) ? lw[v] : {}, cv = isObj(cw[v]) ? cw[v] : {};
+                keys(lv, cv).forEach(function (d) {
+                    var lr = isObj(lv[d]) ? lv[d] : undefined, cr = isObj(cv[d]) ? cv[d] : undefined;
+                    var lt = tOf(lr), ct = tOf(cr), pick;
+                    if (lr && cr) pick = (lt !== ct) ? (lt > ct ? lr : cr) : (cloudWins ? cr : lr);
+                    else if (lr) pick = (cloudWins && !lt) ? undefined : lr;
+                    else pick = (!cloudWins && !ct) ? undefined : cr;
+                    if (pick === undefined) { if (lr) changed = true; return; }
+                    if (pick !== lr && !(lr && same(lr, pick))) changed = true;
+                    if (pick === lr && lt > ct) localNewer = true;
+                    if (!out[wh]) out[wh] = {};
+                    if (!out[wh][v]) out[wh][v] = {};
+                    out[wh][v][d] = pick;
+                });
+            });
+        });
+        return { db: out, changed: changed, localNewer: localNewer };
+    };
+    // 收到雲端資料時呼叫（module 的 onSnapshot 會叫）：合併進本機；本機若有比雲端新的紀錄，稍後自動補送上雲端
+    window.__applyCloudVendorDB = function (cloudVendorDB, mode) {
+        try {
+            if (!cloudVendorDB || typeof cloudVendorDB !== 'object' || Array.isArray(cloudVendorDB)) return;
+            if (Object.keys(cloudVendorDB).length === 0) mode = 'local';   // 雲端是空的：不拿空資料蓋本機（沿用舊版的保護）
+            var res = window.mergeVendorDB(window.customVendorCheckoutDB, cloudVendorDB, mode);
+            if (res.changed) {
+                window.customVendorCheckoutDB = res.db;
+                window.persistVendorDB();
+                if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch (e) {} }
+            }
+            if (res.localNewer && window.userRole && !String(window.userRole).startsWith('ro') && typeof window.saveData === 'function') {
+                clearTimeout(window.__vendorRepushTimer);
+                window.__vendorRepushTimer = setTimeout(function () { window.saveData(false); }, 1500);
+            }
+        } catch (e) { console.error('廠商結帳資料與雲端合併失敗', e); }
+    };
+
+    // 📅 Excel 日期只有「月/日」沒有年份時（例如「12月26日」「9/26」），推算是哪一年：
+    // 優先放進目前「運費結帳比對」選的區間；沒有區間時，取「不晚於今天 45 天後」的最近一個日期
+    // （運費資料都是已發生的：1 月匯入「12月26日」→ 前一年 12/26；10 月匯入「1/5」→ 今年 1/5）。
+    window.inferYearForMonthDay = function (mm, dd) {
+        var Y = window.YEAR, pad = function (n) { return String(n).padStart(2, '0'); };
+        var cands = [Y - 1, Y, Y + 1];
+        var sEl = document.getElementById('checkoutStartDate'), eEl = document.getElementById('checkoutEndDate');
+        if (sEl && eEl && sEl.value && eEl.value) {
+            for (var i = 0; i < cands.length; i++) {
+                var k = cands[i] + '-' + pad(mm) + '-' + pad(dd);
+                if (k >= sEl.value && k <= eEl.value) return cands[i];
+            }
+        }
+        var now = new Date(), ref = new Date(Y, now.getMonth(), now.getDate()).getTime(), limit = ref + 45 * 86400000;
+        var best = null, bestT = -Infinity;
+        cands.forEach(function (y) { var t = new Date(y, mm - 1, dd).getTime(); if (t <= limit && t > bestT) { bestT = t; best = y; } });
+        return best === null ? Y : best;
+    };
+
+    // 🎆 跨年自動切換：頁面若從 12/31 一直開著過了午夜，程式裡的年度還停在舊年度，
+    //    這時切到 1 月輸入，資料會被寫進「舊年度文件的 1 月」（等於蓋掉去年 1 月的資料）。
+    //    所以每分鐘檢查一次系統年份：一跨年就先把還沒送出的資料存回舊年度，再自動重新整理切到新年度。
+    (function () {
+        if (window.IS_YEAR_PREVIEW) return;
+        var started = false;
+        window.__checkYearRollover = function (nowYear) {
+            if (started || nowYear === window.REAL_YEAR) return false;
+            started = true;
+            var go = function () { try { location.reload(); } catch (e) {} };
+            try {
+                var t = document.getElementById('toast-container');
+                if (t) { t.innerText = '🎆 已跨入新年度，系統先儲存資料，接著自動切換到新年度…'; t.className = 'show'; }
+                var canSave = window.userRole && !String(window.userRole).startsWith('ro') && typeof window.saveData === 'function';
+                var needSave = canSave && window.state && (window.state.lastModified || 0) > (window.lastSyncTime || 0);
+                var done = false, finish = function () { if (!done) { done = true; setTimeout(go, 500); } };
+                if (needSave) { Promise.resolve(window.saveData(false)).then(finish, finish); setTimeout(finish, 15000); }
+                else finish();
+            } catch (e) { go(); }
+            return true;
+        };
+        setInterval(function () { window.__checkYearRollover(new Date().getFullYear()); }, 60000);
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
@@ -1025,7 +1238,15 @@
             } else {
                 let prevDate = new Date(targetDate); prevDate.setDate(prevDate.getDate() - 1);
                 let pdStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}-${String(prevDate.getDate()).padStart(2, '0')}`, pdMonth = prevDate.getMonth() + 1, pdDay = prevDate.getDate();
-                let dailyD = getDaily()[dStr] || {}, commentsD = getComments()[dStr] || {}, dailyPD = getDaily()[pdStr] || {}, commentsPD = getComments()[pdStr] || {}, lines = [];
+                let dailyD = getDaily()[dStr] || {}, commentsD = getComments()[dStr] || {}, dailyPD = getDaily()[pdStr], commentsPD = getComments()[pdStr], lines = [];
+                // 📅 1/1 的日報要看 12/31：那天的資料在上一年度的雲端文件，本年度沒有就補讀上一年度（唯讀）
+                if (isPrevYearDate(pdStr)) {
+                    let pw = prevYearWh();
+                    if (!dailyPD && pw && pw.daily) dailyPD = pw.daily[pdStr];
+                    if (!commentsPD && pw && pw.comments) commentsPD = pw.comments[pdStr];
+                    if (!window.__prevYearState) window.loadPrevYearState().then(loaded => { if (loaded) refreshOpenDailyReport(); });
+                }
+                dailyPD = dailyPD || {}; commentsPD = commentsPD || {};
 
                 lines.push({ text: `<b>【${pdMonth}/${pdDay}上收】</b>` });
                 lines.push({ text: `上收申請案件數：${dailyPD['上收申請案件數'] || 0}件` });
@@ -1114,12 +1335,15 @@
                     // 🚀 核心解耦手術 2：強行清除從雲端抓下來的舊版毒素，保護本機記憶體不被蓋台
                     if (cloudData.vendorDB) delete cloudData.vendorDB;
                     
+                    // 🩹 廠商結帳資料（customVendorDB）改成逐筆合併、留下較新的那筆（見 <head> 的 mergeVendorDB），
+                    //    不再整包取代：避免別台電腦用舊資料存檔時，把剛匯入的資料整批蓋回去。
+                    const applyVendor = (mode) => { if (window.__applyCloudVendorDB) window.__applyCloudVendorDB(cloudData.customVendorDB, mode); };
                     if (window.isInitialLoad) {
-                        if (window.state.lastModified && window.state.lastModified > (cloudData.lastModified || 0)) { window.isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); renderAll(); window.checkAndTriggerStartupEvents(); } 
-                        else { 
+                        if (window.state.lastModified && window.state.lastModified > (cloudData.lastModified || 0)) { applyVendor('local'); window.isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); renderAll(); window.checkAndTriggerStartupEvents(); }
+                        else {
                             window.state = cloudData;
-                            // 🌟 防護點 1：如果是從雲端下載，有 vendorDB 才覆蓋，沒有的話保留本機的！
-                            
+                            applyVendor('cloud');
+
                             try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
                             if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; 
                             window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); renderAll(); window.checkAndTriggerStartupEvents(); 
@@ -1128,20 +1352,23 @@
                         // 🩹 修復：本機正在寫入雲端時，這批回聲可能還不包含最新的本機編輯（例如連續打好幾格時，
                         //         中間有幾格因為 isSaving 忙碌被排隊卡住，還沒真正送出）。
                         //         這時候先跳過，等我們自己的寫入完成、下一次回聲進來時再套用，避免蓋掉剛打好的資料。
-                        if (window.isSaving) return;
+                        //         （廠商結帳資料例外：逐筆合併本來就只會留下較新的紀錄，所以照樣吸收別台電腦較新的紀錄。）
+                        if (window.isSaving) { applyVendor('local'); return; }
                         if ((cloudData.lastModified || 0) > window.state.lastModified) {
                             const activeEl = document.activeElement; let fInfo = null, cVal = null;
                             if (activeEl && activeEl.classList.contains('data-cell') && activeEl.dataset.item !== '件數達成率') { fInfo = { d: activeEl.dataset.date, i: activeEl.dataset.item }; cVal = activeEl.value; }
                             window.state = cloudData;
-                            
-                            // 🌟 防護點 2：運行中收到雲端更新，有 vendorDB 才覆寫，沒有就跳過！
-                            
-                            
+                            applyVendor('cloud');
+
                             try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
                             if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } window.lastSyncTime = cloudData.lastModified || Date.now();
-                            if (fInfo) { let p = window.parseVal(cVal); if (cVal === '' || isNaN(p)) { if (window.getDaily()[fInfo.d] && window.getDaily()[fInfo.d][fInfo.i] !== undefined) delete window.getDaily()[fInfo.d][fInfo.i]; } else { if (!window.getDaily()[fInfo.d]) window.getDaily()[fInfo.d] = {}; window.getDaily()[fInfo.d][fInfo.i] = p; } }
+                            // 🩹 修復：原本寫成 window.parseVal / window.getDaily()，但這兩個只存在 module 內、window 上沒有，
+                            //         使用者剛好停在日別格子上時收到同事的更新就會拋錯，畫面停在舊資料不重繪。
+                            if (fInfo) { let p = parseVal(cVal); if (cVal === '' || isNaN(p)) { if (getDaily()[fInfo.d] && getDaily()[fInfo.d][fInfo.i] !== undefined) delete getDaily()[fInfo.d][fInfo.i]; } else { if (!getDaily()[fInfo.d]) getDaily()[fInfo.d] = {}; getDaily()[fInfo.d][fInfo.i] = p; } }
                             if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; renderAll();
                             if (fInfo) { const target = document.querySelector(`input[data-date="${fInfo.d}"][data-item="${fInfo.i}"]`); if (target) { target.focus(); target.value = cVal; } }
+                        } else {
+                            applyVendor('local');
                         }
                     }
                 } else if (window.isInitialLoad) { 
@@ -1150,6 +1377,28 @@
                     setDoc(doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state'), window.state).catch(e => console.error("強制同步失敗", e)); window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = window.state.lastModified; window.checkAndTriggerStartupEvents(); 
                 }
             }, (error) => { clearTimeout(window.syncTimeout); if(ind){ ind.innerText = "☁️ 本機模式 (受阻)"; ind.style.backgroundColor = "#dc3545"; ind.style.color = "white"; } window.isCloudSyncEnabled = false; if (window.isInitialLoad) { window.isInitialLoad = false; window.isAppReady = true; window.checkAndTriggerStartupEvents(); } });
+        };
+
+        // 📅 跨年度唯讀參照：1 月份結帳區間從前一年 12/26 開始、1/1 的日報要看 12/31，
+        //    這幾天的資料存在「上一年度」那份雲端文件裡（年度分開存放的代價）。
+        //    需要時才讀一次（只讀不寫），畫面就能把那幾天補上；本年度若已有同一天的資料，一律以本年度為準。
+        window.__prevYearState = null;
+        let prevYearPromise = null;
+        window.loadPrevYearState = function () {
+            if (window.__prevYearState) return Promise.resolve(false);
+            if (prevYearPromise) return prevYearPromise;
+            if (!window.dbFirebase || !window.isCloudSyncEnabled) return Promise.resolve(false);
+            const ref = doc(window.dbFirebase, 'artifacts', 'dadu-global-world-' + (ROC_YEAR - 1), 'public', 'data', 'freight_app', 'main_state');
+            prevYearPromise = window._withTimeout(getDoc(ref), 15000, '讀取上一年度資料')
+                .then(snap => { window.__prevYearState = snap.exists() ? (snap.data() || {}) : {}; return true; })
+                .catch(e => { console.warn('上一年度資料讀取失敗（不影響本年度資料）', e); prevYearPromise = null; return false; });
+            return prevYearPromise;
+        };
+        const isPrevYearDate = (ds) => String(ds) < `${YEAR}-01-01`;
+        const prevYearWh = () => { let p = window.__prevYearState; return (p && p.warehouses && p.warehouses[window.currentWarehouse]) || null; };
+        const refreshOpenDailyReport = () => {
+            let reportModal = document.getElementById('dailyReportModal');
+            if (reportModal && reportModal.style.display === 'block') { let picker = document.getElementById('reportDateSelect'); let data = window.getDailyReportData(picker.value); document.getElementById('dailyReportText').innerHTML = data.map(d => d.text ? `<span style="${d.color ? `color:${d.color};` : ''}">${d.text}</span>` : '').join('<br>'); }
         };
 
         window.isSaving = false;
@@ -1315,7 +1564,7 @@
             });
             let actualToday = new Date(); if (actualToday.getFullYear() === YEAR) state.currentMonth = actualToday.getMonth() + 1;
             let sel = document.getElementById('monthSelect'); for(let i=1; i<=12; i++) sel.innerHTML += `<option value="${i}" ${i===state.currentMonth?'selected':''}>${i}月</option>`;
-            sel.addEventListener('change', e => { state.currentMonth = parseInt(e.target.value); let m = state.currentMonth, y = 2026, prevM = m === 1 ? 12 : m - 1, prevY = m === 1 ? y - 1 : y; let startInput = document.getElementById('checkoutStartDate'), endInput = document.getElementById('checkoutEndDate'); if (startInput && endInput) { startInput.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`; endInput.value = `${y}-${String(m).padStart(2,'0')}-25`; } renderAll(); setTimeout(window.scrollToToday, 100); });
+            sel.addEventListener('change', e => { state.currentMonth = parseInt(e.target.value); let m = state.currentMonth, y = YEAR, prevM = m === 1 ? 12 : m - 1, prevY = m === 1 ? y - 1 : y; let startInput = document.getElementById('checkoutStartDate'), endInput = document.getElementById('checkoutEndDate'); if (startInput && endInput) { startInput.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`; endInput.value = `${y}-${String(m).padStart(2,'0')}-25`; } renderAll(); setTimeout(window.scrollToToday, 100); });
             
             document.getElementById('checkoutWhSelect')?.addEventListener('change', window.renderCheckoutTab);
             
@@ -4117,10 +4366,12 @@
 
         function extractDate(str, mth) { 
             if(str == null || str === '') return null; let s = String(str).trim();
-            if(/^4[456]\d{3}(?:\.\d+)?$/.test(s)) { let d = new Date((parseFloat(s) - 25569) * 86400 * 1000); d.setTime(d.getTime() + 12 * 60 * 60 * 1000); if(d.getUTCMonth()+1 === mth) return `2026-${String(mth).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; return null; }
+            // 📅 116 年度修正：以前日期一律寫死成 2026-…，116 年匯入的日別資料會全部存到 2026 年的日期、畫面上看不到。
+            //    這裡匯入的是「目前選的月份」，一律落在本年度（YEAR）。Excel 日期序號也放寬到 2036 年（原本只到 2028/8）。
+            if(/^4[4-9]\d{3}(?:\.\d+)?$/.test(s)) { let d = new Date((parseFloat(s) - 25569) * 86400 * 1000); d.setTime(d.getTime() + 12 * 60 * 60 * 1000); if(d.getUTCMonth()+1 === mth) return `${YEAR}-${String(mth).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; return null; }
             s = s.replace(/\([一二三四五六日]\)/g, '').replace(/（[一二三四五六日]）/g, '').trim().replace(/[\/\.]/g, '-'); if(s.length < 3) return null;
             let m1=s.match(/(?:20\d{2}|11[0-9])-(\d{1,2})-(\d{1,2})/), m2=s.match(/^(\d{1,2})-(\d{1,2})$/), m3=s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/), m4=s.match(/^(\d{1,2})-(\d{1,2})-(?:20\d{2}|\d{2})$/);
-            let check = m => m && parseInt(m[1])===mth ? `2026-${String(mth).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}` : null; return check(m1) || check(m2) || check(m3) || check(m4) || null;
+            let check = m => m && parseInt(m[1])===mth ? `${YEAR}-${String(mth).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}` : null; return check(m1) || check(m2) || check(m3) || check(m4) || null;
         }
 
         function renderTab7() {
@@ -4195,10 +4446,13 @@
             let startInput = startInputEl.value, endInput = endInputEl.value; 
             let start = new Date(startInput), end = new Date(endInput), totals = { '主線': 0, '爆量': 0, '回收': 0, '其他': 0, '罰款': 0, '離島': 0, '轉運': 0, '上收': 0 }, grandTotal = 0;
             let current = new Date(start);
-            
+            // 📅 1 月份結帳區間（前一年 12/26～）：先讀一次上一年度的雲端文件，讀到後自動重畫
+            if (isPrevYearDate(startInput) && !window.__prevYearState) window.loadPrevYearState().then(loaded => { if (loaded) window.renderCheckoutTab(); });
+
             while (current <= end) {
                 let dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
                 let dailyData = getDaily()[dateStr];
+                if (!dailyData && isPrevYearDate(dateStr)) { let pw = prevYearWh(); dailyData = (pw && pw.daily) ? pw.daily[dateStr] : undefined; }
                 if (dailyData) {
                     totals['主線'] += Number(dailyData['主線費用'] || 0); 
                     totals['爆量'] += Number(dailyData['爆量費用'] || 0) + Number(dailyData['爆量自揹費用'] || 0); 
@@ -4653,17 +4907,20 @@
 <script>
 (function() {
     // 1. 永久且安全地攔截 localStorage.setItem，完美融合廠商資料，絕不造成無限迴圈
+    // 🩹 改版：以前這裡會把整份廠商結帳資料再塞一份進 freightData（vendorDB），加上 state 裡原本就有的 customVendorDB、
+    //    以及 freight_vendor_db，同一份資料在本機存了三份，是把本機暫存空間（與數位辦公室共用）塞滿的主因之一。
+    //    現在廠商結帳資料只存在自己的 key（window.VENDOR_DB_KEY），寫 freightData 時反而把這兩份重複的拿掉。
+    //    （寫入失敗的保護在 <head> 最前面的 Storage.prototype 那段，這裡不需要再處理。）
     if (!window._origLocalStorageSetItem) {
         window._origLocalStorageSetItem = localStorage.setItem;
         localStorage.setItem = function(key, val) {
-            if (key === `freightData_${window.ROC_YEAR}` && window.customVendorCheckoutDB) {
-                try { 
-                    let obj = JSON.parse(val); 
-                    obj.vendorDB = window.customVendorCheckoutDB; 
-                    val = JSON.stringify(obj); 
+            if (key === `freightData_${window.ROC_YEAR}`) {
+                try {
+                    let obj = JSON.parse(val);
+                    if (obj && (obj.vendorDB || obj.customVendorDB)) { delete obj.vendorDB; delete obj.customVendorDB; val = JSON.stringify(obj); }
                 } catch(e) {}
             }
-            window._origLocalStorageSetItem.apply(this, arguments);
+            return window._origLocalStorageSetItem.call(this, key, val);
         };
     }
 
@@ -4695,22 +4952,10 @@
             window._saveDataHooked = true;
         }
         
-        if (typeof window.renderAll === 'function' && !window._renderAllHooked) {
-            const origRenderAll = window.renderAll;
-            window.renderAll = function() {
-                try {
-                    let stored = JSON.parse(window._origLocalStorageSetItem ? localStorage.getItem(`freightData_${window.ROC_YEAR}`) : '{}');
-                    if (stored && stored.vendorDB) {
-                        window.customVendorCheckoutDB = stored.vendorDB;
-                        window._origLocalStorageSetItem.call(localStorage, 'freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
-                        if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-                    }
-                } catch(e) {}
-                return origRenderAll.apply(this, arguments);
-            };
-            window._renderAllHooked = true;
-        }
-        if (window._saveDataHooked && window._renderAllHooked) clearInterval(attemptHook);
+        // 🩹 移除：原本這裡還會攔截 window.renderAll，用 freightData 裡那份 vendorDB 蓋回廠商資料。
+        //    但 renderAll 只存在 module 內、window 上從來沒有，這段一直沒生效，只讓這個計時器每 0.5 秒空轉不停；
+        //    萬一哪天生效反而會用舊資料蓋掉剛匯入的資料，所以整段拿掉。
+        if (window._saveDataHooked) clearInterval(attemptHook);
     }, 500);
 
     // 3. 強制攔截 MIS 匯入完成事件，一秒上傳雲端
@@ -4757,12 +5002,11 @@
                 let vName = document.getElementById('vendorSelect') ? document.getElementById('vendorSelect').value : '創新';
                 vendorInputsToClear.forEach(inp => {
                     let d = inp.dataset.date, cat = inp.dataset.cat;
-                    if(window.customVendorCheckoutDB && window.customVendorCheckoutDB[wh] && window.customVendorCheckoutDB[wh][vName] && window.customVendorCheckoutDB[wh][vName][d]) {
-                        delete window.customVendorCheckoutDB[wh][vName][d][cat]; inp.value = ''; changedVendor = true;
-                    }
+                    // 透過共用寫入工具刪除：會記下修改時間，雲端合併時這筆刪除才不會被別台電腦的舊資料蓋回來
+                    if (window.setVendorVal(wh, vName, d, cat, '')) changedVendor = true;
+                    inp.value = '';
                 });
                 if (changedVendor) {
-                    try { window._origLocalStorageSetItem.call(localStorage, 'freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); } catch(err) {}
                     if (typeof window.saveData === 'function') window.saveData(false);
                     if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
                     document.querySelectorAll('.cell-selected').forEach(el => el.classList.remove('cell-selected'));
@@ -4806,35 +5050,19 @@
         (function() {
             const LOCAL_DOW = ['日', '一', '二', '三', '四', '五', '六'];
 
-            // 1. 建立獨立廠商結帳暫存保險箱
-            if (!window.customVendorCheckoutDB) {
-                try {
-                    window.customVendorCheckoutDB = JSON.parse(localStorage.getItem('freight_vendor_db') || '{}');
-                } catch(e) {
-                    window.customVendorCheckoutDB = {};
-                }
-            }
+            // 1. 建立獨立廠商結帳暫存保險箱（本機 key 依年度，見 <head> 的 window.VENDOR_DB_KEY）
+            if (!window.customVendorCheckoutDB) window.customVendorCheckoutDB = window.loadVendorDBLocal();
 
-            // 安全資料讀取器
-            const getStorageVal = (wh, vendor, date, cat) => {
-                if (!window.customVendorCheckoutDB[wh] || !window.customVendorCheckoutDB[wh][vendor] || !window.customVendorCheckoutDB[wh][vendor][date]) return '';
-                return window.customVendorCheckoutDB[wh][vendor][date][cat] ?? '';
-            };
+            // 安全資料讀取器（畫面顯示用：1 月份區間的前一年 12/26～12/31 若本年度沒有，會顯示上一年度的值）
+            const getStorageVal = (wh, vendor, date, cat) => window.getVendorValDisplay(wh, vendor, date, cat);
 
-            // 安全資料寫入器
+            // 安全資料寫入器：值真的有變才寫入、才存檔。
+            // 🩹 以前下方表格每重畫一次，就把畫面上每一格「原值」再寫回去一次並觸發存檔，
+            //    看一下廠商明細就會上傳一次雲端，還會替每一天建立空白紀錄；現在沒變動就不動作。
             const setStorageVal = (wh, vendor, date, cat, val) => {
-                if (!window.customVendorCheckoutDB[wh]) window.customVendorCheckoutDB[wh] = {};
-                if (!window.customVendorCheckoutDB[wh][vendor]) window.customVendorCheckoutDB[wh][vendor] = {};
-                if (!window.customVendorCheckoutDB[wh][vendor][date]) window.customVendorCheckoutDB[wh][vendor][date] = {};
-                if (val === '' || val === null || isNaN(val)) {
-                    delete window.customVendorCheckoutDB[wh][vendor][date][cat];
-                } else {
-                    window.customVendorCheckoutDB[wh][vendor][date][cat] = val;
-                }
-                try { 
-                    localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); 
-                    if (typeof window.saveData === 'function') { window.saveData(false); }
-                } catch(e) {}
+                // 畫面上顯示的是上一年度補上的值（本年度還沒有這筆）且沒有修改：不要把它複製進本年度
+                if (typeof val !== 'object' && !window.vendorRecord(wh, vendor, date, false) && String(window.getVendorValDisplay(wh, vendor, date, cat)) === String(val === null || val === undefined ? '' : val)) return;
+                if (window.setVendorVal(wh, vendor, date, cat, val) && typeof window.saveData === 'function') window.saveData(false);
             };
 
             // 🌟 依倉別動態取得廠商清單（「全部」彙總時使用，岡山倉含「離島」假廠商）
@@ -4995,13 +5223,7 @@
                         let dStr = remInput.dataset.date, rVal = remInput.value.trim();
                         let cleanVal = rVal.replace(/^\[.*?\]\s*/, '');
                         if (cleanVal !== getStorageVal(selectedWh, selectedVendor, dStr, 'remark')) {
-                            if (!window.customVendorCheckoutDB[selectedWh][selectedVendor]) window.customVendorCheckoutDB[selectedWh][selectedVendor] = {};
-                            if (!window.customVendorCheckoutDB[selectedWh][selectedVendor][dStr]) window.customVendorCheckoutDB[selectedWh][selectedVendor][dStr] = {};
-                            window.customVendorCheckoutDB[selectedWh][selectedVendor][dStr]['remark'] = cleanVal;
-                            try { 
-                    localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB)); 
-                    if (typeof window.saveData === 'function') { window.saveData(false); }
-                } catch(e) {}
+                            if (window.setVendorVal(selectedWh, selectedVendor, dStr, 'remark', cleanVal) && typeof window.saveData === 'function') window.saveData(false);
                         }
                     }
 
@@ -5243,7 +5465,8 @@ window.handleMainlineExcelImport = function(e) {
             }
         }
         
-        try { localStorage.setItem('freight_vendor_db', JSON.stringify(db)); } catch(e) {}
+        // （這一版的主線匯入已被下方 makeInvincible 的新版取代，保留僅供相容；寫入改走共用工具）
+        window.customVendorCheckoutDB = db; window.persistVendorDB(true);
         if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab(); else if (typeof window.runRefresh === 'function') window.runRefresh();
         if (typeof window.saveData === 'function') window.saveData(true, true);
         
@@ -5337,7 +5560,8 @@ window.handleVendorCheckoutExcelImportNew = function(e) {
             }
         }
         
-        try { localStorage.setItem('freight_vendor_db', JSON.stringify(db)); } catch(e){}
+        // （這一版的 MIS 匯入已被下方 makeInvincible 的新版取代，保留僅供相容；寫入改走共用工具）
+        window.customVendorCheckoutDB = db; window.persistVendorDB(true);
         if(typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab(); else if(typeof window.runRefresh === 'function') window.runRefresh();
         if (typeof window.saveData === 'function') window.saveData(true, true);
         
@@ -5397,29 +5621,16 @@ setInterval(() => {
         keysToNuke.forEach(k => localStorage.removeItem(k));
     } catch(err) {}
 
-    // 1. 初始化我們專屬的下方廠商 DB
-    if (!window.customVendorCheckoutDB) {
-        try { window.customVendorCheckoutDB = JSON.parse(localStorage.getItem('freight_vendor_db') || '{}'); }
-        catch(e) { window.customVendorCheckoutDB = {}; }
-    }
+    // 1. 初始化我們專屬的下方廠商 DB（本機 key 依年度，見 <head> 的 window.VENDOR_DB_KEY）
+    if (!window.customVendorCheckoutDB) window.customVendorCheckoutDB = window.loadVendorDBLocal();
 
-    window.getStorageVal = (wh, vendor, date, cat) => {
-        if (!window.customVendorCheckoutDB[wh] || !window.customVendorCheckoutDB[wh][vendor] || !window.customVendorCheckoutDB[wh][vendor][date]) return '';
-        return window.customVendorCheckoutDB[wh][vendor][date][cat] ?? '';
-    };
+    // 匯入「先讀再累加」用：只讀本年度的值
+    window.getStorageVal = (wh, vendor, date, cat) => window.getVendorVal(wh, vendor, date, cat);
 
-    window.setStorageVal = (wh, vendor, date, cat, val) => {
-        if (!window.customVendorCheckoutDB[wh]) window.customVendorCheckoutDB[wh] = {};
-        if (!window.customVendorCheckoutDB[wh][vendor]) window.customVendorCheckoutDB[wh][vendor] = {};
-        if (!window.customVendorCheckoutDB[wh][vendor][date]) window.customVendorCheckoutDB[wh][vendor][date] = {};
-        
-        if (val === '' || val === null || (typeof val !== 'object' && isNaN(val))) {
-            delete window.customVendorCheckoutDB[wh][vendor][date][cat];
-        } else {
-            window.customVendorCheckoutDB[wh][vendor][date][cat] = val;
-        }
-        localStorage.setItem('freight_vendor_db', JSON.stringify(window.customVendorCheckoutDB));
-    };
+    // 🩹 以前每寫一格就把整份廠商資料重寫進本機暫存一次（匯入一份檔案要重寫上千次），
+    //    而且沒有任何錯誤保護：本機空間一滿就直接拋錯，匯入在第一天（9/26）就中斷、畫面卻沒有任何提示。
+    //    現在改走共用工具：只在值真的變動時寫入並記下修改時間，本機備份統一 0.3 秒後寫一次。
+    window.setStorageVal = (wh, vendor, date, cat, val) => { window.setVendorVal(wh, vendor, date, cat, val); };
 
     window.makeInvincible = (funcName, newFunc) => {
         Object.defineProperty(window, funcName, {
@@ -5439,45 +5650,51 @@ setInterval(() => {
         let m2 = s.match(/^(\d{1,2})-(\d{1,2})$/); 
         let m3 = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/); 
         let m4 = s.match(/^(\d{1,2})-(\d{1,2})-(?:20\d{2}|\d{2})$/);
-        let check = m => m && parseInt(m[1])===mth ? `2026-${String(mth).padStart(2,'0')}-${String(m[m===m1||m===m4?2:2]).padStart(2,'0')}` : null;
-        let rx = check(m1)||check(m2)||check(m3)||check(m4); 
+        // 📅 116 年度修正：以前一律寫死 2026-…；日別匯入的是「目前選的月份」，一律落在本年度（window.YEAR）。
+        let check = m => m && parseInt(m[1])===mth ? `${window.YEAR}-${String(mth).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}` : null;
+        let rx = check(m1)||check(m2)||check(m3)||check(m4);
         if(rx) return rx;
-        if(/^4[456]\d{3}(?:\.\d+)?$/.test(s)) { 
-            let d = new Date(Math.round((parseFloat(s)-25569)*86400*1000)); 
-            if(d.getUTCMonth()+1===mth) return `2026-${String(mth).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`; 
-        } 
+        if(/^4[4-9]\d{3}(?:\.\d+)?$/.test(s)) {
+            let d = new Date(Math.round((parseFloat(s)-25569)*86400*1000));
+            if(d.getUTCMonth()+1===mth) return `${window.YEAR}-${String(mth).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+        }
         return null;
     };
 
+    // 📅 116 年度修正：
+    //   ・Excel 日期序號、含年份的日期（2026/9/26、115/9/26）→ 照檔案上的年份（序號放寬到 2036 年，原本只到 2028/8）。
+    //   ・只有「月/日」的日期（9/26、9月26日）→ 以前一律寫死 2026 年，116 年匯入會存到錯的年份、畫面上看不到；
+    //     現在依目前「運費結帳比對」的區間判斷年份（1 月份區間的 12/26～12/31 會正確算成前一年）。
     window.parseExcelDateUnified = function(cell) {
         if (!cell) return null;
         let s = String(cell).trim();
-        if (/^4[456]\d{3}(?:\.\d+)?$/.test(s)) {
+        let pad = n => String(n).padStart(2, '0');
+        if (/^4[4-9]\d{3}(?:\.\d+)?$/.test(s)) {
             let d = new Date(Math.round((parseFloat(s) - 25569) * 86400 * 1000));
-            return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+            return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
         }
         s = s.replace(/\([一二三四五六日]\)/g, '').replace(/（[一二三四五六日]）/g, '').trim().replace(/[\/\.]/g, '-');
-        
+
         let m1 = s.match(/^(?:20\d{2}|11[0-9])-(\d{1,2})-(\d{1,2})/);
         if (m1) {
             let y = s.startsWith('11') ? parseInt(s.substring(0,3)) + 1911 : parseInt(s.substring(0,4));
-            if (isNaN(y)) y = 2026;
-            return `${y}-${String(m1[1]).padStart(2, '0')}-${String(m1[2]).padStart(2, '0')}`;
+            if (isNaN(y)) y = window.YEAR;
+            return `${y}-${pad(m1[1])}-${pad(m1[2])}`;
         }
-        
+
         let m2 = s.match(/^(\d{1,2})-(\d{1,2})$/);
-        if (m2) return `2026-${String(m2[1]).padStart(2, '0')}-${String(m2[2]).padStart(2, '0')}`;
-        
+        if (m2) return `${window.inferYearForMonthDay(parseInt(m2[1]), parseInt(m2[2]))}-${pad(m2[1])}-${pad(m2[2])}`;
+
         let m3 = s.match(/^(\d{1,2})$/);
         if (m3) {
             let mth = parseInt(document.getElementById('monthSelect')?.value || (new Date().getMonth() + 1));
-            return `2026-${String(mth).padStart(2, '0')}-${String(m3[1]).padStart(2, '0')}`;
+            return `${window.YEAR}-${pad(mth)}-${pad(m3[1])}`;
         }
 
         // 🌟 新增對應「7月1日」這種中文格式的解析
         let m4 = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
         if (m4) {
-            return `2026-${String(m4[1]).padStart(2, '0')}-${String(m4[2]).padStart(2, '0')}`;
+            return `${window.inferYearForMonthDay(parseInt(m4[1]), parseInt(m4[2]))}-${pad(m4[1])}-${pad(m4[2])}`;
         }
 
         return null;
@@ -5521,6 +5738,8 @@ setInterval(() => {
                 ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
                     if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
                 });
+                // 舊版殘留在本機 state 裡的重複副本（vendorDB），不要再跟著帶上雲端，避免雲端文件無謂變大
+                if (window.state) delete window.state.vendorDB;
 
                 // 零延遲瞬間放行，交給原廠送資料
                 return origSave.apply(this, args);
@@ -5638,22 +5857,10 @@ setInterval(() => {
     // ============================================================================
     // 🚀 一般手動打字監聽 (保留背景精靈掛載)
     // ============================================================================
-    var lastCloudVendorStr = JSON.stringify(window.customVendorCheckoutDB);
-
-    setInterval(() => {
-        try {
-            let ms = JSON.parse(localStorage.getItem(`freightData_${window.ROC_YEAR}`) || '{}');
-            if (ms.customVendorDB) {
-                let cloudStr = JSON.stringify(ms.customVendorDB);
-                if (cloudStr !== lastCloudVendorStr && cloudStr !== '{}') {
-                    window.customVendorCheckoutDB = ms.customVendorDB;
-                    localStorage.setItem('freight_vendor_db', cloudStr);
-                    lastCloudVendorStr = cloudStr;
-                    if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
-                }
-            }
-        } catch(e) {}
-    }, 2000);
+    // 🩹 移除：以前這裡每 2 秒去讀本機 freightData 裡的 customVendorDB，只要跟上次不同就「整包」取代畫面上的廠商資料。
+    //    問題：① 本機空間滿了寫不進去時，讀到的是舊資料，反而把新匯入的蓋回去；② 收到雲端更新到這裡套用之間有最長 2 秒空窗，
+    //    這段時間若剛好存檔，就會把舊資料傳上雲端、蓋掉別人剛匯入的資料。
+    //    現在改成收到雲端資料的當下，直接逐筆合併（module 的 onSnapshot → window.__applyCloudVendorDB）。
 
     window.handleAction = (e) => {
         let target = e.target;
@@ -5747,7 +5954,7 @@ setInterval(() => {
                                 let record = db[wh][vendor][date];
                                 let isG = true;
                                 for(let k in record){
-                                    if(['__ob__','date','日期','id','wh','warehouse','倉別'].includes(k)) continue;
+                                    if(['__ob__','date','日期','id','wh','warehouse','倉別','_t'].includes(k)) continue;
                                     let v = record[k];
                                     if(v !== '' && v !== 0 && v !== '0' && v !== null && v !== undefined && !(typeof v === 'number' && isNaN(v))) { isG = false; break; }
                                 }
@@ -5756,7 +5963,7 @@ setInterval(() => {
                         }
                     }
                     window.customVendorCheckoutDB = db;
-                    localStorage.setItem('freight_vendor_db', JSON.stringify(db));
+                    window.persistVendorDB(true);
                     if(window.saveData) window.saveData(true, true);
                     alert(`✅ 雲端大掃除成功！`);
                 };
@@ -5900,9 +6107,11 @@ setInterval(() => {
         
         let r = new FileReader();
         r.onload = ev => {
+          // 🩹 加上錯誤保護：中途拋錯一定會跳出提示，不會再靜悄悄停在一半。
+          try {
             let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
             let sn = wb.SheetNames[0];
-            let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: false}); 
+            let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: 1, raw: false});
 
             let importedCount = 0;
             
@@ -5947,11 +6156,18 @@ setInterval(() => {
             }
             
             if (window.state) window.state.lastModified = Date.now();
+            window.persistVendorDB(true);
             if(typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
             if (typeof window.renderAll === 'function') { try { window.renderAll(); } catch(e){} }
             if(typeof window.saveData === 'function') window.saveData(true, true);
-            alert(`✅ 離島運費匯入成功！\n已成功將 ${importedCount} 筆費用匯入【${selectedWh}倉】的【離島】廠商視圖，\n並同步更新「日別登錄表」的每日離島費用。`);
+            alert(`✅ 離島運費匯入成功！\n已成功將 ${importedCount} 筆費用匯入【${selectedWh}倉】的【離島】廠商視圖，\n並同步更新「日別登錄表」的每日離島費用。` + (window.__lsQuotaFull ? `\n\n⚠️ 提醒：這台電腦瀏覽器的本機暫存空間已滿（與數位辦公室共用），本機備份暫時寫不進去，資料已直接存到雲端，不影響使用。` : ''));
             e.target.value = '';
+          } catch (err) {
+            console.error('離島運費匯入失敗', err);
+            e.target.value = '';
+            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch (e2) {} }
+            alert(`❌ 離島運費匯入過程發生錯誤，資料可能只匯入一部分！\n錯誤訊息：${err && err.message ? err.message : err}\n\n請重新整理網頁後再匯入一次；若仍失敗，請把這個畫面截圖給系統管理員。`);
+          }
         };
         r.readAsArrayBuffer(file);
     };
@@ -6036,21 +6252,25 @@ setInterval(() => {
         
         let r = new FileReader();
         r.onload = ev => {
+          // 🩹 加上錯誤保護：中途拋錯一定會跳出提示，不會再「看起來匯入了、其實停在一半」。
+          try {
             let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}), sn = wb.SheetNames[0];
             let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: "A", raw: true, defval: ''});
 
-            let importedCount = 0; let whNames = ['大肚', '大溪', '岡山']; 
-            let clearedMainlineKeys = new Set();
+            // 🔐 修復：專屬倉帳號只匯入自己倉別的列（舊版程式本來就是這個設計，這一版漏掉了，
+            //    大肚帳號匯入全公司的檔案時，會連大溪/岡山的主線資料一起改寫）；三倉權限帳號維持一次匯入三倉。
+            let importedCount = 0; let whNames = (typeof window.getWhOrder === 'function') ? window.getWhOrder() : ['大肚', '大溪', '岡山'];
+            let clearedMainlineKeys = new Set(), otherWhRows = 0;
 
             for (let i = 1; i < js.length; i++) {
-                let row = js[i]; 
+                let row = js[i];
                 if (!row.D) continue;
 
                 let rWh = String(row.A).trim();
                 let rVendor = String(row.I).trim();
                 let carType = String(row.AG).trim();
 
-                let targetWh = whNames.find(w => rWh.includes(w)); if (!targetWh) continue;
+                let targetWh = whNames.find(w => rWh.includes(w)); if (!targetWh) { if (['大肚', '大溪', '岡山'].some(w => rWh.includes(w))) otherWhRows++; continue; }
                 let targetVendor = ['創新', '峻富', '華碩', '御馬', '詮程'].find(v => rVendor.includes(v)); if (!targetVendor) continue;
 
                 let dateStr = window.parseExcelDateUnified(row.D);
@@ -6081,13 +6301,23 @@ setInterval(() => {
                     importedCount++;
                 }
             }
-            
+
+            window.persistVendorDB(true);
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
+            let msg = `✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。`;
+            if (otherWhRows) msg += `\n（檔案中其他倉別的 ${otherWhRows} 筆，此帳號無權限，未匯入）`;
+            if (window.__lsQuotaFull) msg += `\n\n⚠️ 提醒：這台電腦瀏覽器的本機暫存空間已滿（與數位辦公室共用），本機備份暫時寫不進去，資料已直接存到雲端，不影響使用。`;
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 主線運費智慧對帳成功！\n共成功解析 ${importedCount} 筆主線費用。`);
+                alert(msg);
             }, 500);
             e.target.value = '';
+          } catch (err) {
+            console.error('主線運費匯入失敗', err);
+            e.target.value = '';
+            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch (e2) {} }
+            alert(`❌ 主線運費匯入過程發生錯誤，資料可能只匯入一部分！\n錯誤訊息：${err && err.message ? err.message : err}\n\n請重新整理網頁後再匯入一次（重複匯入同一份檔案不會重複計算）；若仍失敗，請把這個畫面截圖給系統管理員。`);
+          }
         }; r.readAsArrayBuffer(file);
     });
 
@@ -6103,6 +6333,9 @@ setInterval(() => {
         
         let r = new FileReader();
         r.onload = ev => {
+          // 🩹 整段加上錯誤保護：以前中途只要拋錯（例如本機暫存空間滿了），匯入會停在一半，畫面卻沒有任何提示，
+          //    使用者以為匯入成功。現在一定會跳出成功（含各日金額）或失敗訊息。
+          try {
             let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
             let sn = wb.SheetNames[0];
             let js = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header: "A", raw: true, defval: ''});
@@ -6113,7 +6346,7 @@ setInterval(() => {
                     headers = js[i]; headerRowIdx = i; break;
                 }
             }
-            if (!headers) return alert('⚠️ 找不到表頭，請確認檔案格式！');
+            if (!headers) { e.target.value = ''; return alert('⚠️ 找不到表頭，請確認檔案格式！'); }
 
             let getIdx = (keywords) => {
                 for (let k of Object.keys(headers)) {
@@ -6132,22 +6365,25 @@ setInterval(() => {
             let costCol = getIdx(['費用小計', '總計', '金額']);
 
             if (!dateCol || !reasonCol || !costCol) {
+                e.target.value = '';
                 alert('⚠️ 找不到必要的欄位(進貨日/派車原因/費用小計)！'); return;
             }
 
-            let importedCount = 0; let clearedDates = new Set(); 
+            let importedCount = 0; let clearedDates = new Set();
+            let dayTotals = {}, skippedVendors = {}, badDateRows = 0;   // 匯入完成後給使用者核對用
 
             for (let i = headerRowIdx + 1; i < js.length; i++) {
                 let row = js[i]; if (!row[dateCol]) continue;
-                
+
                 let rWh = String(row[whCol] || '').trim();
                 let rVendor = String(row[vendorCol] || '').trim();
                 if (whCol && !rWh.includes(selectedWh)) continue;
-                
+
                 let targetVendor = ['創新', '峻富', '華碩', '御馬', '詮程'].find(v => rVendor.includes(v));
-                if (!targetVendor) continue;
+                if (!targetVendor) { if (rVendor) skippedVendors[rVendor] = (skippedVendors[rVendor] || 0) + 1; continue; }
 
                 let dateStr = window.parseExcelDateUnified(row[dateCol]);
+                if (!dateStr) badDateRows++;
                 if (dateStr) {
                     let reason = String(row[reasonCol] || '').trim(); 
                     let typeStr = typeCol ? String(row[typeCol] || '').trim() : '';
@@ -6209,15 +6445,33 @@ setInterval(() => {
                         }
                     }
                     importedCount++;
+                    dayTotals[dateStr] = (dayTotals[dateStr] || 0) + cost;
                 }
             }
-            
+
+            window.persistVendorDB(true);
             if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab();
+            let dayList = Object.keys(dayTotals).sort().map(d => `${parseInt(d.slice(5, 7))}/${parseInt(d.slice(8, 10))}：${Math.round(dayTotals[d]).toLocaleString('en-US')}`);
+            let msg = `✅ 非主線MIS匯入成功！共處理 ${importedCount} 筆數據！`;
+            if (dayList.length) {
+                let lines = []; for (let k = 0; k < dayList.length; k += 4) lines.push(dayList.slice(k, k + 4).join('　'));
+                msg += `\n\n【${selectedWh}倉】各日匯入金額（請與下方表格核對）：\n${lines.join('\n')}`;
+            }
+            let sv = Object.keys(skippedVendors);
+            if (sv.length) msg += `\n\n（未匯入：不在本倉廠商清單的配送商 ${sv.map(v => `${v} ${skippedVendors[v]} 筆`).join('、')}）`;
+            if (badDateRows) msg += `\n⚠️ 有 ${badDateRows} 筆「進貨日」無法辨識，未匯入，請檢查檔案。`;
+            if (window.__lsQuotaFull) msg += `\n\n⚠️ 提醒：這台電腦瀏覽器的本機暫存空間已滿（與數位辦公室共用），本機備份暫時寫不進去，資料已直接存到雲端，不影響使用。`;
             setTimeout(() => {
                 if (typeof window.saveData === 'function') window.saveData(true, true);
-                alert(`✅ 非主線MIS匯入成功！共處理 ${importedCount} 筆數據！`);
+                alert(msg);
             }, 500);
             e.target.value = '';
+          } catch (err) {
+            console.error('非主線MIS匯入失敗', err);
+            e.target.value = '';
+            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch (e2) {} }
+            alert(`❌ 非主線MIS匯入過程發生錯誤，資料可能只匯入一部分！\n錯誤訊息：${err && err.message ? err.message : err}\n\n請重新整理網頁後再匯入一次（重複匯入同一份檔案不會重複計算）；若仍失敗，請把這個畫面截圖給系統管理員。`);
+          }
         }; r.readAsArrayBuffer(file);
     });
 
@@ -6508,17 +6762,17 @@ setInterval(() => {
             daysCount++; let m = current.getMonth()+1, d = current.getDate();
             let dStr = current.getFullYear() + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
             
-            sum35_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T') || 0);
-            sum8_cost += Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T') || 0);
+            sum35_cost += Number(window.getVendorValDisplay(whName, vendorName, dStr, '主線_3_5T') || 0);
+            sum8_cost += Number(window.getVendorValDisplay(whName, vendorName, dStr, '主線_8T') || 0);
             
             if (m === targetMonth) {
-                let d35 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
-                let d8 = Number(window.getStorageVal(whName, vendorName, dStr, '主線_8T_車數') || 0);
+                let d35 = Number(window.getVendorValDisplay(whName, vendorName, dStr, '主線_3_5T_車數') || 0);
+                let d8 = Number(window.getVendorValDisplay(whName, vendorName, dStr, '主線_8T_車數') || 0);
                 if (d35 > max35_cars) max35_cars = d35;
                 if (d8 > max8_cars) max8_cars = d8;
             }
 
-            let misDetails = window.getStorageVal(whName, vendorName, dStr, 'MIS_DETAILS');
+            let misDetails = window.getVendorValDisplay(whName, vendorName, dStr, 'MIS_DETAILS');
             if (Array.isArray(misDetails)) {
                 misDetails.forEach(dt => {
                     let cat = dt.mainCat, p = dt.price || 0, type = dt.typeStr || '';
@@ -6538,7 +6792,7 @@ setInterval(() => {
             
             // 🌟 核心：離島費用改由「離島」假廠商本身彙總（與其他廠商一致的加總邏輯）
             if (vendorName === '全部' || vendorName === '離島') {
-                let islandCost = Number(window.getStorageVal(whName, '離島', dStr, '離島'));
+                let islandCost = Number(window.getVendorValDisplay(whName, '離島', dStr, '離島'));
                 if (islandCost > 0) {
                     if (!sec3Pool['離島_0']) sec3Pool['離島_0'] = { label: '離島', price: 0, trips: 0, cost: 0, color: '' };
                     sec3Pool['離島_0'].cost += islandCost;
