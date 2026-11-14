@@ -136,6 +136,7 @@
         }
         rec._t = Date.now();
         window.persistVendorDB();
+        if (typeof window.__markVendorDirty === 'function') window.__markVendorDirty(wh, vendor, date);   // 記下「這筆還沒上雲端」
         return true;
     };
     // 雲端與本機逐筆合併。mode='cloud'：這份雲端資料要套用（同時間戳時以雲端為準，本機沒時間戳的舊殘留以雲端為準）；
@@ -186,11 +187,290 @@
                 if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch (e) {} }
             }
             if (res.localNewer && window.userRole && !String(window.userRole).startsWith('ro') && typeof window.saveData === 'function') {
+                if (window.__vendorSync && window.__vendorSync.broken && window.__markVendorAllDirty) window.__markVendorAllDirty();
                 clearTimeout(window.__vendorRepushTimer);
                 window.__vendorRepushTimer = setTimeout(function () { window.saveData(false); }, 1500);
             }
         } catch (e) { console.error('廠商結帳資料與雲端合併失敗', e); }
     };
+
+    // ☁️ 雲端分檔＋只傳有改的格子（2026-11-15）
+    // 115 年度那份雲端主文件已用到上限（1MB）的 94.5%，而且以前每次存檔都要把整份約 1MB 重傳一次，
+    // 網路稍慢就超過 20 秒被判定「存檔失敗」，接著又整份重傳，形成每 24 秒重傳一次的迴圈。改成：
+    //   ① 廠商結帳資料搬到同一個位置的小文件（每個倉別每個月一份，例如 vendor_大肚_2026-11），主文件剩約 6 成；
+    //   ② 存檔時只把「跟雲端不一樣的格子」送上去，不再整份重傳；同事同時存不同格子也不會互相蓋掉。
+    (function () {
+        var has = Object.prototype.hasOwnProperty;
+        var isObj = function (x) { return !!x && typeof x === 'object' && !Array.isArray(x); };
+        var canon = function (x) {
+            if (x === null || typeof x !== 'object') return JSON.stringify(x);
+            if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+            return '{' + Object.keys(x).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(x[k]); }).join(',') + '}';
+        };
+        // 雲端不接受的欄位名稱（空白、__xxx__ 保留字）：這種格子本來就存不上雲端，比對與上傳時一律略過，避免卡住整次存檔
+        var validKey = function (k) { return typeof k === 'string' && k.length > 0 && !/^__.*__$/.test(k); };
+        // 深層複製：跟舊版「轉成文字再轉回來」一樣會去掉空值(undefined)、不合法的欄位名稱；但保留 NaN（避免存上雲端後跟本機比對永遠不一樣）
+        var clone = function (o) {
+            if (o === null || typeof o !== 'object') return o;
+            if (Array.isArray(o)) return o.map(function (x) { return (x === undefined || typeof x === 'function') ? null : clone(x); });
+            var out = {};
+            for (var k in o) { if (!has.call(o, k) || !validKey(k)) continue; var v = o[k]; if (v === undefined || typeof v === 'function') continue; out[k] = clone(v); }
+            return out;
+        };
+        window.__canon = canon; window.__clone = clone; window.__validKey = validKey;
+
+        // ── 主文件：找出「本機跟雲端不一樣的格子」 ──
+        var SKIP_TOP = { lastModified: 1, currentMonth: 1, customVendorDB: 1, vendorDB: 1 };
+        // 比對用：去掉不需要比對的最上層欄位（淺複製，不改到原物件）
+        window.__stripMain = function (s) { var o = {}; if (!isObj(s)) return o; for (var k in s) if (has.call(s, k) && !SKIP_TOP[k]) o[k] = s[k]; return o; };
+        // 回傳把 a 變成 b 需要的修改清單：{p:[路徑], v:新值} 或 {p:[路徑], d:1}（刪除）
+        window.__diffEntries = function (a, b) {
+            var out = [];
+            var walk = function (x, y, path) {
+                if (isObj(x) && isObj(y)) {
+                    var k;
+                    for (k in y) { if (!has.call(y, k) || !validKey(k)) continue; var yv = y[k]; if (typeof yv === 'function') continue; if (!has.call(x, k)) { if (yv !== undefined) out.push({ p: path.concat(k), v: yv }); } else walk(x[k], yv, path.concat(k)); }
+                    for (k in x) { if (has.call(x, k) && validKey(k) && (!has.call(y, k) || y[k] === undefined) && x[k] !== undefined) out.push({ p: path.concat(k), d: 1 }); }
+                    return;
+                }
+                if (x === y) return;
+                if (y === undefined) { if (x !== undefined) out.push({ p: path, d: 1 }); return; }
+                var xo = x !== null && typeof x === 'object', yo = y !== null && typeof y === 'object';
+                if (!xo && !yo) { if (typeof x === 'number' && typeof y === 'number' && x !== x && y !== y) return; out.push({ p: path, v: y }); return; }
+                if (canon(x) === canon(y)) return;
+                out.push({ p: path, v: y });
+            };
+            walk(isObj(a) ? a : {}, isObj(b) ? b : {}, []);
+            return out;
+        };
+        // 把修改清單套用到物件上（會改到 obj 本身）
+        window.__applyEntries = function (obj, entries) {
+            (entries || []).forEach(function (e) {
+                if (!e || !Array.isArray(e.p) || !e.p.length) return;
+                var o = obj;
+                for (var i = 0; i < e.p.length - 1; i++) { var k = e.p[i]; if (!isObj(o[k])) { if (e.d) return; o[k] = {}; } o = o[k]; }
+                var last = e.p[e.p.length - 1];
+                if (e.d) delete o[last]; else o[last] = clone(e.v);
+            });
+            return obj;
+        };
+        // 依 Firestore 的計算方式估算文件大小（上限 1,048,576 位元組）
+        window.__fsSize = function (v) {
+            if (v === null || v === undefined) return 1;
+            var t = typeof v;
+            if (t === 'string') { var n = 0; for (var i = 0; i < v.length; i++) { var c = v.charCodeAt(i); n += c < 0x80 ? 1 : c < 0x800 ? 2 : (c >= 0xD800 && c <= 0xDBFF) ? (i++, 4) : 3; } return n + 1; }
+            if (t === 'number') return 8;
+            if (t === 'boolean') return 1;
+            if (Array.isArray(v)) { var s = 0; for (var j = 0; j < v.length; j++) s += window.__fsSize(v[j]); return s; }
+            if (t === 'object') { var s2 = 0; for (var k in v) if (has.call(v, k)) s2 += window.__fsSize(k) + window.__fsSize(v[k]); return s2; }
+            return 8;
+        };
+        // 還沒送上雲端的修改清單，存在本機（關掉網頁或當機重開，會先補傳這些修改）
+        var JKEY = 'freightPending_' + window.ROC_YEAR;
+        window.__persistJournal = function (entries) { try { localStorage.setItem(JKEY, JSON.stringify({ v: 1, t: Date.now(), entries: entries || [] })); } catch (e) {} };
+        window.__loadJournal = function () { try { var s = localStorage.getItem(JKEY); if (!s) return null; var o = JSON.parse(s); return (o && Array.isArray(o.entries)) ? o : null; } catch (e) { return null; } };
+        // 第一次用新版時（本機還沒有修改清單）：舊版本機副本若比雲端新，只把「雲端完全沒有」的日別/備註格子補上去，
+        // 不刪資料、也不蓋掉雲端已有的值（避免把同事後來改的內容改回舊值）
+        window.__transitionEntries = function (cloudS, localS, localLm, cloudLm) {
+            if (!localLm || localLm <= (cloudLm || 0)) return [];
+            var getAt = function (o, p) { for (var i = 0; i < p.length; i++) { if (!isObj(o) || !has.call(o, p[i])) return undefined; o = o[p[i]]; } return o; };
+            return window.__diffEntries(cloudS, localS).filter(function (e) {
+                return !e.d && e.p[0] === 'warehouses' && (e.p[2] === 'daily' || e.p[2] === 'comments') && getAt(cloudS, e.p) === undefined;
+            });
+        };
+
+        // ── 廠商結帳資料：分檔同步（每個倉別每個月一份小文件） ──
+        var VS = window.__vendorSync = {
+            ready: false, mainSeen: false, legacy: null, legacyPresent: false, broken: false,
+            cloud: {}, ids: {}, dirty: new Map(), seq: 0, flushing: false
+        };
+        window.__vendorDirty = VS.dirty;
+        var SEP = '\u0001';
+        VS.key = function (wh, v, d) { return wh + SEP + v + SEP + d; };
+        VS.months = function () { var Y = window.YEAR, a = [(Y - 1) + '-12']; for (var m = 1; m <= 12; m++) a.push(Y + '-' + String(m).padStart(2, '0')); return a; };
+        VS.groupOf = function (date) { var s = String(date), ym = s.slice(0, 7); return (/^\d{4}-\d{2}-\d{2}$/.test(s) && VS.months().indexOf(ym) >= 0) ? ym : 'misc'; };
+        VS.docId = function (wh, ym) { return 'vendor_' + wh + '_' + ym; };
+        window.__markVendorDirty = function (wh, v, d) { if (!validKey(String(wh)) || !validKey(String(v)) || !validKey(String(d))) return; VS.dirty.set(VS.key(wh, v, d), ++VS.seq); };
+        window.__markVendorAllDirty = function () { var db = window.customVendorCheckoutDB || {}; for (var wh in db) if (isObj(db[wh])) for (var v in db[wh]) if (isObj(db[wh][v])) for (var d in db[wh][v]) window.__markVendorDirty(wh, v, d); };
+        var tOf = function (r) { return isObj(r) ? (Number(r._t) || 0) : 0; };
+        VS.groupFromMemory = function (wh, ym) {
+            var out = {}, db = window.customVendorCheckoutDB || {}, w = isObj(db[wh]) ? db[wh] : {};
+            for (var v in w) { if (!isObj(w[v]) || !validKey(v)) continue; for (var d in w[v]) { if (validKey(d) && isObj(w[v][d]) && VS.groupOf(d) === ym) (out[v] = out[v] || {})[d] = clone(w[v][d]); } }
+            return out;
+        };
+        VS.changed = function () {
+            window.persistVendorDB();
+            clearTimeout(VS.renderTimer);
+            VS.renderTimer = setTimeout(function () { if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch (e) {} } }, 200);
+        };
+        // 有待上傳的紀錄 → 走一般存檔流程；沒有待上傳、但主文件還留著舊副本 → 直接去移除舊副本
+        VS.kick = function () {
+            clearTimeout(VS.kickTimer);
+            VS.kickTimer = setTimeout(function () {
+                if (VS.dirty.size) { if (typeof window.saveData === 'function') window.saveData(false); }
+                else if (VS.legacyPresent && VS.ready && !VS.broken) { VS.flush().catch(function () {}); }
+            }, 800);
+        };
+        // 收到某一份分檔的雲端資料：逐筆合併（較新的留下；時間相同以雲端為準；本機較新或還沒送出的保留並補傳）
+        VS.applyGroup = function (id, exists, data) {
+            var info = VS.ids[id]; if (!info) return;
+            VS.cloud[id] = { exists: !!exists, data: (exists && isObj(data)) ? data : {} };
+            if (!exists) return;
+            var db = isObj(window.customVendorCheckoutDB) ? window.customVendorCheckoutDB : (window.customVendorCheckoutDB = {});
+            var wh = info.wh, ym = info.ym, cg = VS.cloud[id].data, changed = false;
+            var lw = isObj(db[wh]) ? db[wh] : (db[wh] = {});
+            var vendors = {}; Object.keys(lw).forEach(function (v) { vendors[v] = 1; }); Object.keys(cg).forEach(function (v) { vendors[v] = 1; });
+            Object.keys(vendors).forEach(function (v) {
+                var lv = isObj(lw[v]) ? lw[v] : null, cv = isObj(cg[v]) ? cg[v] : {};
+                var dates = {}; if (lv) Object.keys(lv).forEach(function (d) { if (VS.groupOf(d) === ym) dates[d] = 1; }); Object.keys(cv).forEach(function (d) { dates[d] = 1; });
+                Object.keys(dates).forEach(function (d) {
+                    if (VS.dirty.has(VS.key(wh, v, d))) return;            // 本機有還沒送出的修改：先保留本機的
+                    var lr = (lv && isObj(lv[d])) ? lv[d] : undefined, cr = isObj(cv[d]) ? cv[d] : undefined;
+                    var lt = tOf(lr), ct = tOf(cr);
+                    if (lr && cr) {
+                        if (lt > ct) { if (VS.ready) window.__markVendorDirty(wh, v, d); return; }
+                        if (canon(lr) !== canon(cr)) { (lw[v] = lw[v] || {})[d] = clone(cr); changed = true; }
+                    } else if (lr) {
+                        if (lt) { if (VS.ready) window.__markVendorDirty(wh, v, d); }
+                        else { delete lv[d]; changed = true; }
+                    } else if (cr) {
+                        (lw[v] = lw[v] || {})[d] = clone(cr); changed = true;
+                    }
+                });
+            });
+            if (changed) VS.changed();
+        };
+        // 主文件裡的舊副本（舊版存的 customVendorDB）：第一次搬家時以它為準；之後只吸收裡面比較新的紀錄
+        VS.mergeLegacy = function (legacy, mode) {
+            var res = window.mergeVendorDB(window.customVendorCheckoutDB, legacy, mode);
+            if (res.changed) { window.customVendorCheckoutDB = res.db; VS.changed(); }
+        };
+        VS.onLegacy = function (legacy) {
+            VS.mainSeen = true;
+            var present = isObj(legacy) && Object.keys(legacy).length > 0;
+            VS.legacyPresent = present; VS.legacy = present ? legacy : null;
+            if (VS.broken) { if (present) window.__applyCloudVendorDB(legacy, 'cloud'); return; }
+            if (present && VS.ready) { VS.mergeLegacy(legacy, 'local'); VS.reconcile(); VS.kick(); }   // 舊版網頁又把舊副本寫回主文件：吸收較新的紀錄後再移除
+            VS.maybeReady();
+        };
+        // 所有分檔（以及主文件）都讀到之後才開始同步，避免拿本機舊資料先去建立分檔
+        VS.maybeReady = function () {
+            if (VS.ready || VS.broken || !VS.mainSeen) return;
+            var exp = Object.keys(VS.ids).filter(function (id) { return !VS.ids[id].dynamic; });
+            if (!exp.length) return;
+            for (var i = 0; i < exp.length; i++) if (!VS.cloud[exp[i]]) return;
+            var anyDoc = exp.some(function (id) { return VS.cloud[id].exists; });
+            if (VS.legacyPresent) VS.mergeLegacy(VS.legacy, anyDoc ? 'local' : 'cloud');
+            VS.ready = true;
+            VS.reconcile();
+            VS.changed();
+            VS.kick();
+        };
+        // 找出本機跟分檔內容不一樣的紀錄，標記成「待上傳」
+        VS.reconcile = function () {
+            var db = window.customVendorCheckoutDB || {};
+            for (var wh in db) { if (!isObj(db[wh])) continue; for (var v in db[wh]) { if (!isObj(db[wh][v])) continue; for (var d in db[wh][v]) {
+                if (!isObj(db[wh][v][d])) continue;
+                var ym = VS.groupOf(d), id = VS.ensure(wh, ym), c = VS.cloud[id];
+                var cr = c && c.exists && isObj(c.data[v]) ? c.data[v][d] : undefined;
+                if (!cr || canon(cr) !== canon(db[wh][v][d])) window.__markVendorDirty(wh, v, d);
+            } } }
+        };
+        VS.ensure = function (wh, ym, isStatic) {
+            var id = VS.docId(wh, ym);
+            if (VS.ids[id]) return id;
+            VS.ids[id] = { wh: wh, ym: ym, dynamic: !isStatic };
+            var api = window.__fsApi;
+            if (api) api.onSnapshot(api.ref(id), function (snap) {
+                VS.applyGroup(id, snap.exists(), snap.exists() ? snap.data() : null);
+                VS.maybeReady();
+            }, function (err) {
+                console.warn('廠商結帳分檔讀取失敗：' + id, err);
+                if (err && err.code === 'permission-denied') VS.goBroken(err);
+                if (!VS.cloud[id]) VS.cloud[id] = { exists: false, data: {} };
+                VS.maybeReady();
+            });
+            return id;
+        };
+        VS.start = function () {
+            if (VS.started) return; VS.started = true;
+            var whs = ['大肚', '大溪', '岡山'];
+            Object.keys(window.customVendorCheckoutDB || {}).forEach(function (w) { if (whs.indexOf(w) < 0) whs.push(w); });
+            whs.forEach(function (wh) { VS.months().concat(['misc']).forEach(function (ym) { VS.ensure(wh, ym, true); }); });
+        };
+        // 雲端不允許建立分檔時：退回舊做法（整份放在主文件），功能不中斷
+        VS.goBroken = function (err) {
+            if (VS.broken) return;
+            VS.broken = true;
+            console.warn('雲端不允許建立廠商結帳分檔，這次改回舊做法（存在主文件）', err);
+            if (VS.legacyPresent) window.__applyCloudVendorDB(VS.legacy, 'cloud');
+            VS.dirty.clear();
+            // 本機跟主文件裡的那份不一樣時才整份寫回去（一樣就不用重傳）
+            if (!VS.legacyPresent || canon(window.customVendorCheckoutDB || {}) !== canon(VS.legacy || {})) window.__markVendorAllDirty();
+        };
+        // 把「待上傳」的廠商結帳紀錄送上雲端（只送有改的那幾筆）
+        VS.flush = async function () {
+            if (!VS.ready || VS.broken) return true;
+            if (!window.userRole || String(window.userRole).startsWith('ro')) return true;   // 只有登入、有編輯權限的帳號才寫入
+            var api = window.__fsApi; if (!api) return false;
+            if (VS.flushing) return false;
+            if (!VS.dirty.size) { await VS.afterFlush(); return true; }
+            VS.flushing = true;
+            try {
+                var byDoc = {};
+                Array.from(VS.dirty.entries()).forEach(function (kv) {
+                    var parts = kv[0].split(SEP), wh = parts[0], v = parts[1], d = parts[2], ym = VS.groupOf(d), id = VS.ensure(wh, ym);
+                    (byDoc[id] = byDoc[id] || { wh: wh, ym: ym, items: [] }).items.push({ v: v, d: d, key: kv[0], seq: kv[1] });
+                });
+                for (var id in byDoc) {
+                    var g = byDoc[id], ref = api.ref(id), created = false;
+                    for (var i = 0; i < g.items.length && !created; i += 500) {
+                        var part = g.items.slice(i, i + 500), args = [ref], sent = [];
+                        part.forEach(function (it) { var rec = window.vendorRecord(g.wh, it.v, it.d, false); var val = rec ? clone(rec) : undefined; sent.push([it.v, it.d, val]); args.push(new api.FieldPath(it.v, it.d), val !== undefined ? val : api.deleteField()); });
+                        try {
+                            await api.track(api.updateDoc.apply(null, args), '寫入廠商結帳資料');
+                            // 記住雲端現在已有的內容（不用等回音），之後比對才不會誤判成「雲端沒有」而重送
+                            var cache = (VS.cloud[id] = VS.cloud[id] || { exists: true, data: {} }); cache.exists = true;
+                            sent.forEach(function (s) { if (s[2] !== undefined) (cache.data[s[0]] = cache.data[s[0]] || {})[s[1]] = s[2]; else if (cache.data[s[0]]) delete cache.data[s[0]][s[1]]; });
+                        } catch (e) {
+                            if (!(e && e.code === 'not-found')) throw e;
+                            var whole = VS.groupFromMemory(g.wh, g.ym);   // 這個月的分檔還不存在：整份建立
+                            await api.track(api.setDoc(ref, whole), '寫入廠商結帳資料');
+                            VS.cloud[id] = { exists: true, data: clone(whole) };
+                            created = true;
+                        }
+                    }
+                    g.items.forEach(function (it) { if (VS.dirty.get(it.key) === it.seq) VS.dirty.delete(it.key); });
+                }
+            } catch (e) {
+                if (e && e.code === 'permission-denied') VS.goBroken(e);
+                throw e;
+            } finally { VS.flushing = false; }
+            if (!VS.dirty.size) await VS.afterFlush();
+            return VS.dirty.size === 0;
+        };
+        // 全部搬完、也都送上去之後，把主文件裡的舊副本移除（主文件就會從 94.5% 降到約 6 成）
+        VS.afterFlush = async function () {
+            if (!VS.legacyPresent || VS.broken || VS.deletingLegacy || !VS.ready || VS.dirty.size) return;
+            if (!window.userRole || String(window.userRole).startsWith('ro')) return;
+            if (Date.now() < (VS.legacyRetryAt || 0)) return;
+            var api = window.__fsApi; if (!api) return;
+            VS.deletingLegacy = true;
+            try {
+                await api.track(api.updateDoc(api.mainRef(), new api.FieldPath('customVendorDB'), api.deleteField()), '整理雲端主文件');
+                VS.legacyPresent = false; VS.legacy = null;
+                console.log('（廠商結帳資料已全部搬到分檔，主文件裡的舊副本已移除）');
+            } catch (e) { console.warn('移除主文件舊副本失敗，30 秒後再試', e); VS.legacyRetryAt = Date.now() + 30000; }
+            finally { VS.deletingLegacy = false; }
+        };
+        // 是否「所有修改都已確實存到雲端」（儲存按鈕、離開網頁提示都用這個判斷）
+        window.__isFullySynced = function () {
+            if (!window.__syncBase || !window.isCloudSyncEnabled) return false;
+            if ((window.__inflight || 0) > 0) return false;
+            if (VS.dirty.size) return false;
+            return window.__diffEntries(window.__syncBase, window.__stripMain(window.state)).length === 0;
+        };
+    })();
 
     // 📅 Excel 日期只有「月/日」沒有年份時（例如「12月26日」「9/26」），推算是哪一年：
     // 優先放進目前「運費結帳比對」選的區間；沒有區間時，取「不晚於今天 45 天後」的最近一個日期
@@ -975,7 +1255,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, setPersistence, browserLocalPersistence, inMemoryPersistence, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteField, FieldPath } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         window.isAppReady = false; window.lastSyncTime = Date.now(); window.currentWarehouse = '大肚';
         let idleTimer; const IDLE_TIMEOUT = 5 * 60 * 1000; 
@@ -1109,16 +1389,22 @@
         window.confirmSaveAndClose = async function() {
             window.commitActiveInput();
             if (document.activeElement && document.activeElement.tagName === 'INPUT') document.activeElement.blur();
+            // 🩹 修復：以前按儲存時，若背景剛好有一筆存檔還在傳（資料大、網路慢時很常見），這次會被直接略過，
+            //         畫面就跳「儲存尚未完全確認」，使用者以為存不進去。現在會等前一筆傳完，再確認「所有修改都已在雲端」。
+            const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+            const deadline = Date.now() + 20000;
+            showToast('☁️ 儲存中，請稍候…', 20000);
+            while (window.isSaving && Date.now() < deadline) await sleep(200);
             await window.saveData(false, true);
-            // 🩹 修復：saveData 本身在存檔一開始就會自動推進 lastModified 時間戳記（這是正常機制，
-            //         用來標記「這是最新一批要存的資料」），所以不能拿「存檔前」記下的舊時間點來比對，
-            //         那樣一定對不上，導致成功提示永遠跳不出來。正確做法是存檔完成後，
-            //         直接看「雲端確認同步的時間」是否等於「目前資料的時間」——相等就代表真的存好了。
-            if (window.lastSyncTime === window.state.lastModified) {
+            while (!(window.__isFullySynced && window.__isFullySynced()) && Date.now() < deadline) {
+                if (!window.isSaving && !window._pendingSaveArgs && !(window.__inflight > 0)) await window.saveData(false, true);
+                await sleep(300);
+            }
+            if (window.__isFullySynced && window.__isFullySynced()) {
                 window._confirmedSavedLastModified = window.state.lastModified;
                 showToast('✅ 已儲存完成，可以安心離開！（若之後又編輯資料，離開前會再次提醒）');
             } else {
-                showToast('⚠️ 儲存尚未完全確認，請稍候片刻再嘗試離開。');
+                showToast('⚠️ 儲存尚未完全確認，請稍候片刻再嘗試離開。（資料已先存在這台電腦，網路恢復後會自動補傳）', 8000);
             }
         };
 
@@ -1133,20 +1419,18 @@
         }, 300);
 
         window.addEventListener('beforeunload', (e) => {
-            if (window.userRole && !window.userRole.startsWith('ro')) { window.commitActiveInput(); localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(state)); }
-            // 🩹 新功能：若使用者剛按過「儲存」且已確認成功寫入雲端，期間資料沒有再變動過，
-            //         直接放行、不再跳出離開警告——符合「按儲存＝可以安心關檔」的直覺。
-            if (window._confirmedSavedLastModified != null && window.state && window.state.lastModified === window._confirmedSavedLastModified) {
-                return;
-            }
-            // 🩹 修復：若雲端寫入「持續卡住超過 4 秒」還沒完成，離開就有真的遺失的風險，
-            //         這時才跳出離開前的確認提示；短暫的正常寫入（通常不到 1 秒）不再跳出警告，
-            //         這樣看到警告時才代表真的要多等一下，看不到警告就代表已經寫完了。
-            if (window._pendingSinceTime && (Date.now() - window._pendingSinceTime > 4000)) {
-                e.preventDefault();
-                e.returnValue = '資料正在同步至雲端，請稍候再離開，避免最後一筆修改遺失！';
-                return e.returnValue;
-            }
+            if (!window.userRole || window.userRole.startsWith('ro')) return;
+            window.commitActiveInput();
+            try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(state)); } catch (err) {}
+            // 記下還沒送上雲端的修改清單（下次開網頁會先補傳）
+            try { if (window.__syncBase) window.__persistJournal(window.__diffEntries(window.__syncBase, window.__stripMain(state))); } catch (err) {}
+            try { if (typeof window.persistVendorDB === 'function') window.persistVendorDB(true); } catch (err) {}
+            // 🩹 改版：直接檢查「是不是所有修改都已確實存到雲端」——都存好了就不跳離開提示；
+            //         還有沒送達的（網路慢或斷線），才提醒先別離開。看不到提示＝資料都已在雲端。
+            if (window.__isFullySynced && window.__isFullySynced()) return;
+            e.preventDefault();
+            e.returnValue = '資料正在同步至雲端，請稍候再離開，避免最後一筆修改遺失！';
+            return e.returnValue;
         });
 
         // 🩹 最後一道防線：自我修復安全網
@@ -1157,9 +1441,12 @@
         setInterval(() => {
             if (window.userRole && window.userRole.startsWith('ro')) return;
             if (window.isSaving || window._pendingSaveArgs || window._debouncePending) return;
-            if (!window.state || !window.isCloudSyncEnabled) return;
-            if ((window.state.lastModified || 0) > (window.lastSyncTime || 0)) {
+            if (!window.state || !window.isCloudSyncEnabled || !window.__syncBase) return;
+            const vs = window.__vendorSync;
+            if ((window.state.lastModified || 0) > (window.lastSyncTime || 0) || (vs && vs.ready && vs.dirty.size && !vs.flushing)) {
                 window.saveData(false);
+            } else if (vs && vs.ready && vs.legacyPresent && !vs.broken && !vs.flushing && !vs.deletingLegacy && window.userRole) {
+                vs.flush().catch(() => {});   // 廠商資料都已在分檔：把主文件裡的舊副本移除（登入後才會做）
             }
         }, 3000);
         
@@ -1321,11 +1608,25 @@
             window.isInitialLoad = true;
             window.syncTimeout = setTimeout(() => { if (window.isInitialLoad) { if(ind){ ind.innerText = "☁️逾時"; ind.style.backgroundColor = "#6c757d"; ind.style.color = "white"; } window.isCloudSyncEnabled = false; window.isInitialLoad = false; window.isAppReady = true; window.checkAndTriggerStartupEvents(); } }, 5000);
 
-            onSnapshot(doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state'), (docSnap) => {
+            const mainRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
+            // 給 <head> 的廠商結帳分檔同步用的 Firestore 工具（每一筆寫入都追蹤「是否已確實送達雲端」）
+            window.__inflight = window.__inflight || 0;
+            window.__fsApi = {
+                FieldPath, deleteField, setDoc, getDoc, updateDoc, onSnapshot,
+                ref: (id) => doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', id),
+                mainRef: () => mainRef,
+                track: (p, label) => {
+                    window.__inflight = (window.__inflight || 0) + 1;
+                    const done = () => { window.__inflight = Math.max(0, (window.__inflight || 0) - 1); };
+                    p.then(done, done);
+                    return window._withTimeout(p, 20000, label);
+                }
+            };
+            onSnapshot(mainRef, (docSnap) => {
                 clearTimeout(window.syncTimeout); if(ind){ ind.innerText = "☁️已連線"; ind.style.backgroundColor = "#28a745"; ind.style.color = "white"; } window.isCloudSyncEnabled = true;
                 if (docSnap.exists()) {
                     let cloudData = docSnap.data();
-                    if (!cloudData.warehouses) cloudData = { currentMonth: cloudData.currentMonth, lastModified: cloudData.lastModified, warehouses: { '大肚': { daily: cloudData.daily || {}, budget: cloudData.budget || {}, comments: cloudData.comments || {} }, '大溪': { daily: {}, budget: {}, comments: {} }, '岡山': { daily: {}, budget: {}, comments: {} } } };
+                    if (!cloudData.warehouses) cloudData = { currentMonth: cloudData.currentMonth, lastModified: cloudData.lastModified, warehouses: { '大肚': { daily: cloudData.daily || {}, budget: cloudData.budget || {}, comments: cloudData.comments || {} }, '大溪': { daily: {}, budget: {}, comments: {} }, '岡山': { daily: {}, budget: {}, comments: {} } }, customVendorDB: cloudData.customVendorDB };
                     ['大肚', '大溪', '岡山'].forEach(wh => {
                         if(!cloudData.warehouses[wh]) cloudData.warehouses[wh] = { daily: {}, budget: {}, comments: {} };
                         if(!cloudData.warehouses[wh].budget || Object.keys(cloudData.warehouses[wh].budget).length === 0) { cloudData.warehouses[wh].budget = {}; for(let i=1; i<=12; i++) cloudData.warehouses[wh].budget[i] = {'主線':0,'加派車':0,'回收車':0,'其他':0,'違規罰款':0,'離島':0,'轉運':0,'預算件數':0}; }
@@ -1334,49 +1635,75 @@
                     cloudData.currentMonth = window.state.currentMonth;
                     // 🚀 核心解耦手術 2：強行清除從雲端抓下來的舊版毒素，保護本機記憶體不被蓋台
                     if (cloudData.vendorDB) delete cloudData.vendorDB;
-                    
-                    // 🩹 廠商結帳資料（customVendorDB）改成逐筆合併、留下較新的那筆（見 <head> 的 mergeVendorDB），
-                    //    不再整包取代：避免別台電腦用舊資料存檔時，把剛匯入的資料整批蓋回去。
-                    const applyVendor = (mode) => { if (window.__applyCloudVendorDB) window.__applyCloudVendorDB(cloudData.customVendorDB, mode); };
-                    if (window.isInitialLoad) {
-                        if (window.state.lastModified && window.state.lastModified > (cloudData.lastModified || 0)) { applyVendor('local'); window.isInitialLoad = false; window.isAppReady = true; window.saveData(false, true); renderAll(); window.checkAndTriggerStartupEvents(); }
-                        else {
-                            window.state = cloudData;
-                            applyVendor('cloud');
+                    // 廠商結帳資料已改存在分檔；主文件裡若還有舊版留下的副本，交給分檔同步去搬家/合併
+                    const legacyVendor = cloudData.customVendorDB; delete cloudData.customVendorDB;
+                    const cloudLm = cloudData.lastModified || 0;
+                    const cloudS = window.__stripMain(cloudData);
 
+                    if (!window.__syncBase) {
+                        // ── 第一次收到雲端資料 ──
+                        // 以雲端為底，再補上本機「還沒送上雲端的修改」（上次關網頁前記下的清單；
+                        // 第一次用新版時，改用舊版本機副本裡「雲端完全沒有」的日別/備註格子）。
+                        const journal = window.__journalAtLoad !== undefined ? window.__journalAtLoad : window.__loadJournal();
+                        let entries = journal ? journal.entries : window.__transitionEntries(cloudS, window.__stripMain(window.state), window.state.lastModified, cloudLm);
+                        if (window.__localCopyAtLoad) entries = entries.concat(window.__diffEntries(window.__stripMain(window.__localCopyAtLoad), window.__stripMain(window.state)));
+                        const merged = window.__applyEntries(window.__clone(cloudS), entries);
+                        merged.currentMonth = window.state.currentMonth;
+                        merged.lastModified = entries.length ? Date.now() : cloudLm;
+                        window.__syncBase = cloudS; window.__syncBaseLm = cloudLm;
+                        window.__localCopyAtLoad = null; window.__journalAtLoad = null;
+                        window.state = merged;
+                        window.lastSyncTime = cloudLm;
+                        window.__persistJournal(entries.length ? window.__diffEntries(cloudS, window.__stripMain(merged)) : []);
+                        try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
+                        window.__vendorSync.onLegacy(legacyVendor);
+                        if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth;
+                        window.isInitialLoad = false; window.isAppReady = true; renderAll(); window.checkAndTriggerStartupEvents();
+                        if (entries.length) setTimeout(() => window.saveData(false, true), 300);
+                    } else {
+                        // ── 執行中收到雲端更新（可能是自己剛存的，也可能是同事存的）──
+                        // 🩹 以前用「誰的時間比較新」決定整份採用雲端或整份保留本機，常常一邊的修改被丟掉，
+                        //    或是卡在「雲端有更新的資料，已攔截本次存檔」一直重試。現在改成：找出本機還沒送上雲端的格子，
+                        //    套在最新的雲端資料上——同事改的格子和自己改的格子都會留下來。
+                        const pending = window.__diffEntries(window.__syncBase, window.__stripMain(window.state));
+                        const merged = window.__applyEntries(window.__clone(cloudS), pending);
+                        const external = window.__diffEntries(window.__stripMain(window.state), merged);
+                        window.__syncBase = cloudS; window.__syncBaseLm = cloudLm;
+                        window.__vendorSync.onLegacy(legacyVendor);
+                        if (external.length) {
+                            // 🩹 修正：游標停在某一格時，只有「使用者真的在這格打了新字」才保留畫面上的值；
+                            //         以前只要游標停著就把畫面上的舊值寫回去，會把同事剛改好的那一格蓋回舊值。
+                            const activeEl = document.activeElement; let fInfo = null, cVal = null, typed = false;
+                            if (activeEl && activeEl.classList.contains('data-cell') && activeEl.dataset.item !== '件數達成率') { fInfo = { d: activeEl.dataset.date, i: activeEl.dataset.item }; cVal = activeEl.value; typed = activeEl.dataset.focusVal !== undefined && cVal !== activeEl.dataset.focusVal; }
+                            merged.currentMonth = window.state.currentMonth;
+                            merged.lastModified = pending.length ? window.state.lastModified : cloudLm;
+                            window.state = merged;
+                            if (!pending.length) window.lastSyncTime = cloudLm;
                             try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
-                            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; 
-                            window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = cloudData.lastModified || Date.now(); renderAll(); window.checkAndTriggerStartupEvents(); 
-                        }
-                    } else if (JSON.stringify(window.state) !== JSON.stringify(cloudData)) {
-                        // 🩹 修復：本機正在寫入雲端時，這批回聲可能還不包含最新的本機編輯（例如連續打好幾格時，
-                        //         中間有幾格因為 isSaving 忙碌被排隊卡住，還沒真正送出）。
-                        //         這時候先跳過，等我們自己的寫入完成、下一次回聲進來時再套用，避免蓋掉剛打好的資料。
-                        //         （廠商結帳資料例外：逐筆合併本來就只會留下較新的紀錄，所以照樣吸收別台電腦較新的紀錄。）
-                        if (window.isSaving) { applyVendor('local'); return; }
-                        if ((cloudData.lastModified || 0) > window.state.lastModified) {
-                            const activeEl = document.activeElement; let fInfo = null, cVal = null;
-                            if (activeEl && activeEl.classList.contains('data-cell') && activeEl.dataset.item !== '件數達成率') { fInfo = { d: activeEl.dataset.date, i: activeEl.dataset.item }; cVal = activeEl.value; }
-                            window.state = cloudData;
-                            applyVendor('cloud');
-
-                            try { localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state)); } catch(e){}
-                            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} } window.lastSyncTime = cloudData.lastModified || Date.now();
+                            if (typeof window.renderCheckoutTab === 'function') { try { window.renderCheckoutTab(); } catch(e){} }
                             // 🩹 修復：原本寫成 window.parseVal / window.getDaily()，但這兩個只存在 module 內、window 上沒有，
                             //         使用者剛好停在日別格子上時收到同事的更新就會拋錯，畫面停在舊資料不重繪。
-                            if (fInfo) { let p = parseVal(cVal); if (cVal === '' || isNaN(p)) { if (getDaily()[fInfo.d] && getDaily()[fInfo.d][fInfo.i] !== undefined) delete getDaily()[fInfo.d][fInfo.i]; } else { if (!getDaily()[fInfo.d]) getDaily()[fInfo.d] = {}; getDaily()[fInfo.d][fInfo.i] = p; } }
+                            if (fInfo && typed) { let p = parseVal(cVal); if (cVal === '' || isNaN(p)) { if (getDaily()[fInfo.d] && getDaily()[fInfo.d][fInfo.i] !== undefined) delete getDaily()[fInfo.d][fInfo.i]; } else { if (!getDaily()[fInfo.d]) getDaily()[fInfo.d] = {}; getDaily()[fInfo.d][fInfo.i] = p; } }
                             if (document.getElementById('monthSelect')) document.getElementById('monthSelect').value = window.state.currentMonth; renderAll();
-                            if (fInfo) { const target = document.querySelector(`input[data-date="${fInfo.d}"][data-item="${fInfo.i}"]`); if (target) { target.focus(); target.value = cVal; } }
-                        } else {
-                            applyVendor('local');
+                            if (fInfo) { const target = document.querySelector(`input[data-date="${fInfo.d}"][data-item="${fInfo.i}"]`); if (target) { target.focus(); if (typed) target.value = cVal; } }
                         }
+                        // 本機還有沒送上雲端的修改（例如剛好同時在打字）：排一次存檔，確保會送出
+                        if (pending.length && !window.isSaving) window.saveData(false);
                     }
-                } else if (window.isInitialLoad) { 
-                    // 🚀 核心解耦手術 1：絕對禁止把 vendorDB 放入 state 塞上雲端
-                    delete window.state.vendorDB; 
-                    setDoc(doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state'), window.state).catch(e => console.error("強制同步失敗", e)); window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = window.state.lastModified; window.checkAndTriggerStartupEvents(); 
+                } else if (!window.__syncBase) {
+                    // 這一年度的雲端文件還不存在（例如 1/1 換年後第一次開）：用本機資料建立
+                    delete window.state.vendorDB;
+                    const init = window.__clone(window.__stripMain(window.state));
+                    window.__syncBase = window.__clone(init); window.__syncBaseLm = window.state.lastModified || 0;
+                    init.lastModified = window.state.lastModified || Date.now();
+                    setDoc(mainRef, init).catch(e => console.error("強制同步失敗", e));
+                    window.__localCopyAtLoad = null; window.__journalAtLoad = null;
+                    window.__vendorSync.onLegacy(null);
+                    window.isInitialLoad = false; window.isAppReady = true; window.lastSyncTime = window.state.lastModified; window.checkAndTriggerStartupEvents();
                 }
             }, (error) => { clearTimeout(window.syncTimeout); if(ind){ ind.innerText = "☁️ 本機模式 (受阻)"; ind.style.backgroundColor = "#dc3545"; ind.style.color = "white"; } window.isCloudSyncEnabled = false; if (window.isInitialLoad) { window.isInitialLoad = false; window.isAppReady = true; window.checkAndTriggerStartupEvents(); } });
+            // 廠商結帳分檔：每個倉別每個月一份，一起監聽
+            window.__vendorSync.start();
         };
 
         // 📅 跨年度唯讀參照：1 月份結帳區間從前一年 12/26 開始、1/1 的日報要看 12/31，
@@ -1388,9 +1715,22 @@
             if (window.__prevYearState) return Promise.resolve(false);
             if (prevYearPromise) return prevYearPromise;
             if (!window.dbFirebase || !window.isCloudSyncEnabled) return Promise.resolve(false);
-            const ref = doc(window.dbFirebase, 'artifacts', 'dadu-global-world-' + (ROC_YEAR - 1), 'public', 'data', 'freight_app', 'main_state');
+            const prevAppId = 'dadu-global-world-' + (ROC_YEAR - 1);
+            const ref = doc(window.dbFirebase, 'artifacts', prevAppId, 'public', 'data', 'freight_app', 'main_state');
             prevYearPromise = window._withTimeout(getDoc(ref), 15000, '讀取上一年度資料')
-                .then(snap => { window.__prevYearState = snap.exists() ? (snap.data() || {}) : {}; return true; })
+                .then(async snap => {
+                    const st = snap.exists() ? (snap.data() || {}) : {};
+                    // 上一年度的廠商結帳資料：已搬到分檔的讀 12 月那幾份；還沒搬的沿用主文件裡的舊副本
+                    const pdb = (st.customVendorDB && typeof st.customVendorDB === 'object') ? st.customVendorDB : {};
+                    await Promise.all(['大肚', '大溪', '岡山'].map(async wh => {
+                        try {
+                            const s2 = await window._withTimeout(getDoc(doc(window.dbFirebase, 'artifacts', prevAppId, 'public', 'data', 'freight_app', 'vendor_' + wh + '_' + (YEAR - 1) + '-12')), 15000, '讀取上一年度廠商資料');
+                            if (s2.exists()) { const g = s2.data() || {}; pdb[wh] = pdb[wh] || {}; for (const v in g) pdb[wh][v] = Object.assign({}, pdb[wh][v] || {}, g[v]); }
+                        } catch (e) { console.warn('上一年度廠商分檔讀取失敗（不影響本年度資料）', wh, e); }
+                    }));
+                    st.customVendorDB = pdb;
+                    window.__prevYearState = st; return true;
+                })
                 .catch(e => { console.warn('上一年度資料讀取失敗（不影響本年度資料）', e); prevYearPromise = null; return false; });
             return prevYearPromise;
         };
@@ -1411,8 +1751,11 @@
             //         🩹 修復：以前「慢但最終成功」的情況，因為主線程已經先判定逾時失敗，
             //         程式完全不知道它後來其實成功了，導致一直誤判成沒同步。現在補上 onLateSuccess，
             //         讓這種「慢一點但真的成功了」的情況也能正確記錄同步狀態。
+            // 🩹 修正：以前不管有沒有逾時，每一筆成功都會印「其實在逾時之後才成功」，診斷訊息會誤導；現在只有真的逾時才印。
+            let timedOut = false;
             p.then(
                 (result) => {
+                    if (!timedOut) return;
                     console.log(`（🔍診斷：「${label}」背後的真實請求，其實在逾時之後才成功回來了）`);
                     if (typeof onLateSuccess === 'function') { try { onLateSuccess(result); } catch(e) {} }
                 },
@@ -1420,14 +1763,15 @@
             ).catch(() => {});
             return Promise.race([
                 p,
-                new Promise((_, reject) => setTimeout(() => reject(new Error((label || '雲端連線') + '逾時，請檢查網路')), ms))
+                new Promise((_, reject) => setTimeout(() => { timedOut = true; reject(new Error((label || '雲端連線') + '逾時，請檢查網路')); }, ms))
             ]);
         };
         window.saveData = async function(showMsg = false, forceOverwrite = false) {
             if (window.isSaving) {
                 // 🩹 修復：以前這裡直接 return 會讓這筆存檔「憑空消失」，除非使用者剛好再打一次字才會被補救。
                 //         現在改成記住「還有一筆沒送出」，目前這筆寫完後會自動用最新資料補送一次。
-                window._pendingSaveArgs = { showMsg, forceOverwrite };
+                const prev = window._pendingSaveArgs || {};
+                window._pendingSaveArgs = { showMsg: showMsg || !!prev.showMsg, forceOverwrite: forceOverwrite || !!prev.forceOverwrite };
                 return;
             }
             // 🩹 修復：斷路器保護。以前只要持續失敗，安全網、防抖、衝突重試三條路徑會疊在一起，
@@ -1440,7 +1784,7 @@
                     window._circuitBreakerUntil = now + 30000;
                     console.log('（雲端連線持續失敗，暫停自動重試 30 秒，避免無限狂跳）');
                 }
-                if (now < window._circuitBreakerUntil && !showMsg) {
+                if (now < window._circuitBreakerUntil && !showMsg && !forceOverwrite) {
                     // 冷卻期間：不主動重試，但也不佔用 _pendingSaveArgs，讓安全網 30 秒後能自然重新嘗試
                     return;
                 }
@@ -1449,43 +1793,27 @@
             let shouldRetryConflict = false;
             try {
                 window.state.lastModified = Date.now();
-
-                // 🌟 防護點 4：保證每次按下儲存，廠商結帳資料一定跟著上雲端，不怕遺失！
-
+                const writeLm = window.state.lastModified;
 
                 localStorage.setItem(`freightData_${window.ROC_YEAR}`, JSON.stringify(window.state));
                 let ind = document.getElementById("cloud-indicator"); if (ind && ind.innerText.includes("雲端已連線")) { let originalText = ind.innerText; ind.innerText = "☁️寫入中"; setTimeout(() => ind.innerText = originalText, 800); }
-                if (window.isCloudSyncEnabled) {
+                if (window.isCloudSyncEnabled && !window.__syncBase) {
+                    // 雲端資料還沒讀進來（剛開網頁的頭幾秒）：先記在本機，讀進來後會自動補傳
+                    if (window.__localCopyAtLoad) { const prevEntries = (window.__journalAtLoad && window.__journalAtLoad.entries) || []; window.__persistJournal(prevEntries.concat(window.__diffEntries(window.__stripMain(window.__localCopyAtLoad), window.__stripMain(window.state)))); }
+                } else if (window.isCloudSyncEnabled) {
                     try {
-                        const docRef = doc(window.dbFirebase, 'artifacts', window.appId, 'public', 'data', 'freight_app', 'main_state');
-                        if (!forceOverwrite) {
-                            const snap = await window._withTimeout(getDoc(docRef), 15000, '讀取雲端資料');
-                            if (snap.exists()) {
-                                let cloudData = snap.data();
-                                if (cloudData.lastModified > window.lastSyncTime) {
-                                    // 🩹 修復：這個警告以前每次重試都會跳出來，背景安全網每 3 秒巡邏一次，
-                                    //         導致同一個警告反覆彈出、干擾操作。這裡改成最多 20 秒跳一次，
-                                    //         背後的排隊重試邏輯完全不受影響、一樣會持續自動重試。
-                                    let now = Date.now();
-                                    if (!window._lastConflictToastTime || now - window._lastConflictToastTime > 20000) {
-                                        window._lastConflictToastTime = now;
-                                        showToast('⚠️ 警告：雲端有更新的資料！為防止覆蓋同事輸入的數據，已攔截本次存檔，資料同步後會自動重試。', 8000);
-                                    } else {
-                                        console.log('（雲端衝突重試中，已抑制重複警告視窗）');
-                                    }
-                                    // 🩹 修復：以前這裡攔截後就直接放棄，這筆編輯永遠不會再上雲端。
-                                    //         現在改成排隊，等本機收到最新的雲端回聲、資料對齊後自動重試存檔。
-                                    shouldRetryConflict = true;
-                                    return;
-                                }
-                            }
-                        }
-                        let cleanState = JSON.parse(JSON.stringify(window.state));
+                        // 🩹 改版：以前每次存檔都先下載整份雲端資料比對、再把整份約 1MB 重新上傳；網路稍慢就超過 20 秒
+                        //    被判定失敗，接著又整份重傳，變成每 24 秒重傳一次的迴圈，畫面一直顯示「雲端寫入失敗或逾時」。
+                        //    現在只把「跟雲端不一樣的格子」送上去（通常只有幾十個位元組），同事同時存的其他格子也不會被蓋掉。
+                        const cur = window.__stripMain(window.state);
+                        const entries = window.__diffEntries(window.__syncBase, cur);
+                        window.__persistJournal(entries);
+                        const VSY = window.__vendorSync;
 
                         // 🛡️ 防護：Firestore 單一文件硬上限 1 MiB，超過會「永久失敗」而非「暫時性逾時」，
                         //         重試無效，必須清資料才能解決。事先量測大小，超過就直接明確告知，
                         //         不要讓使用者誤以為是網路問題而白白等待自動重試。
-                        let stateSize = new Blob([JSON.stringify(cleanState)]).size;
+                        let stateSize = window.__fsSize(cur) + 200 + (VSY.broken ? window.__fsSize(window.customVendorCheckoutDB || {}) : 0);
                         const FIRESTORE_LIMIT = 1048576;
                         if (stateSize >= FIRESTORE_LIMIT) {
                             window._consecutiveFailCount = 0; // 這不是網路問題，不該觸發斷路器
@@ -1496,13 +1824,37 @@
                             showToast(`⚠️ 目前資料量 ${(stateSize/1024).toFixed(0)}KB，已接近雲端單筆文件上限(1024KB)，建議適時清除不需要的日別明細，避免日後寫入失敗。`, 10000);
                         }
 
-                        let writeStartTime = window.state.lastModified;
-                        await window._withTimeout(setDoc(docRef, cleanState), 20000, '寫入雲端資料', () => {
-                            // 🩹 修復：這筆寫入「慢但最終成功」，補記錄同步狀態，避免程式一直誤判成沒同步過。
-                            if ((window.lastSyncTime || 0) < writeStartTime) window.lastSyncTime = writeStartTime;
-                            window._consecutiveFailCount = 0;
-                        });
-                        window.lastSyncTime = window.state.lastModified; window._consecutiveFailCount = 0; if (showMsg) showToast('☁️ 資料已成功同步至雲端！');
+                        const api = window.__fsApi, mainRef = api.mainRef();
+                        // 萬一雲端不接受「只改部分欄位」（極少見），退回舊做法：整份寫入（以雲端最新內容為底）
+                        const writeWhole = async () => {
+                            const full = window.__clone(cur);
+                            full.lastModified = writeLm;
+                            if (VSY.broken || VSY.legacyPresent) full.customVendorDB = window.__clone(window.customVendorCheckoutDB || {});
+                            await api.track(setDoc(mainRef, full), '寫入雲端資料');
+                        };
+                        for (let i = 0; i < entries.length; i += 500) {
+                            const args = [mainRef];
+                            entries.slice(i, i + 500).forEach(e => { args.push(new FieldPath(...e.p), e.d ? deleteField() : window.__clone(e.v)); });
+                            args.push(new FieldPath('lastModified'), writeLm);
+                            try { await api.track(updateDoc(...args), '寫入雲端資料'); }
+                            catch (e) {
+                                if (e && (e.code === 'not-found' || e.code === 'invalid-argument')) { console.warn('改用整份寫入：', e.code, e.message); await writeWhole(); break; }
+                                throw e;
+                            }
+                        }
+                        // 已送達雲端：本機的「待補傳清單」只留下存檔期間又新改的格子（避免當機重開時把已存過的舊值再送一次）
+                        if (entries.length) window.__persistJournal(window.state.lastModified === writeLm ? [] : window.__diffEntries(window.__applyEntries(window.__clone(window.__syncBase), entries), window.__stripMain(window.state)));
+                        // 廠商結帳資料：只送有改的那幾筆到分檔（雲端不允許分檔時，退回整份放在主文件的舊做法）
+                        if (VSY.broken) {
+                            if (VSY.dirty.size) {
+                                const sent = Array.from(VSY.dirty.entries());
+                                await api.track(updateDoc(mainRef, new FieldPath('customVendorDB'), window.__clone(window.customVendorCheckoutDB || {}), new FieldPath('lastModified'), writeLm), '寫入雲端資料');
+                                sent.forEach(([k, s]) => { if (VSY.dirty.get(k) === s) VSY.dirty.delete(k); });
+                            }
+                        } else {
+                            await VSY.flush();
+                        }
+                        window.lastSyncTime = writeLm; window._consecutiveFailCount = 0; if (showMsg) showToast('☁️ 資料已成功同步至雲端！');
                     } catch(e) {
                         console.error("Firestore Error:", e);
                         // 🛡️ 防護：文件過大或欄位格式不合法這類「無論重試多少次都不會成功」的錯誤，
@@ -1562,6 +1914,9 @@
                 if(!state.warehouses[wh].budget || Object.keys(state.warehouses[wh].budget).length === 0) { state.warehouses[wh].budget = {}; for(let i=1; i<=12; i++) state.warehouses[wh].budget[i] = {'主線':0,'加派車':0,'回收車':0,'其他':0,'違規罰款':0,'離島':0,'轉運':0,'預算件數':0}; }
                 if(!state.warehouses[wh].daily) state.warehouses[wh].daily = {}; if(!state.warehouses[wh].comments) state.warehouses[wh].comments = {};
             });
+            // 記下開網頁當下的本機資料與「上次還沒送上雲端的修改清單」，雲端讀進來後用來補傳（見 onSnapshot 第一次收到資料）
+            window.__journalAtLoad = window.__loadJournal();
+            try { window.__localCopyAtLoad = window.__clone(state); } catch (e) { window.__localCopyAtLoad = null; }
             let actualToday = new Date(); if (actualToday.getFullYear() === YEAR) state.currentMonth = actualToday.getMonth() + 1;
             let sel = document.getElementById('monthSelect'); for(let i=1; i<=12; i++) sel.innerHTML += `<option value="${i}" ${i===state.currentMonth?'selected':''}>${i}月</option>`;
             sel.addEventListener('change', e => { state.currentMonth = parseInt(e.target.value); let m = state.currentMonth, y = YEAR, prevM = m === 1 ? 12 : m - 1, prevY = m === 1 ? y - 1 : y; let startInput = document.getElementById('checkoutStartDate'), endInput = document.getElementById('checkoutEndDate'); if (startInput && endInput) { startInput.value = `${prevY}-${String(prevM).padStart(2,'0')}-26`; endInput.value = `${y}-${String(m).padStart(2,'0')}-25`; } renderAll(); setTimeout(window.scrollToToday, 100); });
@@ -1572,6 +1927,8 @@
             
             document.getElementById('dailyTable').addEventListener('change', handleInput);
             document.getElementById('dailyTable').addEventListener('focusin', e => { if (window.userRole === 'ro_all') return; if(e.target.classList.contains('data-cell') && e.target.dataset.item !== '件數達成率') { let v = getDaily()[e.target.dataset.date]?.[e.target.dataset.item]; e.target.value = (v !== undefined && v !== null) ? v : ''; } });
+            // 記下游標進入格子時的值（同事的更新進來時，用來判斷使用者是否真的在這格打了新字）
+            document.addEventListener('focusin', e => { const t = e.target; if (t && t.classList && t.classList.contains('data-cell')) t.dataset.focusVal = t.value; });
             document.getElementById('dailyTable').addEventListener('focusout', e => { if (window.userRole === 'ro_all') return; if(e.target.classList.contains('data-cell') && e.target.value.trim()!=='' && e.target.dataset.item !== '件數達成率') { let p = parseVal(e.target.value); if(!isNaN(p)) e.target.value = formatVal(p, e.target.dataset.type); } });
             document.getElementById('dailyTable').addEventListener('contextmenu', e => {
                 if (window.userRole === 'ro_all') return;
@@ -5466,7 +5823,7 @@ window.handleMainlineExcelImport = function(e) {
         }
         
         // （這一版的主線匯入已被下方 makeInvincible 的新版取代，保留僅供相容；寫入改走共用工具）
-        window.customVendorCheckoutDB = db; window.persistVendorDB(true);
+        window.customVendorCheckoutDB = db; window.persistVendorDB(true); if (window.__markVendorAllDirty) window.__markVendorAllDirty();
         if (typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab(); else if (typeof window.runRefresh === 'function') window.runRefresh();
         if (typeof window.saveData === 'function') window.saveData(true, true);
         
@@ -5561,7 +5918,7 @@ window.handleVendorCheckoutExcelImportNew = function(e) {
         }
         
         // （這一版的 MIS 匯入已被下方 makeInvincible 的新版取代，保留僅供相容；寫入改走共用工具）
-        window.customVendorCheckoutDB = db; window.persistVendorDB(true);
+        window.customVendorCheckoutDB = db; window.persistVendorDB(true); if (window.__markVendorAllDirty) window.__markVendorAllDirty();
         if(typeof window.renderCheckoutTab === 'function') window.renderCheckoutTab(); else if(typeof window.runRefresh === 'function') window.runRefresh();
         if (typeof window.saveData === 'function') window.saveData(true, true);
         
@@ -5734,12 +6091,10 @@ setInterval(() => {
             let origSave = window.saveData;
             
             window.saveData = function(...args) {
-                // 將我們專屬的下方廠商 DB 塞進 Vue 的大腦
-                ['appData', 'state', 'mainState', 'vueData'].forEach(varName => {
-                    if (window[varName]) { window[varName].customVendorDB = window.customVendorCheckoutDB; }
-                });
-                // 舊版殘留在本機 state 裡的重複副本（vendorDB），不要再跟著帶上雲端，避免雲端文件無謂變大
-                if (window.state) delete window.state.vendorDB;
+                // 🩹 改版：廠商結帳資料已改存在雲端分檔（vendor_倉別_年-月），不再塞進主文件一起上傳
+                //    （以前每次存檔都把它整包放進主文件，是主文件逼近 1MB 上限的主因）。
+                // 舊版殘留在本機 state 裡的重複副本（vendorDB / customVendorDB），不要再跟著帶上雲端
+                if (window.state) { delete window.state.vendorDB; delete window.state.customVendorDB; }
 
                 // 零延遲瞬間放行，交給原廠送資料
                 return origSave.apply(this, args);
@@ -5958,7 +6313,7 @@ setInterval(() => {
                                     let v = record[k];
                                     if(v !== '' && v !== 0 && v !== '0' && v !== null && v !== undefined && !(typeof v === 'number' && isNaN(v))) { isG = false; break; }
                                 }
-                                if(isG) delete db[wh][vendor][date];
+                                if(isG) { delete db[wh][vendor][date]; if (window.__markVendorDirty) window.__markVendorDirty(wh, vendor, date); }   // 雲端分檔也一起刪掉
                             }
                         }
                     }
