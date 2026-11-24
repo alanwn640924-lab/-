@@ -550,6 +550,14 @@
         .tab-content.active { display: block; }
         
         .table-container { max-width: 100%; overflow: auto; max-height: 70vh; border: 1px solid var(--border-color); }
+        /* 🆕 浮動左右捲軸：表格底部的左右捲軸跑到畫面外時，視窗最下方會出現一條跟表格同步的捲軸，隨時都能左右拉 */
+        #floatHScroll { position: fixed; bottom: 0; height: 18px; overflow-x: scroll; overflow-y: hidden; z-index: 2900; display: none; box-sizing: border-box; background: #eef1f4; border-top: 1px solid #c3ccd5; box-shadow: 0 -2px 6px rgba(0,0,0,0.12); scrollbar-width: auto; scrollbar-color: #8f9ba8 #eef1f4; }
+        #floatHScroll > div { height: 1px; }
+        #floatHScroll::-webkit-scrollbar { height: 16px; }
+        #floatHScroll::-webkit-scrollbar-track { background: #eef1f4; }
+        #floatHScroll::-webkit-scrollbar-thumb { background: #8f9ba8; border-radius: 8px; border: 3px solid #eef1f4; }
+        #floatHScroll::-webkit-scrollbar-thumb:hover { background: #5f6b78; }
+        @media print { #floatHScroll { display: none !important; } }
         table { border-collapse: collapse; width: 100%; white-space: nowrap; }
         th, td { border: 1px solid var(--border-color); padding: 6px 10px; text-align: right; background-color: white; user-select: auto; }
         th.sticky-top { position: sticky; top: 0; background-color: var(--header-bg); z-index: 10; text-align: center; }
@@ -1361,13 +1369,22 @@
             set('bpOtherBaseOptB', `B版：${ROC_YEAR}年8月實績推估`);
         })();
         const GROUPS = [
-            { id: "g0", name: "【件數統計】", type: "count", items: ["預算件數", "出貨件數", "件數達成率", "裝載率", "回收件數"] },
-            { id: "g1", name: "【夜配】趟次與數量", type: "count", items: ["主線條數", "爆量趟次", "爆量自揹", "回收趟次", "回頭收趟次", "其他專車", "特殊點專車", "新開店", "離島", "轉運"] },
-            { id: "g2", name: "【夜配】費用金額", type: "cost", items: ["主線費用", "爆量費用", "爆量自揹費用", "回收費用", "回頭收費用", "其他專車費用", "特殊點專車費用", "新開店費用", "違規罰款", "離島費用", "轉運費用"] },
+            { id: "g0", name: "【件數統計】", type: "count", items: ["預算件數", "出貨件數", "件數達成率", "裝載率", "回收件數", "【社區取-送】", "【社區取-收】"] },
+            { id: "g1", name: "【夜配】趟次與數量", type: "count", items: ["主線條數", "爆量趟次", "爆量自揹", "回收趟次", "回頭收趟次", "其他專車", "特殊點專車", "新開店", "【社區取-點位】", "【社區取-專車】", "(醫)-正光", "(醫)-佑銓", "(醫)-大樹", "離島", "轉運"] },
+            { id: "g2", name: "【夜配】費用金額", type: "cost", items: ["主線費用", "爆量費用", "爆量自揹費用", "回收費用", "回頭收費用", "其他專車費用", "特殊點專車費用", "新開店費用", "違規罰款", "【社區取-點位】費用", "【社區取-專車】費用", "(醫)-正光費用", "(醫)-佑銓費用", "(醫)-大樹費用", "離島費用", "轉運費用"] },
             { id: "g3", name: "【上收/商流】趟次與費用", type: "mixed", items: ["上收申請案件數", "B2C件數", "C2C件數", "B2C專車趟次", "B2C回頭趟次", "C2C專車趟次", "C2C回頭趟次", "B2C專車費用", "B2C回頭費用", "C2C專車費用", "C2C回頭費用"] },
             { id: "g4", name: "【營運指標】", type: "rate", items: ["特殊專車準點率", "特殊專車簽到率", "全台共配準點率", "全台共配簽到率", "夜配準點率", "夜配簽到率"] } 
         ];
-        const BUDGET_MAPPING = { '主線': ['主線費用'], '加派車': ['爆量費用', '爆量自揹費用'], '回收車': ['回收費用', '回頭收費用'], '其他': ['其他專車費用', '特殊點專車費用', '新開店費用'], '違規罰款': ['違規罰款'], '離島': ['離島費用'], '轉運': ['轉運費用'] };
+        // 🆕 新業務（116 年正式上線、115 年已開始）：社區取、醫藥配送。
+        //    日別登錄表逐項分開登錄（排在「離島」上方）。週別／月別／預估實績表各自一列「其他-社區取」「其他-醫藥」，
+        //    原「其他」維持其他專車＋特殊點專車＋新開店。每一列都算進費用合計、不重複加總，
+        //    所以 其他大類 ＝ 其他＋違規罰款＋其他-社區取＋其他-醫藥，拆開或合併看數字都對得起來。
+        const NEWBIZ_COUNT_ITEMS = ['【社區取-送】', '【社區取-收】'];
+        const NEWBIZ_TRIP_ITEMS = ['【社區取-點位】', '【社區取-專車】', '(醫)-正光', '(醫)-佑銓', '(醫)-大樹'];
+        const NEWBIZ_COST_ITEMS = NEWBIZ_TRIP_ITEMS.map(i => i + '費用');
+        const NEWBIZ_CATS = { '其他-社區取': ['【社區取-點位】費用', '【社區取-專車】費用'], '其他-醫藥': ['(醫)-正光費用', '(醫)-佑銓費用', '(醫)-大樹費用'] };
+        const BUDGET_MAPPING = { '主線': ['主線費用'], '加派車': ['爆量費用', '爆量自揹費用'], '回收車': ['回收費用', '回頭收費用'], '其他': ['其他專車費用', '特殊點專車費用', '新開店費用'], '違規罰款': ['違規罰款'], ...NEWBIZ_CATS, '離島': ['離島費用'], '轉運': ['轉運費用'] };
+        const OTHER_BIG_CATS = ['其他', ...Object.keys(NEWBIZ_CATS)];   // 預算編列頁仍用原本 7 大科目時，「其他」大類＝這三列加總
         
         let state = { currentMonth: new Date().getMonth() + 1, lastModified: 0, warehouses: { '大肚': { daily: {}, budget: {}, comments: {} }, '大溪': { daily: {}, budget: {}, comments: {} }, '岡山': { daily: {}, budget: {}, comments: {} } } };
         Object.defineProperty(window, 'state', { get: () => state, set: (v) => state = v }); // 🚀 鎖死全域記憶體，徹底消滅 undefined Bug
@@ -2137,7 +2154,7 @@
         };
         function formatVal(v, type) { let n = Number(v); return isNaN(n) || v==null || v==='' ? '' : (type === 'rate' ? n.toFixed(1)+'%' : (type === 'unit-cost' ? n.toLocaleString('en-US', {minimumFractionDigits:1, maximumFractionDigits:1}) : n.toLocaleString('en-US', {maximumFractionDigits:0}))); }
         function parseVal(v) { return Number(String(v||'').replace(/[,%]/g, '')); }
-        function getItemType(item) { return GROUPS.find(g=>g.type==='rate').items.includes(item) || item.includes('達成率') || item.includes('裝載率') ? 'rate' : (item.includes('趟次')||item.includes('條數')||item.includes('件數')||(item.includes('新開店')&&!item.includes('費用')) ? 'count' : 'cost'); }
+        function getItemType(item) { if (NEWBIZ_COUNT_ITEMS.includes(item) || NEWBIZ_TRIP_ITEMS.includes(item)) return 'count'; return GROUPS.find(g=>g.type==='rate').items.includes(item) || item.includes('達成率') || item.includes('裝載率') ? 'rate' : (item.includes('趟次')||item.includes('條數')||item.includes('件數')||(item.includes('新開店')&&!item.includes('費用')) ? 'count' : 'cost'); }
         function getDays(m) { let d=[], dt=new Date(YEAR, m-1, 1); while(dt.getMonth()===m-1) { d.push({ dateStr:`${YEAR}-${String(m).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`, label:`${m}/${dt.getDate()}(${DOW_LABELS[dt.getDay()]})`, dow:dt.getDay()}); dt.setDate(dt.getDate()+1); } return d; }
         function getWeeks(days) { let w=[], cur=[], idx=1; days.forEach(d => { cur.push(d.dateStr); if(d.dow===5 || d.dateStr===days[days.length-1].dateStr) { let sd=cur[0].substring(5).split('-').map(Number).join('/'); let ed=cur[cur.length-1].substring(5).split('-').map(Number).join('/'); w.push({name:`第${idx++}週`, dateRange:`${sd}~${ed}`, days:[...cur]}); cur=[]; }}); return w; }
 
@@ -2184,7 +2201,8 @@
             tableIds.forEach(id => { let t = document.getElementById(id); if(t) { t.style.tableLayout = 'fixed'; t.style.width = tableWidth; t.style.minWidth = minTableWidth; let oldCg = t.querySelector('colgroup'); if(oldCg) oldCg.remove(); t.insertAdjacentHTML('afterbegin', cg); } });
         }
 
-        function getExcludedChartKeys() {
+        function getExcludedChartKeys() { return getExcludedChartKeysBase().concat(Object.keys(NEWBIZ_CATS)); }   // 🆕 其他-社區取／其他-醫藥不另外畫動支率圖
+        function getExcludedChartKeysBase() {
             if (['rw_all', 'ro_all', 'rw_daxi'].includes(window.userRole)) return ['違規罰款', '件數統計', '裝載率', '總計']; 
             if (window.userRole === 'rw_gangshan') return ['違規罰款', '其他', '轉運', '件數統計', '裝載率', '總計'];
             return ['違規罰款', '其他', '離島', '轉運', '件數統計', '裝載率', '總計'];
@@ -2256,6 +2274,13 @@
                 });
                 cbCumRow += `<td class="total-col" style="background:#fff3cd;">${formatVal(mItemBud,'count')}</td><td class="total-col" style="background:#fff3cd;">${formatVal(mItemAct,'count')}</td><td class="total-col ${mItemAct-mItemBud<0?'text-red':'text-green'}" style="background:#fff3cd;">${formatVal(mItemAct-mItemBud,'count')}</td><td class="total-col" style="background:#fff3cd; font-weight:bold;">${mItemBud?(mItemAct/mItemBud*100).toFixed(1)+'%':'0.0%'}</td></tr>`;
                 cb += cbCumRow;
+
+                // 🆕 社區取（送／收）件數：只列實際件數，沒有預算
+                NEWBIZ_COUNT_ITEMS.forEach(item => {
+                    let row = `<tr><td class="sticky-left" style="background:#eef7ec;">${item}</td>`, mSum = 0;
+                    weeks.forEach(w => { let a = 0; w.days.forEach(d => { a += Number(daily[d]?.[item] || 0); }); mSum += a; row += `<td style="color:#aaa;">—</td><td>${formatVal(a,'count')}</td><td style="color:#aaa;">—</td><td style="color:#aaa;">—</td>`; });
+                    cb += row + `<td class="total-col" style="color:#aaa;">—</td><td class="total-col">${formatVal(mSum,'count')}</td><td class="total-col" style="color:#aaa;">—</td><td class="total-col" style="color:#aaa;">—</td></tr>`;
+                });
                 
                 let lBody = `<tr><td class="sticky-left" style="background:#e8f0fe;">裝載率</td>`, lSum=0, lValid=0;
                 weeks.forEach(w => { let s=0, v=0; w.days.forEach(d => { let val = daily[d]?.['裝載率']; if(val != null && val !== '') { s+=Number(val); v++; lSum+=Number(val); lValid++; } }); let avg = v ? s/v : 0; chartData['裝載率'].r.push(parseFloat(avg.toFixed(1))); lBody += `<td colspan="4" style="background:#f8f9fa; font-weight:bold; color:#0056b3; text-align:center;">${v ? formatVal(avg, 'rate') : ''}</td>`; });
@@ -2498,6 +2523,12 @@
                     cItemB+=mb; cItemA+=ma; yItemAct[m_i-1]=ma; yItemBud[m_i-1]=mb; 
                 }
                 cb += rItemB+`<td class="total-col">${formatVal(cItemB,'count')}</td></tr>` + rItemA+`<td class="total-col">${formatVal(cItemA,'count')}</td></tr>` + rItemD+`<td class="total-col ${cItemA-cItemB<0?'text-red':'text-green'}">${formatVal(cItemA-cItemB,'count')}</td></tr>` + rItemR+`<td class="total-col">${cItemB?(cItemA/cItemB*100).toFixed(1)+'%':'0.0%'}</td></tr>`;
+                // 🆕 社區取（送／收）件數：只列實際件數，沒有預算
+                NEWBIZ_COUNT_ITEMS.forEach(item => {
+                    let row = `<tr><td class="sticky-left" style="background:#eef7ec;">${item}</td><td class="sticky-left" style="left:${fW}; z-index:6; color:#555; background:#eef7ec;">實際件數</td>`, ySum = 0;
+                    for (let m_i = 1; m_i <= 12; m_i++) { let s = 0; getDays(m_i).forEach(d => { s += Number(daily[d.dateStr]?.[item] || 0); }); ySum += s; row += `<td>${formatVal(s,'count')}</td>`; }
+                    cb += row + `<td class="total-col">${formatVal(ySum,'count')}</td></tr>`;
+                });
                 
                 let mlBody = `<tr><td class="sticky-left" style="background:#e8f0fe;">裝載率</td><td class="sticky-left" style="left:${fW}; z-index:6; color:#555; background:#e8f0fe;">月平均 (%)</td>`, mlSum=0, mlValid=0;
                 for(let m_i=1; m_i<=12; m_i++) { let s=0, v=0; getDays(m_i).forEach(d => { let val = daily[d.dateStr]?.['裝載率']; if(val != null && val !== '') { s+=Number(val); v++; mlSum+=Number(val); mlValid++; } }); mlBody += `<td style="background:#f8f9fa; font-weight:bold; color:#0056b3;">${v ? formatVal(s/v, 'rate') : ''}</td>`; }
@@ -2625,13 +2656,13 @@
         function renderTab6() {
             if (typeof window.refreshAIForecastPanel === 'function') window.refreshAIForecastPanel();
             let m = state.currentMonth, days = getDays(m), leftTotal = 0, today = new Date(), simTodayStr = `${YEAR}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-            const EST_CATS = [ { label: '主線調節', budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { label: '爆量加派', budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { label: '店回專車', budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { label: '其他專車', budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { label: '違規罰款', budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, { label: '離島', budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { label: '轉運', budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
+            const EST_CATS = [ { label: '主線調節', budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { label: '爆量加派', budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { label: '店回專車', budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { label: '其他專車', budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { label: '違規罰款', budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, ...Object.keys(NEWBIZ_CATS).map(c => ({ label: c, budgetKey: c, items: BUDGET_MAPPING[c] })), { label: '離島', budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { label: '轉運', budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
 
             let leftData = days.map(d => { let dayCost = 0; EST_CATS.forEach(cat => cat.items.forEach(i => dayCost += Number(getDaily()[d.dateStr]?.[i] || 0))); leftTotal += dayCost; return { dateFull: d.dateStr, dow: DOW_LABELS[d.dow], cost: dayCost, isEstimate: (d.dateStr > simTodayStr) && (dayCost !== 0) }; });
             let totalBudget = 0, totalDiff = 0, rightData = [];
             EST_CATS.forEach(cat => { let b = getBudget()[m]?.[cat.budgetKey] || 0; totalBudget += b; let a = 0; days.forEach(d => { cat.items.forEach(i => { a += Number(getDaily()[d.dateStr]?.[i] || 0); }); }); let diff = a - b; totalDiff += diff; let note = (getComments() && getComments()['monthly_diff'] && getComments()['monthly_diff'][m]) ? (getComments()['monthly_diff'][m][cat.label] || '') : ''; rightData.push({ cat: cat.label, originalCat: cat.label, diff: diff, note: note }); });
 
-            let leftDiff = leftTotal - totalBudget, leftRate = totalBudget ? (leftTotal / totalBudget * 100).toFixed(1) + '%' : '0.0%', maxRows = Math.max(leftData.length + 5, rightData.length + 3); 
+            let leftDiff = leftTotal - totalBudget, leftRate = totalBudget ? (leftTotal / totalBudget * 100).toFixed(1) + '%' : '0.0%', maxRows = Math.max(leftData.length + 5, rightData.length + 3);
             let html = `<thead><tr><th colspan="2" class="sticky-top" style="background:#2F5597; border: 1px solid var(--border-color); text-align:center; font-weight:bold; color:#FFF; padding: 8px;">項目</th><th class="sticky-top" style="background:#2F5597; border: 1px solid var(--border-color); text-align:center; font-weight:bold; color:#FFF; padding: 8px;">費用</th><th class="sticky-top" style="background:transparent; border:none; min-width:20px;"></th><th class="sticky-top" style="background:#2F5597; border: 1px solid var(--border-color); text-align:center; font-weight:bold; color:#FFF; padding: 8px;">差異科目</th><th class="sticky-top" style="background:#2F5597; border: 1px solid var(--border-color); text-align:center; font-weight:bold; color:#FFF; padding: 8px;">費用</th><th class="sticky-top" style="background:#2F5597; border: 1px solid var(--border-color); text-align:left; font-weight:bold; color:#FFF; padding: 8px; width:60%;">說明</th><th class="sticky-top" style="background:#2F5597; border:none; border-bottom: 1px solid var(--border-color); text-align:left; font-weight:bold; color:#FFF; white-space:nowrap; font-size:12px;">←額外項目可自行新增</th></tr></thead><tbody>`;
             let roAttr = window.userRole === 'ro_all' ? 'readonly' : '';
 
@@ -2646,7 +2677,7 @@
                 else lHtml = `<td style="border:none; background:transparent;"></td><td style="border:none; background:transparent;"></td><td style="border:none; background:transparent;"></td>`;
 
                 let rHtml = '';
-                if (i < rightData.length) { let r = rightData[i], color = r.diff < 0 ? 'red' : '#333'; rHtml = `<td style="border:1px solid var(--border-color); text-align:center;">${r.cat}</td><td style="border:1px solid var(--border-color); text-align:right; color:${color}; font-weight:bold;">${formatVal(r.diff, 'cost')}</td><td style="border:1px solid var(--border-color); padding:0;"><input type="text" class="diff-note-cell" data-cat="${r.originalCat}" value="${r.note}" ${roAttr} style="width:100%; border:none; padding:6px 10px; background:transparent; font-size:13px;" placeholder="可輸入說明..."></td><td style="border:none;"></td>`; } 
+                if (i < rightData.length) { let r = rightData[i], color = r.diff < 0 ? 'red' : '#333'; rHtml = `<td style="border:1px solid var(--border-color); text-align:center;">${r.cat}</td><td style="border:1px solid var(--border-color); text-align:right; color:${color}; font-weight:bold;">${formatVal(r.diff, 'cost')}</td><td style="border:1px solid var(--border-color); padding:0;"><input type="text" class="diff-note-cell" data-cat="${r.originalCat}" value="${r.note}" ${roAttr} style="width:100%; border:none; padding:6px 10px; background:transparent; font-size:13px;" placeholder="可輸入說明..."></td><td style="border:none;"></td>`; }
                 else if (i === rightData.length) rHtml = `<td style="border:1px solid var(--border-color); text-align:center; font-weight:bold;">合計</td><td style="border:1px solid var(--border-color); text-align:right; font-weight:bold; background:#E2EFDA; color:${totalDiff < 0 ? 'red' : '#333'};">${formatVal(totalDiff, 'cost')}</td><td style="border:1px solid var(--border-color);"></td><td style="border:none;"></td>`;
                 else if (i === rightData.length + 1) rHtml = `<td colspan="3" style="border:none; border-bottom:1px solid var(--border-color); text-align:left; color:#666; font-size:13px; padding-top:8px;">數值需等於實績差異(綠底)</td><td style="border:none;"></td>`;
                 else rHtml = `<td style="border:none; background:transparent;"></td><td style="border:none; background:transparent;"></td><td style="border:none; background:transparent;"></td><td style="border:none;"></td>`;
@@ -2657,7 +2688,7 @@
 
         window.exportEstActual = () => {
             let m = state.currentMonth, days = getDays(m), leftTotal = 0, today = new Date(), simTodayStr = `${YEAR}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-            const EST_CATS = [ { label: '主線調節', budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { label: '爆量加派', budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { label: '店回專車', budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { label: '其他專車', budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { label: '違規罰款', budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, { label: '離島', budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { label: '轉運', budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
+            const EST_CATS = [ { label: '主線調節', budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { label: '爆量加派', budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { label: '店回專車', budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { label: '其他專車', budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { label: '違規罰款', budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, ...Object.keys(NEWBIZ_CATS).map(c => ({ label: c, budgetKey: c, items: BUDGET_MAPPING[c] })), { label: '離島', budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { label: '轉運', budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
 
             let leftData = days.map(d => { let dayCost = 0; EST_CATS.forEach(cat => cat.items.forEach(i => dayCost += Number(getDaily()[d.dateStr]?.[i] || 0))); leftTotal += dayCost; return { dateFull: d.dateStr, dow: DOW_LABELS[d.dow], cost: dayCost, isEstimate: d.dateStr > simTodayStr }; });
             let totalBudget = 0, totalDiff = 0, rightData = [];
@@ -2701,9 +2732,9 @@
         // ============================================================
         // 🤖 AI 一鍵生成整月預估（依星期別費用起伏 + 歷史類似件數比對推算）
         // ============================================================
-        const AI_FORECAST_COST_ITEMS = ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款','離島費用','轉運費用','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用'];
-        const AI_FORECAST_COUNT_ITEMS = ['預算件數','出貨件數','回收件數','主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店','離島','轉運','上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次'];
-        const AI_FORECAST_DRIVER_MAP = { '主線費用':'主線條數', '爆量費用':'爆量趟次', '爆量自揹費用':'爆量自揹', '回收費用':'回收趟次', '回頭收費用':'回頭收趟次', '其他專車費用':'其他專車', '特殊點專車費用':'特殊點專車', '新開店費用':'新開店', '離島費用':'離島', '轉運費用':'轉運', 'B2C專車費用':'B2C專車趟次', 'B2C回頭費用':'B2C回頭趟次', 'C2C專車費用':'C2C專車趟次', 'C2C回頭費用':'C2C回頭趟次' };
+        const AI_FORECAST_COST_ITEMS = ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款','離島費用','轉運費用','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用', ...NEWBIZ_COST_ITEMS];
+        const AI_FORECAST_COUNT_ITEMS = ['預算件數','出貨件數','回收件數','主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店','離島','轉運','上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次', ...NEWBIZ_COUNT_ITEMS, ...NEWBIZ_TRIP_ITEMS];
+        const AI_FORECAST_DRIVER_MAP = { '主線費用':'主線條數', '爆量費用':'爆量趟次', '爆量自揹費用':'爆量自揹', '回收費用':'回收趟次', '回頭收費用':'回頭收趟次', '其他專車費用':'其他專車', '特殊點專車費用':'特殊點專車', '新開店費用':'新開店', '離島費用':'離島', '轉運費用':'轉運', 'B2C專車費用':'B2C專車趟次', 'B2C回頭費用':'B2C回頭趟次', 'C2C專車費用':'C2C專車趟次', 'C2C回頭費用':'C2C回頭趟次', ...Object.fromEntries(NEWBIZ_TRIP_ITEMS.map(t => [t + '費用', t])) };
         window.__aiForecastCache = window.__aiForecastCache || {}; // { [wh]: { [m]: { forecast, model, monthsUsed, generatedAt, params } } }
 
         function getAIParams() {
@@ -2941,7 +2972,7 @@
             if (!panel) return;
             if (!cache) { panel.style.display = 'none'; if (dlBtn) dlBtn.disabled = true; return; }
 
-            const EST_CATS = [ { budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, { budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
+            const EST_CATS = [ { budgetKey: '主線', items: BUDGET_MAPPING['主線'] }, { budgetKey: '加派車', items: BUDGET_MAPPING['加派車'] }, { budgetKey: '回收車', items: BUDGET_MAPPING['回收車'] }, { budgetKey: '其他', items: BUDGET_MAPPING['其他'] }, { budgetKey: '違規罰款', items: BUDGET_MAPPING['違規罰款'] }, ...Object.keys(NEWBIZ_CATS).map(c => ({ budgetKey: c, items: BUDGET_MAPPING[c] })), { budgetKey: '離島', items: BUDGET_MAPPING['離島'] }, { budgetKey: '轉運', items: BUDGET_MAPPING['轉運'] } ];
             let days = getDays(m), totalBudget = 0, totalForecast = 0, rows = [];
             EST_CATS.forEach(cat => {
                 let b = getBudget()[m]?.[cat.budgetKey] || 0, f = 0;
@@ -3014,9 +3045,9 @@
             if (!cache) { showToast('⚠️ 請先點擊「一鍵生成整月預估」！'); return; }
             let days = getDays(m);
             let forecastGroups = [
-                { name: '【件數統計】', items: ['預算件數','出貨件數','回收件數'] },
-                { name: '【夜配】趟次與數量', items: ['主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店','離島','轉運'] },
-                { name: '【夜配】費用金額', items: ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款','離島費用','轉運費用'], subtotalLabel: '每日小計' },
+                { name: '【件數統計】', items: ['預算件數','出貨件數','回收件數', ...NEWBIZ_COUNT_ITEMS] },
+                { name: '【夜配】趟次與數量', items: ['主線條數','爆量趟次','爆量自揹','回收趟次','回頭收趟次','其他專車','特殊點專車','新開店', ...NEWBIZ_TRIP_ITEMS, '離島','轉運'] },
+                { name: '【夜配】費用金額', items: ['主線費用','爆量費用','爆量自揹費用','回收費用','回頭收費用','其他專車費用','特殊點專車費用','新開店費用','違規罰款', ...NEWBIZ_COST_ITEMS, '離島費用','轉運費用'], subtotalLabel: '每日小計' },
                 { name: '【上收/商流】趟次與費用', items: ['上收申請案件數','B2C件數','C2C件數','B2C專車趟次','B2C回頭趟次','C2C專車趟次','C2C回頭趟次','B2C專車費用','B2C回頭費用','C2C專車費用','C2C回頭費用'], subtotalLabel: '費用合計', subtotalFilter: i => i.includes('費用') }
             ];
             let header = ['營運項目 / 日期', ...days.map(d => `${m}/${parseInt(d.dateStr.split('-')[2])}(${DOW_LABELS[d.dow]})`), '月合計'];
@@ -3071,6 +3102,9 @@
         const BP_DEFAULT_UNITS = { 'EC': '件', '一般商品': '箱', '團預購': '箱', '手揀': '箱', 'POP': '箱' };
         const BP_OTHER_CATS = ['其他', '違規罰款', '離島', '轉運'];
         const BP_CATS = ['主線', '加派車', '回收車', '其他', '違規罰款', '離島', '轉運'];
+        // 🆕 預算編列仍是原本 7 大科目：這裡的「其他」＝其他＋其他-社區取＋其他-醫藥（新業務併在其他大類裡算）
+        function bpCatItems(cat) { return cat === '其他' ? OTHER_BIG_CATS.flatMap(c => BUDGET_MAPPING[c] || []) : (BUDGET_MAPPING[cat] || []); }
+        function bpCatBudget(wh, m, cat) { return (cat === '其他' ? OTHER_BIG_CATS : [cat]).reduce((t, c) => t + bpNum(state.warehouses[wh]?.budget?.[m]?.[c]), 0); }
         const BP_MONTH_DAYS = (y, m) => new Date(y, m, 0).getDate();
         // 預設帶入：115 年度 EC 預算件數（待公司提供 116 實際預算後可直接覆蓋或匯入）
         const BP_EC_DEFAULT = { 1:969409, 2:738955, 3:965224, 4:936225, 5:968595, 6:945488, 7:956195, 8:951158, 9:958463, 10:1003935, 11:1115588, 12:1082326 };
@@ -3305,7 +3339,7 @@
             let today = new Date(), tY = today.getFullYear(), tM = today.getMonth() + 1;
             if (YEAR > tY || (YEAR === tY && m > tM)) return { val: 0, mode: 'none' };
             let sum = 0;
-            days.forEach(d => { (BUDGET_MAPPING[cat] || []).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); }); });
+            days.forEach(d => { bpCatItems(cat).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); }); });
             let rd = bp115ReportedDays(wh, m);
             if (rd.reported >= rd.dim || rd.reported === 0) return { val: sum, mode: sum > 0 ? 'actual' : 'empty' };
             return { val: sum / rd.reported * rd.dim, mode: 'partial' };
@@ -3321,7 +3355,7 @@
             let today = new Date(), tY = today.getFullYear(), tM = today.getMonth() + 1;
             if (YEAR > tY || (YEAR === tY && m > tM)) return { m, mode: 'future', sum: 0, reported: 0, dim: days.length };
             let sum = 0;
-            days.forEach(d => { (BUDGET_MAPPING[cat] || []).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); }); });
+            days.forEach(d => { bpCatItems(cat).forEach(it => { let v = dailyData[d.dateStr]?.[it]; if (v !== undefined && v !== null && v !== '') sum += bpNum(v); }); });
             let rd = bp115ReportedDays(wh, m), reported = rd.reported, dim = rd.dim;
             if (reported >= dim || reported === 0) return { m, mode: sum > 0 ? 'actual' : 'empty', sum, reported, dim };
             return { m, mode: 'partial', sum, reported, dim };
@@ -3352,7 +3386,7 @@
                 if (r.mode === 'future') {
                     futureMonths.push(r.m);
                     let vA = baseDaily !== null ? baseDaily * r.dim : 0;
-                    let vB = bpNum(state.warehouses[wh]?.budget?.[r.m]?.[cat]);
+                    let vB = bpCatBudget(wh, r.m, cat);
                     byA[r.m] = vA; byB[r.m] = vB; totA += vA; totB += vB; fillA += vA; fillB += vB;
                 } else {
                     // 已填滿的月份(含實際為0)與只填一部分的月份：兩版採相同處理
@@ -3367,7 +3401,7 @@
 
         // 其他項目基準：A版=115年逐月實際(未發生/無資料的月份以115核定預算補值)；B版=115年8月實績按天數比例
         function bpOtherBase(wh, m, cat, mode) {
-            let budget = bpNum(state.warehouses[wh]?.budget?.[m]?.[cat]);
+            let budget = bpCatBudget(wh, m, cat);
             if (mode === 'B') {
                 let aug = bp115ActualCat(wh, 8, cat), augDays = getDays(8).length;
                 if (aug.val > 0) return { val: aug.val / augDays * BP_MONTH_DAYS(BP_YEAR, m), src: '8月實績' };
@@ -3492,7 +3526,7 @@
             let cmp = {}, cmpMeta = { baseMonth: null, futureMonths: [], hasPartial: false };
             BP_CATS.forEach(cat => {
                 let b115 = 0;
-                for (let m = 1; m <= 12; m++) b115 += bpNum(state.warehouses[wh]?.budget?.[m]?.[cat]);
+                for (let m = 1; m <= 12; m++) b115 += bpCatBudget(wh, m, cat);
                 let ya = bp115YearActual(wh, cat);
                 cmp[cat] = { budget115: Math.round(b115), actualA: ya.totalA, actualB: ya.totalB, actual115: ya.totalA,
                     common: ya.common, fillA: ya.fillA, fillB: ya.fillB, byA: ya.byA, byB: ya.byB };
@@ -4566,7 +4600,7 @@
 
         function handleExcelImport(e) {
             let r = new FileReader(); r.onload = e => {
-                let nb={}, wb=XLSX.read(new Uint8Array(e.target.result), {type:'array'}); for(let m=1;m<=12;m++) nb[m]={'主線':0,'加派車':0,'回收車':0,'其他':0,'違規罰款':0,'離島':0,'轉運':0,'預算件數':0};
+                let nb={}, wb=XLSX.read(new Uint8Array(e.target.result), {type:'array'}); for(let m=1;m<=12;m++) nb[m]={'主線':0,'加派車':0,'回收車':0,'其他':0,'違規罰款':0,'其他-社區取':0,'其他-醫藥':0,'離島':0,'轉運':0,'預算件數':0};
                 let parsedDailyTarget = {}, targetWh = window.targetBudgetWarehouse || window.currentWarehouse; 
 
                 wb.SheetNames.forEach(n => { 
@@ -4574,7 +4608,7 @@
                     sheetData.forEach((row, rIdx) => {
                         for(let i=0; i<row.length; i++) { 
                             let c=String(row[i]||'').trim();
-                            let cat = c.includes('主線') ? '主線' : c.includes('爆量') || c.includes('加派') ? '加派車' : c.includes('回收') || c.includes('回頭') ? '回收車' : c.includes('離島') ? '離島' : c.includes('轉運') ? '轉運' : c.includes('特殊') || c.includes('新開店') || c.includes('其他') ? '其他' : c.includes('罰款') || c.includes('違規') ? '違規罰款' : c.includes('預算件數') ? '預算件數' : null;
+                            let cat = c.includes('社區取') ? '其他-社區取' : /醫藥|\(醫\)|（醫）/.test(c) ? '其他-醫藥' : c.includes('主線') ? '主線' : c.includes('爆量') || c.includes('加派') ? '加派車' : c.includes('回收') || c.includes('回頭') ? '回收車' : c.includes('離島') ? '離島' : c.includes('轉運') ? '轉運' : c.includes('特殊') || c.includes('新開店') || c.includes('其他') ? '其他' : c.includes('罰款') || c.includes('違規') ? '違規罰款' : c.includes('預算件數') ? '預算件數' : null;
                             if(cat) { let nums=[]; for(let j=i+1;j<row.length;j++) { let parsed = parseFloat(String(row[j]||'').replace(/[,%]/g, '')); if(!isNaN(parsed)) nums.push(parsed); } if(nums.length>=12) { for(let m=1;m<=12;m++) nb[m][cat]+=nums[m-1]; } else if(nums.length>0) { if(mth) nb[mth][cat]+=nums[0]; else for(let m=1;m<=12;m++) nb[m][cat]+=nums[0]; } }
                             if(c.includes('推估件數')) {
                                 for(let j=i+1; j<row.length; j++) {
@@ -4650,6 +4684,13 @@
 
                 let cnt = 0, tempData = { '大肚': {}, '大溪': {}, '岡山': {} }, skippedRows = new Set(), validDates = new Set();
                 let trackingItems = ['爆量自揹', '爆量自揹費用', '爆量趟次', '爆量費用', '回收趟次', '回收費用', '回頭收趟次', '回頭收費用', 'B2C回頭趟次', 'B2C回頭費用', 'B2C專車趟次', 'B2C專車費用', 'C2C回頭趟次', 'C2C回頭費用', 'C2C專車趟次', 'C2C專車費用', '特殊點專車', '特殊點專車費用', '新開店', '新開店費用', '違規罰款', '其他專車', '其他專車費用', '離島', '離島費用', '轉運', '轉運費用'];
+                // 🆕 新業務（社區取／醫藥）：派車原因、計價方式或配送項目有「社區取」「醫藥」字眼就自動歸類。
+                //    只有檔案裡真的有新業務資料時，才會把這幾格「先歸零再重算」——避免舊格式的 MIS 檔把手動登錄的新業務數字清掉。
+                let rowTxt = (row) => [reasonIdx, typeIdx, itemIdx].filter(ix => ix !== -1).map(ix => String(row[ix] || '')).join(' ');
+                let isNewBizTxt = (t) => t.includes('社區取') || /醫藥|\(醫\)|（醫）/.test(t);
+                let fileHasNewBiz = js.slice(1).some(row => row && isNewBizTxt(rowTxt(row)));
+                if (fileHasNewBiz) trackingItems = trackingItems.concat(NEWBIZ_TRIP_ITEMS, NEWBIZ_COST_ITEMS);
+                let medNoClient = 0;
 
                 for (let i = 1; i < js.length; i++) {
                     let row = js[i]; if (!row || row.length === 0) continue;
@@ -4669,7 +4710,12 @@
 
                     if (dateStr && reason) {
                         let tripItem = '', costItem = '', isB2C = itemStr.includes('B2C') || reason.includes('B2C'), isC2C = itemStr.includes('C2C') || reason.includes('C2C');
-                        if (reason.includes('爆量')) { if (typeStr.includes('回頭收') || typeStr.includes('自揹') || typeStr.includes('自背')) { tripItem = '爆量自揹'; costItem = '爆量自揹費用'; } else { tripItem = '爆量趟次'; costItem = '爆量費用'; } } 
+                        let nbTxt = rowTxt(row), nbTrip = '', nbSkip = false;
+                        if (nbTxt.includes('社區取')) nbTrip = nbTxt.includes('點位') ? '【社區取-點位】' : '【社區取-專車】';
+                        else if (/醫藥|\(醫\)|（醫）/.test(nbTxt)) { let c = nbTxt.includes('正光') ? '正光' : /佑銓|佑全/.test(nbTxt) ? '佑銓' : nbTxt.includes('大樹') ? '大樹' : ''; if (c) nbTrip = '(醫)-' + c; else { nbSkip = true; medNoClient++; } }
+                        if (nbSkip) { /* 醫藥但沒寫是哪一家：不匯入，最後提醒 */ }
+                        else if (nbTrip) { tripItem = nbTrip; costItem = nbTrip + '費用'; }
+                        else if (reason.includes('爆量')) { if (typeStr.includes('回頭收') || typeStr.includes('自揹') || typeStr.includes('自背')) { tripItem = '爆量自揹'; costItem = '爆量自揹費用'; } else { tripItem = '爆量趟次'; costItem = '爆量費用'; } } 
                         else if (reason.includes('店回') || reason.includes('回收')) { tripItem = '回收趟次'; costItem = '回收費用'; } 
                         else if (reason.includes('回頭收')) { tripItem = '回頭收趟次'; costItem = '回頭收費用'; } 
                         else if (reason.includes('上收') || isB2C || isC2C) {
@@ -4693,16 +4739,41 @@
                     if (cnt > 0) { state.lastModified = Date.now(); window.saveData(true, true); renderAll(); }
                     let msg = cnt > 0 ? `✅ MIS明細匯入成功！共更新 ${cnt} 個項目。` : `⚠️ 本月沒有屬於【${window.currentWarehouse}倉】的資料。`;
                     if (skippedRows.size > 0) { msg += `\n(已自動攔截並略過 ${skippedRows.size} 筆非本倉資料)`; showToast(msg, 5000); } else showToast(msg);
+                    // 這個提醒用彈出視窗：提示列會被緊接著的「已同步至雲端」蓋掉，使用者可能看不到
+                    if (medNoClient > 0) alert(`⚠️ MIS 檔裡有 ${medNoClient} 筆「醫藥」派車沒有寫是正光／佑銓／大樹，這幾筆沒有匯入，請手動登錄到日別表。`);
                 } else showToast(`⚠️ 找不到符合本月的派車資料，請確認檔案內容。`);
                 document.getElementById('dispatchExcelFile').value = '';
             }; r.readAsArrayBuffer(e.target.files[0]);
         }
 
-        function findItem(s, items) { 
-            s=(s||'').replace(/[ \(\)（）\n]/g,''); if(!s) return null; 
-            let ex=items.find(i=>i===s); if(ex) return ex; 
-            if(/日配|預算|達成|目標|去年|差異/.test(s)&&!s.includes('件數')) return null; 
+        // 🆕 新業務項目辨識：社區取（送／收／點位／專車）、醫藥（正光／佑銓／大樹）。
+        //    回傳項目名稱；字眼不夠判斷時回傳 null（不匯入，避免放錯格子）；不是新業務則回傳 undefined。
+        function newBizItemOf(s, isC) {
+            s = String(s || '');
+            if (s.includes('社區取')) {
+                if (s.includes('點位')) return isC ? '【社區取-點位】費用' : '【社區取-點位】';
+                if (s.includes('專車')) return isC ? '【社區取-專車】費用' : '【社區取-專車】';
+                if (!isC && s.includes('送')) return '【社區取-送】';
+                if (!isC && s.includes('收')) return '【社區取-收】';
+                return null;
+            }
+            let isMed = /醫藥|醫-|^醫/.test(s);
+            if (isMed || /正光|佑銓|佑全|大樹/.test(s)) {
+                let c = s.includes('正光') ? '正光' : /佑銓|佑全/.test(s) ? '佑銓' : s.includes('大樹') ? '大樹' : '';
+                if (c) return isC ? `(醫)-${c}費用` : `(醫)-${c}`;
+                return isMed ? null : undefined;
+            }
+            return undefined;
+        }
+        window.__newBizItemOf = newBizItemOf;
+
+        function findItem(s, items) {
+            s=(s||'').replace(/[ \(\)（）\n]/g,''); if(!s) return null;
+            let ex=items.find(i=>i===s || i.replace(/[ \(\)（）\n\r]/g,'')===s); if(ex) return ex;
+            if(/日配|預算|達成|目標|去年|差異/.test(s)&&!s.includes('件數')) return null;
             let isC=/費用|運費|金額|成本/.test(s), isI=/件數/.test(s);
+            // 新業務放在最前面判斷，避免被下面「轉運」「回收」等舊規則搶走
+            let nb = newBizItemOf(s, isC); if (nb !== undefined) return nb;
             if(/B2C|上收/.test(s)&&!s.includes('C2C')) return isC?(s.includes('回頭')?'B2C回頭費用':'B2C專車費用'):(isI?'B2C件數':(s.includes('回頭')?'B2C回頭趟次':'B2C專車趟次'));
             if(s.includes('C2C')) return isC?(s.includes('回頭')?'C2C回頭費用':'C2C專車費用'):(isI?'C2C件數':(s.includes('回頭')?'C2C回頭趟次':'C2C專車趟次'));
             if(s.includes('全台共配')) return s.includes('準點')?'全台共配準點率':(s.includes('簽到')?'全台共配簽到率':null);
@@ -4814,7 +4885,7 @@
                     totals['主線'] += Number(dailyData['主線費用'] || 0); 
                     totals['爆量'] += Number(dailyData['爆量費用'] || 0) + Number(dailyData['爆量自揹費用'] || 0); 
                     totals['回收'] += Number(dailyData['回收費用'] || 0) + Number(dailyData['回頭收費用'] || 0); 
-                    totals['其他'] += Number(dailyData['其他專車費用'] || 0) + Number(dailyData['特殊點專車費用'] || 0) + Number(dailyData['新開店費用'] || 0); 
+                    totals['其他'] += Number(dailyData['其他專車費用'] || 0) + Number(dailyData['特殊點專車費用'] || 0) + Number(dailyData['新開店費用'] || 0) + NEWBIZ_COST_ITEMS.reduce((a, it) => a + Number(dailyData[it] || 0), 0);   // 🆕 社區取／醫藥歸在「其他」
                     totals['罰款'] += Number(dailyData['違規罰款'] || 0); 
                     totals['離島'] += Number(dailyData['離島費用'] || 0); 
                     totals['轉運'] += Number(dailyData['轉運費用'] || 0); 
@@ -6057,11 +6128,12 @@ setInterval(() => {
         return null;
     };
 
-    window.findItem = function(s, items) { 
-        s = (s||'').replace(/[ \(\)（）\n\r]/g,''); if(!s) return null; 
-        let ex = items.find(i=>i===s); if(ex) return ex; 
-        if(/日配|預算|達成|目標|去年|差異/.test(s) && !s.includes('件數')) return null; 
+    window.findItem = function(s, items) {
+        s = (s||'').replace(/[ \(\)（）\n\r]/g,''); if(!s) return null;
+        let ex = items.find(i => i === s || i.replace(/[ \(\)（）\n\r]/g, '') === s); if(ex) return ex;
+        if(/日配|預算|達成|目標|去年|差異/.test(s) && !s.includes('件數')) return null;
         let isC = /費用|運費|金額|成本/.test(s), isI = /件數/.test(s);
+        if (typeof window.__newBizItemOf === 'function') { let nb = window.__newBizItemOf(s, isC); if (nb !== undefined) return nb; }   // 🆕 社區取／醫藥
         if(/B2C|上收/.test(s) && !s.includes('C2C')) return isC?(s.includes('回頭')?'B2C回頭費用':'B2C專車費用'):(isI?'B2C件數':(s.includes('回頭')?'B2C回頭趟次':'B2C專車趟次'));
         if(s.includes('C2C')) return isC?(s.includes('回頭')?'C2C回頭費用':'C2C專車費用'):(isI?'C2C件數':(s.includes('回頭')?'C2C回頭趟次':'C2C專車趟次'));
         if(s.includes('夜配') && s.includes('簽到')) return '夜配簽到率';
@@ -6349,7 +6421,9 @@ setInterval(() => {
                 "主線條數", "爆量趟次", "爆量自揹", "回收趟次", "回頭收趟次", "其他專車", "特殊點專車", "新開店", "離島", "轉運",
                 "主線費用", "爆量費用", "爆量自揹費用", "回收費用", "回頭收費用", "其他專車費用", "特殊點專車費用", "新開店費用", "違規罰款",
                 "上收申請案件數", "B2C件數", "C2C件數", "B2C專車趟次", "B2C回頭趟次", "C2C專車趟次", "C2C回頭趟次", "B2C專車費用", "B2C回頭費用", "C2C專車費用", "C2C回頭費用",
-                "特殊專車準點率", "特殊專車簽到率", "全台共配準點率", "全台共配簽到率", "夜配準點率", "夜配簽到率"
+                "特殊專車準點率", "特殊專車簽到率", "全台共配準點率", "全台共配簽到率", "夜配準點率", "夜配簽到率",
+                "【社區取-送】", "【社區取-收】", "【社區取-點位】", "【社區取-專車】", "(醫)-正光", "(醫)-佑銓", "(醫)-大樹",
+                "【社區取-點位】費用", "【社區取-專車】費用", "(醫)-正光費用", "(醫)-佑銓費用", "(醫)-大樹費用"
             ];
             
             let cnt = 0;
@@ -6715,6 +6789,7 @@ setInterval(() => {
             let vendorCol = getIdx(['配送商', '配送廠商']);
             let reasonCol = getIdx(['派車原因']);
             let typeCol = getIdx(['計價方式', '計價級距']);
+            let itemCol = getIdx(['配送項目']);   // 🆕 用來辨識社區取／醫藥
             let priceCol = getIdx(['單價']);
             let tripCol = getIdx(['趟數', '趟次']);
             let costCol = getIdx(['費用小計', '總計', '金額']);
@@ -6750,7 +6825,11 @@ setInterval(() => {
                     if (cost === 0 && trips === 0) continue; 
                     
                     let mainCat = '';
-                    if (reason.includes('上收') || reason.includes('B2C') || reason.includes('C2C')) mainCat = '上收';
+                    // 🆕 新業務：派車原因／計價方式／配送項目有「社區取」「醫藥」字眼 → 獨立辨識（廠商每日統計歸在「其他」欄）
+                    let nbTxt = reason + ' ' + typeStr + ' ' + (itemCol ? String(row[itemCol] || '') : '');
+                    if (nbTxt.includes('社區取')) { mainCat = '社區取'; typeStr = nbTxt.includes('點位') ? '點位' : '專車'; }
+                    else if (/醫藥|\(醫\)|（醫）/.test(nbTxt)) { mainCat = '醫藥'; let c = nbTxt.includes('正光') ? '正光' : /佑銓|佑全/.test(nbTxt) ? '佑銓' : nbTxt.includes('大樹') ? '大樹' : ''; if (c) typeStr = c; }
+                    else if (reason.includes('上收') || reason.includes('B2C') || reason.includes('C2C')) mainCat = '上收';
                     else if (reason.includes('回頭收') || reason.includes('店回') || reason.includes('回收')) mainCat = '回頭收';
                     else if (reason.includes('特殊')) mainCat = '特殊點專車';
                     else if (reason.includes('新開店') || typeStr.includes('新開店')) mainCat = '新開店';
@@ -6787,7 +6866,7 @@ setInterval(() => {
                     else if (mainCat === '回頭收') legacyCat = '回收';
                     else if (mainCat === '特殊點專車') legacyCat = '特殊專車';
                     else if (mainCat === '違規罰款') legacyCat = '罰款';
-                    else if (mainCat === '新開店' || mainCat === '其他專車') legacyCat = '其他';
+                    else if (mainCat === '新開店' || mainCat === '其他專車' || mainCat === '社區取' || mainCat === '醫藥') legacyCat = '其他';
                     else legacyCat = mainCat;
 
                     if (legacyCat) {
@@ -7078,7 +7157,9 @@ setInterval(() => {
         let getCleanLabel = (mainCat, typeStr, price) => {
             let m = (mainCat || '').trim(); let t = (typeStr || '').trim(); let p = Number(price) || 0;
             let combined = m + t; let range = '';
-            
+            // 🆕 新業務先判斷：不要被下面「依單價對應里程級距」的規則併到一般加派車
+            if (m === '社區取' || m === '醫藥') return m + (t ? ' (' + t + ')' : '');
+
             if (p === 1590 || combined.includes('100km') || combined.includes('100公里') || combined.includes('以內')) range = '100km以內';
             else if (p === 1715 || combined.includes('101-150')) range = '101-150km';
             else if (p === 1840 || combined.includes('151-200')) range = '151-200km';
@@ -7134,7 +7215,7 @@ setInterval(() => {
                     let cleanLabel = getCleanLabel(cat, type, p);
                     let poolKey = cleanLabel + '_' + p;
 
-                    if (cat === '上收') {
+                    if (cat === '上收' || cat === '社區取' || cat === '醫藥') {   // 🆕 社區取／醫藥列在「三、其他費用」
                         if (!sec3Pool[poolKey]) sec3Pool[poolKey] = { label: cleanLabel, price: p, trips: 0, cost: 0, color: '' };
                         sec3Pool[poolKey].trips += dt.trips; sec3Pool[poolKey].cost += dt.cost;
                     } else {
@@ -7350,6 +7431,67 @@ setInterval(() => {
 
     if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAll); } else { initAll(); }
 
+})();
+</script>
+<script>
+// 🆕 浮動左右捲軸（所有頁籤共用）：表格區塊比畫面長、底部的左右捲軸跑到畫面外時，
+//    在視窗最下方顯示一條跟表格同步的左右捲軸，不用先捲到最下面才能左右拉。
+//    表格底部的捲軸已經看得到時自動收起；手機／平板直接用手指滑，不顯示。只負責捲動，不碰任何資料。
+(function () {
+    if (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+    var SEL = '.tab-content.active .table-container, .tab-content.active .bp-scroll';
+    var bar = null, inner = null, target = null, timer = 0, lock = null, lockTimer = 0;
+    // 記住這一波捲動是誰先動的（拉浮動捲軸 or 直接捲表格），另一邊跟著動時不再回寫，避免互相拉扯
+    function setLock(src) { lock = src; clearTimeout(lockTimer); lockTimer = setTimeout(function () { lock = null; }, 150); }
+    function ensureBar() {
+        if (bar) return;
+        bar = document.createElement('div'); bar.id = 'floatHScroll'; bar.title = '左右拉動表格';
+        inner = document.createElement('div'); bar.appendChild(inner);
+        document.body.appendChild(bar);
+        bar.addEventListener('scroll', function () {
+            if (!target || lock === 'table') return;
+            setLock('bar');
+            if (Math.abs(target.scrollLeft - bar.scrollLeft) >= 1) target.scrollLeft = bar.scrollLeft;
+        });
+    }
+    // 找出「上半部在畫面內、底部（原本的左右捲軸）在畫面外」而且需要左右捲動的表格區塊
+    function pick() {
+        var vh = window.innerHeight || document.documentElement.clientHeight;
+        var list = document.querySelectorAll(SEL);
+        for (var i = 0; i < list.length; i++) {
+            var el = list[i];
+            if (!el.offsetParent || el.scrollWidth - el.clientWidth < 2) continue;
+            var ox = getComputedStyle(el).overflowX; if (ox !== 'auto' && ox !== 'scroll') continue;   // 本身不能左右捲的區塊跳過
+            var r = el.getBoundingClientRect();
+            if (r.top < vh - 60 && r.bottom > vh + 1) return { el: el, r: r };
+        }
+        return null;
+    }
+    function update() {
+        timer = 0;
+        if (!document.body) return;
+        ensureBar();
+        var hit = pick();
+        if (!hit) { target = null; if (bar.style.display !== 'none') bar.style.display = 'none'; return; }
+        var el = hit.el, r = hit.r, fresh = (target !== el) || bar.style.display !== 'block';
+        target = el;
+        bar.style.left = (r.left + el.clientLeft) + 'px';
+        bar.style.width = el.clientWidth + 'px';
+        inner.style.width = el.scrollWidth + 'px';
+        if (bar.style.display !== 'block') bar.style.display = 'block';
+        // 只有剛出現、或換到另一個表格時才對齊位置；平常的拖拉由上面的同步處理
+        if (fresh && Math.abs(bar.scrollLeft - el.scrollLeft) >= 1) { setLock('table'); bar.scrollLeft = el.scrollLeft; }
+    }
+    function schedule() { if (!timer) timer = setTimeout(update, 30); }
+    document.addEventListener('scroll', function (e) {
+        if (bar && e.target === bar) return;
+        if (bar && target && e.target === target && lock !== 'bar' && Math.abs(bar.scrollLeft - target.scrollLeft) >= 1) { setLock('table'); bar.scrollLeft = target.scrollLeft; }
+        schedule();
+    }, true);
+    window.addEventListener('resize', schedule);
+    document.addEventListener('click', function () { setTimeout(schedule, 80); }, true);
+    setInterval(schedule, 700);   // 切換頁籤、月份、資料載入後表格變寬變窄時跟著更新
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', schedule); else schedule();
 })();
 </script>
 </body>
